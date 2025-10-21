@@ -11,6 +11,7 @@ import apiService from '../services/api.service';
 interface UseVideoRoomOptions {
   identity: string;
   roomName: string;
+  role?: 'doctor' | 'patient';
 }
 
 interface UseVideoRoomReturn {
@@ -31,6 +32,7 @@ interface UseVideoRoomReturn {
 export const useVideoRoom = ({
   identity,
   roomName,
+  role,
 }: UseVideoRoomOptions): UseVideoRoomReturn => {
   const [room, setRoom] = useState<Room | null>(null);
   const [localParticipant, setLocalParticipant] = useState<LocalParticipant | null>(null);
@@ -65,6 +67,15 @@ export const useVideoRoom = ({
       setRoom(connectedRoom);
       setLocalParticipant(connectedRoom.localParticipant);
       setIsConnected(true);
+
+      // Registrar conexión para reportes (si se proporcionó rol)
+      if (role) {
+        try {
+          await apiService.trackParticipantConnected(roomName, identity, role);
+        } catch (err) {
+          console.error('Error tracking participant connection:', err);
+        }
+      }
 
       // Agregar participantes remotos existentes
       connectedRoom.participants.forEach((participant) => {
@@ -102,17 +113,26 @@ export const useVideoRoom = ({
     } finally {
       setIsConnecting(false);
     }
-  }, [identity, roomName]);
+  }, [identity, roomName, role]);
 
   const disconnectFromRoom = useCallback(() => {
     if (room) {
+      // Registrar desconexión para reportes (si se proporcionó rol)
+      if (role) {
+        try {
+          apiService.trackParticipantDisconnected(roomName, identity);
+        } catch (err) {
+          console.error('Error tracking participant disconnection:', err);
+        }
+      }
+
       room.disconnect();
       setRoom(null);
       setLocalParticipant(null);
       setRemoteParticipants(new Map());
       setIsConnected(false);
     }
-  }, [room]);
+  }, [room, role, roomName, identity]);
 
   const toggleAudio = useCallback(() => {
     if (localParticipant) {

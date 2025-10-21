@@ -63,6 +63,31 @@ class ApiService {
     const response = await this.client.get(`/api/video/rooms/${roomName}/participants`);
     return response.data.data;
   }
+
+  /**
+   * Registrar que un participante se conectó (para reportes)
+   */
+  async trackParticipantConnected(
+    roomName: string,
+    identity: string,
+    role: 'doctor' | 'patient'
+  ): Promise<void> {
+    await this.client.post('/api/video/events/participant-connected', {
+      roomName,
+      identity,
+      role,
+    });
+  }
+
+  /**
+   * Registrar que un participante se desconectó (para reportes)
+   */
+  async trackParticipantDisconnected(roomName: string, identity: string): Promise<void> {
+    await this.client.post('/api/video/events/participant-disconnected', {
+      roomName,
+      identity,
+    });
+  }
 }
 
 export default new ApiService();

@@ -5,10 +5,11 @@ import { VideoControls } from './VideoControls';
 interface VideoRoomProps {
   identity: string;
   roomName: string;
+  role?: 'doctor' | 'patient';
   onLeave?: () => void;
 }
 
-export const VideoRoom = ({ identity, roomName, onLeave }: VideoRoomProps) => {
+export const VideoRoom = ({ identity, roomName, role, onLeave }: VideoRoomProps) => {
   const {
     localParticipant,
     remoteParticipants,
@@ -21,7 +22,7 @@ export const VideoRoom = ({ identity, roomName, onLeave }: VideoRoomProps) => {
     toggleVideo,
     isAudioEnabled,
     isVideoEnabled,
-  } = useVideoRoom({ identity, roomName });
+  } = useVideoRoom({ identity, roomName, role });
 
   const handleLeave = () => {
     disconnectFromRoom();

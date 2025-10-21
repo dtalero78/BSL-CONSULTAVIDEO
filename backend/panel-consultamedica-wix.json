@@ -220,9 +220,6 @@ async function modificarHistoriaClinica() {
             }
         }
 
-        // 📊 Enviar reporte de consulta completada por WhatsApp
-        await enviarReporteConsulta(updatedItem);
-
         wixWindow.lightbox.close();
     } catch (error) {
         console.error("Error actualizando el registro:", error);
@@ -272,65 +269,6 @@ async function handleSITELorKM2Case(item) {
         telefonoConPrefijo,
         `Hola! Estás realizando el examen médico de ${empresaNombre} con nosotros. Debes terminar el siguiente link *urgente*: \n\nhttp://www.bsl.com.co/historia-clinica/${item.numeroId}`
     );
-}
-
-/**
- * 📊 Enviar reporte detallado de consulta completada
- */
-async function enviarReporteConsulta(item) {
-    const timestamp = new Date().toLocaleString('es-CO', {
-        timeZone: 'America/Bogota',
-        hour12: false
-    });
-
-    // Construir reporte detallado
-    let reporte = `📋 *CONSULTA COMPLETADA*\n`;
-    reporte += `📅 ${timestamp}\n\n`;
-
-    // Información del Paciente
-    reporte += `👤 *PACIENTE*\n`;
-    reporte += `• Nombre: ${item.primerNombre} ${item.primerApellido}\n`;
-    reporte += `• Documento: ${item.numeroId}\n`;
-    reporte += `• Celular: ${item.celular || 'No registrado'}\n\n`;
-
-    // Información de la Empresa y Examen
-    reporte += `🏢 *EMPRESA Y EXAMEN*\n`;
-    reporte += `• Empresa: ${item.codEmpresa}\n`;
-    reporte += `• Tipo Examen: ${item.tipoExamen || 'No especificado'}\n`;
-    reporte += `• Cargo: ${item.cargo || 'No especificado'}\n\n`;
-
-    // Información Médica
-    reporte += `⚕️ *MÉDICO*\n`;
-    reporte += `• Código: ${codEmpresa}\n\n`;
-
-    // Datos Clínicos
-    reporte += `📊 *DATOS CLÍNICOS*\n`;
-    reporte += `• Talla: ${item.talla || 'N/A'}\n`;
-    reporte += `• Peso: ${item.peso || 'N/A'}\n`;
-    if (item.mdConceptoFinal) {
-        reporte += `• Concepto: ${item.mdConceptoFinal}\n`;
-    }
-
-    // Diagnósticos
-    if (item.mdDx1 || item.mdDx2) {
-        reporte += `\n🔍 *DIAGNÓSTICOS*\n`;
-        if (item.mdDx1) reporte += `• DX1: ${item.mdDx1}\n`;
-        if (item.mdDx2) reporte += `• DX2: ${item.mdDx2}\n`;
-    }
-
-    // Observaciones importantes
-    if (item.mdObservacionesCertificado) {
-        reporte += `\n📝 *OBSERVACIONES*\n`;
-        reporte += `${item.mdObservacionesCertificado.substring(0, 200)}${item.mdObservacionesCertificado.length > 200 ? '...' : ''}\n`;
-    }
-
-    try {
-        // Enviar al número del administrador
-        await sendTextMessage('573008021701', reporte);
-        console.log('✅ Reporte de consulta enviado');
-    } catch (error) {
-        console.error('❌ Error enviando reporte de consulta:', error);
-    }
 }
 
 $w.onReady(async function () {

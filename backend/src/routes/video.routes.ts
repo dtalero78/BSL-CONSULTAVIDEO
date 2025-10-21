@@ -18,4 +18,8 @@ router.post(
   videoController.disconnectParticipant
 );
 
+// Tracking de sesiones para reportes
+router.post('/events/participant-connected', videoController.trackParticipantConnected);
+router.post('/events/participant-disconnected', videoController.trackParticipantDisconnected);
+
 export default router;

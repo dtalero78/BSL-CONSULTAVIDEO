@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import twilioService from '../services/twilio.service';
+import { sessionTracker } from '../services/session-tracker.service';
 
 class VideoController {
   /**
@@ -157,6 +158,75 @@ class VideoController {
       console.error('Error disconnecting participant:', error);
       res.status(500).json({
         error: 'Failed to disconnect participant',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  /**
+   * Registrar que un participante se conectó
+   * POST /api/video/events/participant-connected
+   * Body: { roomName: string, identity: string, role: 'doctor' | 'patient' }
+   */
+  async trackParticipantConnected(req: Request, res: Response): Promise<void> {
+    try {
+      const { roomName, identity, role } = req.body;
+
+      if (!roomName || !identity || !role) {
+        res.status(400).json({
+          error: 'roomName, identity, and role are required',
+        });
+        return;
+      }
+
+      if (role !== 'doctor' && role !== 'patient') {
+        res.status(400).json({
+          error: 'role must be either "doctor" or "patient"',
+        });
+        return;
+      }
+
+      sessionTracker.trackParticipantConnected(roomName, identity, role);
+
+      res.status(200).json({
+        success: true,
+        message: 'Participant connection tracked',
+      });
+    } catch (error) {
+      console.error('Error tracking participant connection:', error);
+      res.status(500).json({
+        error: 'Failed to track participant connection',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  /**
+   * Registrar que un participante se desconectó
+   * POST /api/video/events/participant-disconnected
+   * Body: { roomName: string, identity: string }
+   */
+  async trackParticipantDisconnected(req: Request, res: Response): Promise<void> {
+    try {
+      const { roomName, identity } = req.body;
+
+      if (!roomName || !identity) {
+        res.status(400).json({
+          error: 'roomName and identity are required',
+        });
+        return;
+      }
+
+      sessionTracker.trackParticipantDisconnected(roomName, identity);
+
+      res.status(200).json({
+        success: true,
+        message: 'Participant disconnection tracked',
+      });
+    } catch (error) {
+      console.error('Error tracking participant disconnection:', error);
+      res.status(500).json({
+        error: 'Failed to track participant disconnection',
         message: error instanceof Error ? error.message : 'Unknown error',
       });
     }

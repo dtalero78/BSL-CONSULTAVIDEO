@@ -37,6 +37,7 @@ export const PatientPage = () => {
       <VideoRoom
         identity={patientName}
         roomName={roomName}
+        role="patient"
         onLeave={handleLeaveCall}
       />
     );
