@@ -90,6 +90,10 @@ Asegúrate de permitir el acceso a tu cámara y micrófono cuando el navegador t
             // Formatear teléfono para sendTextMessage (sin el prefijo +)
             const telefonoSinPrefijo = telefonoConPrefijo.substring(1);
 
+            // Mostrar estado de envío
+            $w('#estadoWhp').text = "📤 ENVIANDO LINK...";
+            $w('#estadoWhp').show();
+
             // Enviar mensaje de WhatsApp usando la API de backend
             try {
                 await sendTextMessage(telefonoSinPrefijo, mensajeVideollamada);
@@ -97,13 +101,11 @@ Asegúrate de permitir el acceso a tu cámara y micrófono cuando el navegador t
 
                 // Actualizar el campo de texto para indicar que el mensaje fue enviado
                 $w('#estadoWhp').text = "✅ MENSAJE ENVIADO";
-                $w('#estadoWhp').show();
             } catch (error) {
                 console.error("Error enviando mensaje de videollamada:", error);
 
                 // Mostrar error en el campo de texto
                 $w('#estadoWhp').text = "❌ ERROR AL ENVIAR";
-                $w('#estadoWhp').show();
             }
         });
 

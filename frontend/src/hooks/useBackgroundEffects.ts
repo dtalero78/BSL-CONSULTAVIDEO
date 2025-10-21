@@ -46,11 +46,11 @@ export const useBackgroundEffects = (): UseBackgroundEffectsReturn => {
         await track.removeProcessor(processor);
       }
 
-      // Crear y aplicar blur
+      // Crear y aplicar blur usando CDN de Twilio
       const blurProcessor = new GaussianBlurBackgroundProcessor({
-        assetsPath: 'https://my-server-path.com/assets',
-        maskBlurRadius: 10,
-        blurFilterRadius: 10,
+        assetsPath: 'https://sdk.twilio.com/js/video-processors/2.8.0/build',
+        maskBlurRadius: 15,
+        blurFilterRadius: 15,
       });
 
       await blurProcessor.loadModel();
@@ -79,6 +79,7 @@ export const useBackgroundEffects = (): UseBackgroundEffectsReturn => {
 
       // Crear imagen de fondo
       const img = new Image();
+      img.crossOrigin = 'anonymous';
       img.src = imageUrl;
 
       await new Promise((resolve, reject) => {
@@ -86,9 +87,9 @@ export const useBackgroundEffects = (): UseBackgroundEffectsReturn => {
         img.onerror = reject;
       });
 
-      // Crear y aplicar virtual background
+      // Crear y aplicar virtual background usando CDN de Twilio
       const virtualBgProcessor = new VirtualBackgroundProcessor({
-        assetsPath: 'https://my-server-path.com/assets',
+        assetsPath: 'https://sdk.twilio.com/js/video-processors/2.8.0/build',
         backgroundImage: img,
         maskBlurRadius: 5,
       });
