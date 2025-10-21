@@ -6,6 +6,39 @@ import { sendTextMessage } from 'backend/WHATSAPP';
 let documento = wixStorage.local.getItem("documentoParaLightbox");
 let codEmpresa = wixStorage.local.getItem("codEmpresaParaLightbox");
 
+// ==================================================
+// CONFIGURACION DE VIDEOLLAMADAS
+// ==================================================
+const VIDEO_APP_DOMAIN = 'https://bsl-consultavideo-58jne.ondigitalocean.app';
+
+/**
+ * Genera un nombre único para la sala de video
+ */
+function generarNombreSala() {
+    const timestamp = Date.now().toString(36);
+    const random = Math.random().toString(36).substring(2, 7);
+    return `consulta-${timestamp}-${random}`;
+}
+
+/**
+ * Construye el link de videollamada para el paciente
+ */
+function construirLinkVideollamada(roomName, nombre, apellido, codMedico) {
+    const params = new URLSearchParams({
+        nombre: nombre.trim(),
+        apellido: apellido.trim(),
+        doctor: codMedico.trim()
+    });
+    return `${VIDEO_APP_DOMAIN}/patient/${roomName}?${params.toString()}`;
+}
+
+/**
+ * Construye el link de videollamada para el doctor
+ */
+function construirLinkDoctor(roomName, codMedico) {
+    return `${VIDEO_APP_DOMAIN}/doctor/${roomName}?doctor=${encodeURIComponent(codMedico.trim())}`;
+}
+
 async function fetchHistoriaClinica(documento) {
     try {
         let results = await wixData.query("HistoriaClinica").eq("numeroId", documento).find();
@@ -14,11 +47,45 @@ async function fetchHistoriaClinica(documento) {
         let item = results.items[0];
         populateHistoriaClinicaFields(item);
         const telefonoConPrefijo = formatTelefono(item.celular);
+
+        // Botón WhatsApp simple (#whp)
         const mensaje = `Hola ${item.nombre}. Te escribimos de BSL. Tienes una cita médica programada conmigo`;
         const enlaceWhatsApp = `https://api.whatsapp.com/send?phone=${telefonoConPrefijo}&text=${encodeURIComponent(mensaje)}`;
 
         $w('#whp').link = enlaceWhatsApp;
         $w('#whp').target = "_blank";
+
+        // Botón WhatsApp con videollamada (#whpTwilio)
+        const roomName = generarNombreSala();
+        const linkVideollamadaPaciente = construirLinkVideollamada(
+            roomName,
+            item.primerNombre,
+            item.primerApellido,
+            codEmpresa
+        );
+        const linkVideollamadaDoctor = construirLinkDoctor(roomName, codEmpresa);
+
+        const mensajeVideollamada = `Hola ${item.primerNombre}. Te escribimos de BSL.
+
+Para tu consulta médica, haz clic en el siguiente link:
+
+${linkVideollamadaPaciente}
+
+El link te conectará automáticamente con el Dr. ${codEmpresa}.
+
+Asegúrate de permitir el acceso a tu cámara y micrófono cuando el navegador te lo pida.
+
+¡Que tengas una excelente consulta!`;
+
+        const enlaceWhatsAppTwilio = `https://api.whatsapp.com/send?phone=${telefonoConPrefijo}&text=${encodeURIComponent(mensajeVideollamada)}`;
+
+        $w('#whpTwilio').link = enlaceWhatsAppTwilio;
+        $w('#whpTwilio').target = "_blank";
+        $w('#whpTwilio').onClick(() => {
+            // Guardar el link del doctor para el botón iniciarConsultaTwilio
+            wixStorage.local.setItem("linkVideollamadaDoctor", linkVideollamadaDoctor);
+            wixStorage.local.setItem("roomNameActual", roomName);
+        });
 
         return item;
     } catch (error) {
