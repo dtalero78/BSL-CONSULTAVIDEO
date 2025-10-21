@@ -27,6 +27,7 @@ interface UseVideoRoomReturn {
   toggleVideo: () => void;
   isAudioEnabled: boolean;
   isVideoEnabled: boolean;
+  localVideoTrack: LocalVideoTrack | null;
 }
 
 export const useVideoRoom = ({
@@ -44,6 +45,7 @@ export const useVideoRoom = ({
   const [error, setError] = useState<string | null>(null);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
+  const [localVideoTrack, setLocalVideoTrack] = useState<LocalVideoTrack | null>(null);
 
   const connectToRoom = useCallback(async () => {
     try {
@@ -67,6 +69,12 @@ export const useVideoRoom = ({
       setRoom(connectedRoom);
       setLocalParticipant(connectedRoom.localParticipant);
       setIsConnected(true);
+
+      // Guardar referencia al video track local para efectos de fondo
+      const videoTrack = Array.from(connectedRoom.localParticipant.videoTracks.values())[0]?.track as LocalVideoTrack;
+      if (videoTrack) {
+        setLocalVideoTrack(videoTrack);
+      }
 
       // Registrar conexión para reportes (si se proporcionó rol)
       if (role) {
@@ -186,5 +194,6 @@ export const useVideoRoom = ({
     toggleVideo,
     isAudioEnabled,
     isVideoEnabled,
+    localVideoTrack,
   };
 };

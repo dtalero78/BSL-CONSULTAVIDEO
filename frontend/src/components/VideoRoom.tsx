@@ -1,6 +1,8 @@
 import { useVideoRoom } from '../hooks/useVideoRoom';
+import { useBackgroundEffects } from '../hooks/useBackgroundEffects';
 import { Participant } from './Participant';
 import { VideoControls } from './VideoControls';
+import { BackgroundControls } from './BackgroundControls';
 
 interface VideoRoomProps {
   identity: string;
@@ -22,11 +24,38 @@ export const VideoRoom = ({ identity, roomName, role, onLeave }: VideoRoomProps)
     toggleVideo,
     isAudioEnabled,
     isVideoEnabled,
+    localVideoTrack,
   } = useVideoRoom({ identity, roomName, role });
+
+  const {
+    currentEffect,
+    isProcessing,
+    applyBlur,
+    applyVirtualBackground,
+    removeEffect,
+  } = useBackgroundEffects();
 
   const handleLeave = () => {
     disconnectFromRoom();
     onLeave?.();
+  };
+
+  const handleApplyBlur = () => {
+    if (localVideoTrack) {
+      applyBlur(localVideoTrack);
+    }
+  };
+
+  const handleApplyVirtualBackground = (imageUrl: string) => {
+    if (localVideoTrack) {
+      applyVirtualBackground(localVideoTrack, imageUrl);
+    }
+  };
+
+  const handleRemoveEffect = () => {
+    if (localVideoTrack) {
+      removeEffect(localVideoTrack);
+    }
   };
 
   if (error) {
@@ -174,6 +203,19 @@ export const VideoRoom = ({ identity, roomName, role, onLeave }: VideoRoomProps)
         {localParticipant && (
           <div className="absolute top-3 right-3 w-36 h-48 sm:w-40 sm:h-56 md:w-32 md:h-48 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/30 z-10">
             <Participant participant={localParticipant} isLocal={true} />
+          </div>
+        )}
+
+        {/* Controles de fondo virtual - Solo para doctores */}
+        {role === 'doctor' && localVideoTrack && (
+          <div className="absolute top-3 left-3 z-10">
+            <BackgroundControls
+              onApplyBlur={handleApplyBlur}
+              onApplyVirtualBackground={handleApplyVirtualBackground}
+              onRemoveEffect={handleRemoveEffect}
+              isProcessing={isProcessing}
+              currentEffect={currentEffect}
+            />
           </div>
         )}
 
