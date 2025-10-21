@@ -160,15 +160,36 @@ function populateFormularioFields(item) {
     $w('#cargoAnterior').text = item.empresa1 || "No especificado";
 }
 
+/**
+ * Formatea un número de teléfono para WhatsApp (con prefijo +)
+ * Soporta formatos internacionales: +52, +1, +57, etc.
+ * Ejemplos:
+ *   "(+52) 2441564651" -> "+522441564651"
+ *   "+13053392098" -> "+13053392098"
+ *   "13053455190" -> "+13053455190"
+ *   "3001234567" -> "+573001234567" (Colombia por defecto)
+ */
 function formatTelefono(telefono) {
-    telefono = telefono.replace(/\s+/g, '');
-    if (telefono.startsWith('+57')) {
+    // Remover todos los espacios, paréntesis y guiones
+    telefono = telefono.replace(/[\s\(\)\-]/g, '');
+
+    // Si ya tiene el +, retornar tal cual
+    if (telefono.startsWith('+')) {
         return telefono;
-    } else if (telefono.startsWith('57')) {
-        return `+${telefono}`;
-    } else {
-        return `+57${telefono}`;
     }
+
+    // Si empieza con un código de país conocido (sin +), agregar el +
+    // Códigos de país comunes: 1 (USA/Canada), 52 (México), 57 (Colombia), etc.
+    const countryCodes = ['1', '52', '57', '54', '55', '34', '44', '49', '33'];
+
+    for (let code of countryCodes) {
+        if (telefono.startsWith(code)) {
+            return `+${telefono}`;
+        }
+    }
+
+    // Si no tiene código de país, asumir Colombia (+57) por defecto
+    return `+57${telefono}`;
 }
 
 async function modificarHistoriaClinica() {

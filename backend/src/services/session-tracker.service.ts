@@ -17,7 +17,7 @@ interface VideoSession {
 class SessionTrackerService {
   private sessions: Map<string, VideoSession> = new Map();
   private readonly ADMIN_PHONE = '573008021701';
-  private readonly WHAPI_TOKEN = process.env.WHAPI_TOKEN || '';
+  private readonly WHAPI_TOKEN = process.env.WHAPI_TOKEN || 'due3eWCwuBM2Xqd6cPujuTRqSbMb68lt';
   private readonly WHAPI_URL = 'https://gate.whapi.cloud/messages/text';
 
   /**
