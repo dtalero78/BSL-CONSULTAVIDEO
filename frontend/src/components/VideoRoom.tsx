@@ -153,11 +153,11 @@ export const VideoRoom = ({ identity, roomName, onLeave }: VideoRoomProps) => {
         </button>
       </div>
 
-      {/* Video Grid - Full screen */}
-      <div className="flex-1 relative overflow-hidden">
-        {/* Remote participant (large) */}
+      {/* Video Grid - Full screen with better mobile layout */}
+      <div className="flex-1 relative overflow-hidden bg-[#0b141a]">
+        {/* Remote participant (large) - ocupa TODO el espacio disponible */}
         {remoteParticipantArray.length > 0 ? (
-          <div className="absolute inset-0">
+          <div className="absolute inset-0 w-full h-full">
             <Participant participant={remoteParticipantArray[0]} />
           </div>
         ) : (
@@ -169,16 +169,16 @@ export const VideoRoom = ({ identity, roomName, onLeave }: VideoRoomProps) => {
           </div>
         )}
 
-        {/* Local participant (small, floating) */}
+        {/* Local participant (floating) - MÁS GRANDE en móvil */}
         {localParticipant && (
-          <div className="absolute top-4 right-4 w-28 h-40 sm:w-32 sm:h-48 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/20">
+          <div className="absolute top-3 right-3 w-36 h-48 sm:w-40 sm:h-56 md:w-32 md:h-48 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/30 z-10">
             <Participant participant={localParticipant} isLocal={true} />
           </div>
         )}
 
         {/* Additional remote participants (if more than 1) */}
         {remoteParticipantArray.length > 1 && (
-          <div className="absolute bottom-24 left-0 right-0 px-4">
+          <div className="absolute bottom-24 left-0 right-0 px-4 z-10">
             <div className="flex gap-2 justify-center overflow-x-auto pb-2">
               {remoteParticipantArray.slice(1).map((participant) => (
                 <div key={participant.sid} className="w-24 h-32 rounded-lg overflow-hidden flex-shrink-0 border-2 border-gray-700">

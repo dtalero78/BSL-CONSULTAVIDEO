@@ -135,7 +135,7 @@ export const Participant = ({ participant, isLocal = false }: ParticipantProps) 
   }, [participant, isLocal]);
 
   return (
-    <div className={`relative bg-gray-900 rounded-lg overflow-hidden ${isLocal ? 'h-full' : 'aspect-video'}`}>
+    <div className={`relative bg-gray-900 overflow-hidden ${isLocal ? 'h-full rounded-lg' : 'h-full w-full'}`}>
       {videoTrack ? (
         <video
           ref={videoRef}
@@ -146,7 +146,7 @@ export const Participant = ({ participant, isLocal = false }: ParticipantProps) 
         />
       ) : (
         <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-purple-600">
-          <div className={`text-white font-bold ${isLocal ? 'text-4xl' : 'text-6xl'}`}>
+          <div className={`text-white font-bold ${isLocal ? 'text-4xl' : 'text-6xl sm:text-7xl md:text-8xl'}`}>
             {participant.identity.charAt(0).toUpperCase()}
           </div>
         </div>
@@ -154,19 +154,19 @@ export const Participant = ({ participant, isLocal = false }: ParticipantProps) 
 
       {!isLocal && <audio ref={audioRef} autoPlay />}
 
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-3 pb-2">
         <div className="flex items-center justify-between">
-          <span className="text-white font-medium">
+          <span className="text-white font-semibold text-sm sm:text-base drop-shadow-lg">
             {isLocal ? 'Tú' : participant.identity}
           </span>
           <div className="flex gap-2">
             {!audioTrack && (
-              <span className="text-red-400 text-sm">
+              <span className="text-red-400 text-xs sm:text-sm drop-shadow-lg">
                 🔇 Silenciado
               </span>
             )}
             {!videoTrack && (
-              <span className="text-red-400 text-sm">
+              <span className="text-red-400 text-xs sm:text-sm drop-shadow-lg">
                 📹 Sin video
               </span>
             )}
