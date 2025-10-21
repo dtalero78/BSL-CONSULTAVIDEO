@@ -1,0 +1,204 @@
+import wixData from 'wix-data';
+import wixStorage from 'wix-storage';
+import wixWindow from 'wix-window';
+import { sendTextMessage } from 'backend/WHATSAPP';
+
+let documento = wixStorage.local.getItem("documentoParaLightbox");
+let codEmpresa = wixStorage.local.getItem("codEmpresaParaLightbox");
+
+async function fetchHistoriaClinica(documento) {
+    try {
+        let results = await wixData.query("HistoriaClinica").eq("numeroId", documento).find();
+        if (results.items.length === 0) throw "No se encontró un registro en HistoriaClinica con ese documento.";
+
+        let item = results.items[0];
+        populateHistoriaClinicaFields(item);
+        const telefonoConPrefijo = formatTelefono(item.celular);
+        const mensaje = `Hola ${item.nombre}. Te escribimos de BSL. Tienes una cita médica programada conmigo`;
+        const enlaceWhatsApp = `https://api.whatsapp.com/send?phone=${telefonoConPrefijo}&text=${encodeURIComponent(mensaje)}`;
+
+        $w('#whp').link = enlaceWhatsApp;
+        $w('#whp').target = "_blank";
+
+        return item;
+    } catch (error) {
+        console.error("Error en la consulta de HistoriaClinica:", error);
+        throw error;
+    }
+}
+
+async function fetchFormulario(documento) {
+    try {
+        let results = await wixData.query("FORMULARIO").eq("documentoIdentidad", documento).find();
+        if (results.items.length === 0) throw "No se encontró un registro en FORMULARIO con ese documento.";
+
+        let item = results.items[0];
+        populateFormularioFields(item);
+
+        return item;
+    } catch (error) {
+        console.error("Error en la consulta de FORMULARIO:", error);
+        throw error;
+    }
+}
+
+function populateHistoriaClinicaFields(item) {
+    $w('#nombres').text = `${item.primerNombre || ""} ${item.primerApellido || ""}`;
+    $w('#numeroId').text = item.numeroId || "";
+    $w('#empresa').text = item.empresa || "";
+    $w('#tipoExamen').text = item.tipoExamen || "";
+    $w('#fechaConsulta').text = item.fechaAtencion ? item.fechaAtencion.toLocaleString() : "";
+    $w('#examenes').text = item.examenes ? item.examenes.toString() : "";
+    $w('#mdAntecedentes').value = item.mdAntecedentes || "";
+    $w('#mdObsparaMidocya').value = item.mdObsParaMiDocYa || "";
+    $w('#mdObservacionesCertificado').value = item.mdObservacionesCertificado || "";
+    $w('#mdRecomendacionesMedicasAdicionales').value = item.mdRecomendacionesMedicasAdicionales || "";
+    $w('#cargo').text = item.cargo || "";
+    $w('#concepto').value = item.mdConceptoFinal || "";
+    $w('#celular').text = item.celular || "No Registrado";
+}
+
+function populateFormularioFields(item) {
+    $w('#profesion').text = item.profesion || "No especificado";
+    $w('#foto').src = item.foto || "";
+    $w('#edad').text = item.edad || "No especificado";
+    $w('#genero').text = item.genero || "No especificado";
+    $w('#licor').text = item.licor || "No especificado";
+    $w('#ciudadDeResidencia').text = item.ciudadDeResidencia || "No especificado";
+    $w('#estadoCivil').text = item.estadoCivil || "No especificado";
+    $w('#hijos').text = item.hijos || "No especificado";
+    $w('#ejercicio').text = item.ejercicio || "No especificado";
+    $w('#encuesta').text = item.encuestaSalud ? item.encuestaSalud.toString() : "No especificado";
+    $w('#historiaFamiliar').text = item.antecedentesFamiliares ? item.antecedentesFamiliares.toString() : "No especificado";
+    $w('#cargoAnterior').text = item.empresa1 || "No especificado";
+}
+
+function formatTelefono(telefono) {
+    telefono = telefono.replace(/\s+/g, '');
+    if (telefono.startsWith('+57')) {
+        return telefono;
+    } else if (telefono.startsWith('57')) {
+        return `+${telefono}`;
+    } else {
+        return `+57${telefono}`;
+    }
+}
+
+async function modificarHistoriaClinica() {
+    // 🔹 Deshabilitar el botón mientras se procesa
+    $w('#modificar').disable();
+    $w('#loadingModificar').show();
+
+    const today = new Date();
+
+    try {
+        let results = await wixData.query("HistoriaClinica").eq("numeroId", documento).find();
+        if (results.items.length === 0) throw "No se encontró un registro con ese documento.";
+
+        let item = results.items[0];
+        updateHistoriaClinicaFields(item, today);
+
+        let updatedItem = await wixData.update("HistoriaClinica", item);
+
+        // 🟨 Enviar mensaje solo si es SITEL o KM2
+        if (updatedItem.codEmpresa === "SITEL" || updatedItem.codEmpresa === "KM2") {
+            await handleSITELorKM2Case(updatedItem);
+        }
+
+        // 🟨 Llamar a la app externa para generar el PDF si es RIPPLING
+        if (updatedItem.codEmpresa === "RIPPLING") {
+            $w('#modificar').label = "ESPERA! NO CIERRES LA VENTANA";
+
+            const documentoId = updatedItem.numeroId;
+            const nombreArchivo = `${updatedItem.primerNombre} ${updatedItem.primerApellido} ${updatedItem.numeroId}`;
+
+            try {
+                const res = await fetch("https://bsl-utilidades-yp78a.ondigitalocean.app/generar-pdf", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        documento: documentoId,
+                        nombreArchivo,
+                        codEmpresa: updatedItem.codEmpresa,
+                        tipoExamen: updatedItem.tipoExamen
+                    })
+                });
+
+                const data = await res.json();
+                console.log("✅ PDF generado y subido:", data);
+            } catch (err) {
+                console.error("❌ Error generando PDF:", err);
+            } finally {
+                $w('#modificar').label = "Guardar";
+            }
+        }
+
+        wixWindow.lightbox.close();
+    } catch (error) {
+        console.error("Error actualizando el registro:", error);
+    } finally {
+        // 🔹 Siempre reactivar el botón al final
+        $w('#loadingModificar').hide();
+        $w('#modificar').enable();
+    }
+}
+
+
+function updateHistoriaClinicaFields(item, date) {
+    item.mdAntecedentes = $w('#mdAntecedentes').value;
+    item.mdObsParaMiDocYa = $w('#mdObsparaMidocya').value;
+    item.mdObservacionesCertificado = $w('#mdObservacionesCertificado').value;
+    item.mdRecomendacionesMedicasAdicionales = $w('#mdRecomendacionesMedicasAdicionales').value;
+    item.cargo = $w('#cargo').text;
+    item.mdConceptoFinal = $w('#concepto').value;
+    item.mdDx1 = $w('#dx1').value;
+    item.mdDx2 = $w('#dx2').value;
+    item.fechaConsulta = date;
+    item.atendido = "ATENDIDO";
+    item.talla = $w('#talla').value;
+    item.peso = $w('#peso').value;
+}
+
+async function handleSITELorKM2Case(item) {
+    let results = await wixData.query("ADCTEST").eq("documento", item.numeroId).find();
+    if (results.items.length > 0) return;
+
+    const telefonoConPrefijo = formatTelefono(item.celular).substring(1);
+    const phonePattern = /^57\d{10}$/;
+    if (!phonePattern.test(telefonoConPrefijo)) throw 'Número de teléfono no válido';
+
+    let empresaNombre;
+    if (item.codEmpresa === "SITEL") {
+        empresaNombre = "FOUNDEVER";
+    } else if (item.codEmpresa === "KM2") {
+        empresaNombre = "KM2";
+    } else if (item.codEmpresa === "SIIGO") {
+        empresaNombre = "SIIGO";
+    } else {
+        throw "Empresa no reconocida";
+    }
+
+    await sendTextMessage(
+        telefonoConPrefijo,
+        `Hola! Estás realizando el examen médico de ${empresaNombre} con nosotros. Debes terminar el siguiente link *urgente*: \n\nhttp://www.bsl.com.co/historia-clinica/${item.numeroId}`
+    );
+}
+
+$w.onReady(async function () {
+    try {
+        await fetchHistoriaClinica(documento);
+        await fetchFormulario(documento);
+    } catch (error) {
+        console.error("Error al obtener los datos:", error);
+    }
+
+    $w("#modificar").onClick(modificarHistoriaClinica);
+
+    // Configurar el campo iniciarConsultaTwilio para abrir la sala del doctor
+    const linkVideollamadaDoctor = wixStorage.local.getItem("linkVideollamadaDoctor");
+
+    if (linkVideollamadaDoctor) {
+        $w('#iniciarConsultaTwilio').link = linkVideollamadaDoctor;
+        $w('#iniciarConsultaTwilio').target = "_blank";
+    }
+});

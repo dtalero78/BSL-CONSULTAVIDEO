@@ -1,0 +1,441 @@
+import wixData from 'wix-data';
+import wixWindow from 'wix-window';
+import wixStorage from 'wix-storage';
+import wixLocation from 'wix-location';
+
+// ==================================================
+// CONFIGURACION DE VIDEOLLAMADAS
+// ==================================================
+// IMPORTANTE: Cambia este dominio por tu URL de Digital Ocean
+const VIDEO_APP_DOMAIN = 'https://bsl-consultavideo-58jne.ondigitalocean.app';
+
+// ==================================================
+// FUNCIONES AUXILIARES PARA VIDEOLLAMADAS
+// ==================================================
+
+/**
+ * Genera un nombre único para la sala de video
+ * Mismo algoritmo que usa el frontend de React
+ */
+function generarNombreSala() {
+    const timestamp = Date.now().toString(36);
+    const random = Math.random().toString(36).substring(2, 7);
+    return `consulta-${timestamp}-${random}`;
+}
+
+/**
+ * Construye el link de videollamada para el paciente con datos pre-llenados
+ */
+function construirLinkVideollamada(roomName, nombre, apellido, codMedico) {
+    const params = new URLSearchParams({
+        nombre: nombre.trim(),
+        apellido: apellido.trim(),
+        doctor: codMedico.trim()
+    });
+    return `${VIDEO_APP_DOMAIN}/patient/${roomName}?${params.toString()}`;
+}
+
+/**
+ * Construye el link de videollamada para el doctor
+ */
+function construirLinkDoctor(roomName, codMedico) {
+    return `${VIDEO_APP_DOMAIN}/doctor/${roomName}?doctor=${encodeURIComponent(codMedico.trim())}`;
+}
+
+// ==================================================
+// VARIABLES GLOBALES
+// ==================================================
+
+let medico;
+let pageSize = 10;
+let currentPage = 0;
+let pagedData = [];
+let collapsedItems = {};
+
+$w.onReady(async function () {
+    $w('#btnNext').onClick(() => goToPage(currentPage + 1));
+    $w('#btnPrev').onClick(() => goToPage(currentPage - 1));
+    soporteWhp();
+});
+
+function soporteWhp() {
+    const mensaje = `Hola`; // Mensaje personalizado
+    const enlaceWhatsApp = `https://api.whatsapp.com/send?phone=${"+573014152706"}&text=${encodeURIComponent(mensaje)}`;
+
+    $w('#whpSoporte').link = enlaceWhatsApp;
+    $w('#whpSoporte').target = "_blank";
+}
+
+function goToPage(pageNumber) {
+    currentPage = pageNumber;
+    if (currentPage < 0) currentPage = 0;
+    if (currentPage >= pagedData.length) currentPage = pagedData.length - 1;
+
+    $w('#ordenesCompletadas').data = pagedData[currentPage];
+    updatePaginationControls();
+}
+
+function updatePaginationControls() {
+    $w('#btnPrev').enable();
+    $w('#btnNext').enable();
+    if (currentPage <= 0) $w('#btnPrev').disable();
+    if (currentPage >= pagedData.length - 1) $w('#btnNext').disable();
+}
+
+//---------------CARGAR TODOS LOS DATOS---------------
+
+async function actualizarDatos() {
+    $w('#codigoIncorrecto').hide();
+    $w('#loadingOrdenes').show()
+    $w('#loadingActualizar').show()
+    $w('#lostConection').hide()
+
+    medico = $w('#codEmpresa').value;
+
+    const today = new Date();
+    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+
+    // Query para programadosHoy
+    try {
+        const programadosHoyResults = await wixData.query("HistoriaClinica")
+            .eq("medico", medico)
+            .between("fechaAtencion", startOfDay, endOfDay)
+            .count();
+
+        $w("#programadosHoy").text = programadosHoyResults.toString();
+
+    } catch (error) {
+        console.error("Error al consultar programadosHoy:", error);
+    }
+
+    // Query para atendidosHoy
+    try {
+        const atendidosHoyResults = await wixData.query("HistoriaClinica")
+            .eq("medico", medico)
+            .between("fechaConsulta", startOfDay, endOfDay)
+            .count();
+
+        $w("#atendidosHoy").text = atendidosHoyResults.toString();
+
+    } catch (error) {
+        console.error("Error al consultar atendidosHoy:", error);
+    }
+
+    try {
+        const restantesHoyResults = await wixData.query("HistoriaClinica")
+            .eq("medico", medico)
+            .between("fechaAtencion", startOfDay, endOfDay)
+            .isEmpty("fechaConsulta")
+            .count();
+
+        $w("#restantesHoy").text = restantesHoyResults.toString();
+
+    } catch (error) {
+        console.error("Error al consultar atendidosHoy:", error);
+    }
+
+    let success = false;
+    while (!success) {
+        try {
+            // Consultar HistoriaClinica
+            const historiaClinicaResults = await wixData.query("HistoriaClinica")
+                .eq("medico", medico)
+                .isEmpty("fechaConsulta")
+                .between("fechaAtencion", startOfDay, endOfDay)
+                .ne("numeroId", "TEST")
+                .ne("numeroId", "test")
+                .ascending("fechaAtencion")
+                .limit(100)
+                .find();
+            console.log(historiaClinicaResults.items);
+
+            const historiaClinicaItems = historiaClinicaResults.items;
+            let numerosId = historiaClinicaItems.map(item => item.numeroId).filter(Boolean);
+
+            const formularioResults = await wixData.query("FORMULARIO")
+                .hasSome("documentoIdentidad", numerosId)
+                .limit(10)
+                .find();
+
+            let formularioMap = {};
+            formularioResults.items.forEach(item => {
+                formularioMap[item.documentoIdentidad] = item;
+            });
+
+            let combinedData = historiaClinicaItems.map(historiaClinicaItem => {
+                let foto = formularioMap[historiaClinicaItem.numeroId]?.foto || "";
+                $w('#ordenesRepetear').show();
+
+                return {
+                    _id: historiaClinicaItem._id,
+                    nombres: historiaClinicaItem.primerNombre + ' ' + historiaClinicaItem.primerApellido,
+                    nombre: historiaClinicaItem.primerNombre,
+                    primerNombre: historiaClinicaItem.primerNombre,
+                    primerApellido: historiaClinicaItem.primerApellido,
+                    numeroId: historiaClinicaItem.numeroId,
+                    estado: historiaClinicaItem.atendido,
+                    foto: foto,
+                    celular: historiaClinicaItem.celular,
+                    fechaAtencion: historiaClinicaItem.fechaAtencion,
+                    empresaListado: historiaClinicaItem.codEmpresa
+                };
+
+            });
+
+            console.log("ESTE ES EL COMBINED", combinedData);
+
+            pagedData = [];
+            for (let i = 0; i < combinedData.length; i += pageSize) {
+                pagedData.push(combinedData.slice(i, i + pageSize));
+            }
+            $w('#loadingActualizar').hide()
+
+            goToPage(0);
+
+            $w('#ordenesCompletadas').onItemReady(($item, itemData, index) => {
+                const itemId = itemData._id;
+
+                // Colapsar o expandir basado en el estado guardado
+                if (collapsedItems[itemId]) {
+                    $item('#container').collapse();
+                } else {
+                    $item('#container').expand();
+                }
+
+                // Manipulación de texto y enlaces
+                $item('#empresaListado').text = itemData.empresaListado === "SANITHELP-JJ" ? "PARTICULAR" : itemData.empresaListado;
+                $item('#nombres').text = itemData.nombres;
+                $item('#numeroId').text = itemData.numeroId;
+                $item('#fechaAtencion').text = itemData.fechaAtencion ? itemData.fechaAtencion.toLocaleString() : "";
+                $item('#celular').text = itemData.celular ? itemData.celular : "NO REGISTRA";
+                $item('#estado').text = itemData.estado;
+
+                // Formatear teléfono con prefijo +57
+                const telefono = itemData.celular.replace(/\s+/g, '');
+                let telefonoConPrefijo;
+
+                if (telefono.startsWith('+57')) {
+                    telefonoConPrefijo = telefono;
+                } else if (telefono.startsWith('57')) {
+                    telefonoConPrefijo = '+' + telefono;
+                } else {
+                    telefonoConPrefijo = '+57' + telefono;
+                }
+
+                // ==================================================
+                // BOTON #whp - MENSAJE SIMPLE ORIGINAL
+                // ==================================================
+                const mensaje = `Hola ${itemData.nombre}. Te escribimos de BSL. Tienes una cita médica programada conmigo`;
+                const enlaceWhatsApp = `https://api.whatsapp.com/send?phone=${telefonoConPrefijo}&text=${encodeURIComponent(mensaje)}`;
+
+                $item('#whp').link = enlaceWhatsApp;
+                $item('#whp').target = "_blank";
+
+                // ==================================================
+                // BOTON #whpTwilio - VIDEOLLAMADA CON LINK AUTOMATICO
+                // ==================================================
+
+                // Generar sala única para esta consulta
+                const roomName = generarNombreSala();
+
+                // Construir links de videollamada
+                const linkVideollamadaPaciente = construirLinkVideollamada(
+                    roomName,
+                    itemData.primerNombre,
+                    itemData.primerApellido,
+                    medico
+                );
+
+                const linkVideollamadaDoctor = construirLinkDoctor(roomName, medico);
+
+                // Mensaje de WhatsApp con link de videollamada para el paciente
+                const mensajeVideollamada = `Hola ${itemData.nombre}. Te escribimos de BSL.
+
+Para tu consulta médica, haz clic en el siguiente link:
+
+${linkVideollamadaPaciente}
+
+El link te conectará automáticamente con el Dr. ${medico}.
+
+Asegúrate de permitir el acceso a tu cámara y micrófono cuando el navegador te lo pida.
+
+¡Que tengas una excelente consulta!`;
+
+                const enlaceWhatsAppTwilio = `https://api.whatsapp.com/send?phone=${telefonoConPrefijo}&text=${encodeURIComponent(mensajeVideollamada)}`;
+
+                // Configurar el link de WhatsApp como link principal del botón
+                $item('#whpTwilio').link = enlaceWhatsAppTwilio;
+                $item('#whpTwilio').target = "_blank";
+
+                // Configurar evento onClick para guardar el link de videollamada del doctor
+                $item('#whpTwilio').onClick(() => {
+                    // Guardar el link de la sala del doctor en el storage local
+                    // para que esté disponible cuando se abra el panel de consulta
+                    wixStorage.local.setItem("linkVideollamadaDoctor", linkVideollamadaDoctor);
+                    wixStorage.local.setItem("roomNameActual", roomName);
+                });
+
+                // ==================================================
+                // BOTON #whp2 - LINK ANTIGUO (COMPATIBILIDAD)
+                // ==================================================
+                const mensaje2 = `Hola ${itemData.nombre}. Te escribimos de BSL. Tienes una cita médica programada conmigo
+
+Conéctate al link:
+
+https://osteomuscular-nnsks.ondigitalocean.app/paciente?nombre=${itemData.primerNombre}&apellido=${itemData.primerApellido}`;
+                const enlaceWhatsApp2 = `https://api.whatsapp.com/send?phone=${telefonoConPrefijo}&text=${encodeURIComponent(mensaje2)}`;
+
+                $item('#whp2').link = enlaceWhatsApp2;
+                $item('#whp2').target = "_blank";
+
+                // ==================================================
+                // OTROS BOTONES Y EVENTOS
+                // ==================================================
+
+                $item('#noContesta').onClick(async () => {
+                    const documentoId = itemData.numeroId;
+                    console.log(documentoId)
+
+                    wixData.query("HistoriaClinica")
+                        .eq("numeroId", documentoId)
+                        .find()
+                        .then((results) => {
+                            if (results.items.length > 0) {
+                                let item = results.items[0];
+                                item.pvEstado = 'No Contesta'
+
+                                return wixData.update("HistoriaClinica", item);
+
+                            } else {
+                                console.error("No se encontró un registro con ese documento.");
+                            }
+                        })
+                        .then((updatedItem) => {
+                            if (updatedItem) {
+                                $item('#container').collapse();
+                                collapsedItems[itemData._id] = true;
+                                console.log("Registro actualizado con éxito.");
+
+                            }
+                        })
+                        .catch((error) => {
+                            console.error("Error actualizando el registro:", error);
+                        });
+                });
+
+                // Manejo del evento de clic para colapsar
+                $item('#cerrarRegistro').onClick(() => {
+                    $item('#container').collapse();
+                    collapsedItems[itemData._id] = true;
+                });
+            });
+
+            $w('#loadingOrdenes').hide();
+            $w('#login').hide();
+
+            success = true;
+
+        } catch (error) {
+            console.error(error);
+            if (error.code !== "WDE0028") {
+                $w('#loadingOrdenes').hide()
+                $w('#lostConection').show()
+                break;
+            }
+            await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+    }
+
+}
+
+$w('#entrar').onClick(async () => {
+    await actualizarDatos();
+});
+
+async function handleDocumentoChange(documento, repeaterItem) {
+    if (repeaterItem) {
+        repeaterItem('#loadingRepeater').show();
+    } else {
+        $w('#loadingDocumento').show();
+    }
+
+    try {
+        const results = await wixData.query("HistoriaClinica")
+            .eq("numeroId", documento)
+            .find();
+
+        if (results.items.length > 0) {
+            if (repeaterItem) {
+                repeaterItem('#loadingRepeater').hide();
+            } else {
+                $w('#loadingDocumento').hide();
+            }
+
+            wixStorage.local.setItem("documentoParaLightbox", documento);
+            wixStorage.local.setItem("codEmpresaParaLightbox", medico);
+            wixWindow.openLightbox("CONSULTA");
+
+        } else {
+            if (repeaterItem) {
+                repeaterItem('#loadingRepeater').hide();
+            } else {
+                $w('#loadingDocumento').hide();
+            }
+            $w('#noExiste').show();
+        }
+    } catch (error) {
+        if (repeaterItem) {
+            repeaterItem('#loadingRepeater').hide();
+        } else {
+            $w('#loadingDocumento').hide();
+        }
+        console.error("Hubo un error al consultar la base de datos:", error);
+    }
+}
+
+export async function documento_change(event) {
+    const documento = $w('#documento').value;
+    await handleDocumentoChange(documento, null);
+}
+
+export function documento_click(event) {
+    $w('#noExiste').hide();
+}
+
+export function numeroId_click_1(event, $item) {
+    const documento = $item('#numeroId').text;
+    handleDocumentoChange(documento, $item);
+}
+
+export async function actualizarButton_click(event) {
+    await actualizarDatos();
+}
+
+export function button1_click(event) {
+    wixStorage.local.setItem("codEmpresaParaLightbox", medico);
+
+    setTimeout(() => {
+        wixWindow.openLightbox("ADC EMPRESAS");
+
+    }, 100);
+}
+
+export function nuevaOrden_click(event) {
+    wixStorage.local.setItem("codEmpresaParaLightbox", medico);
+
+    setTimeout(() => {
+        wixWindow.openLightbox("NUEVA ORDEN");
+
+    }, 100);
+
+}
+
+export function estadisticasButton_click(event) {
+    wixStorage.local.setItem("codEmpresaParaLightbox", medico);
+
+    setTimeout(() => {
+        wixWindow.openLightbox("ESTADISTICAS");
+
+    }, 100);
+}
