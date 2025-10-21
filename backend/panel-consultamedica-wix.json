@@ -1,7 +1,6 @@
 import wixData from 'wix-data';
 import wixStorage from 'wix-storage';
 import wixWindow from 'wix-window';
-import wixLocation from 'wix-location';
 import { sendTextMessage } from 'backend/WHATSAPP';
 
 let documento = wixStorage.local.getItem("documentoParaLightbox");
@@ -57,7 +56,7 @@ async function fetchHistoriaClinica(documento) {
         $w('#whp').target = "_blank";
 
         // Botón WhatsApp con videollamada (#whpTwilio)
-        $w('#whpTwilio').onClick(() => {
+        $w('#whpTwilio').onClick(async () => {
             // Generar sala SOLO cuando se hace clic
             const roomName = generarNombreSala();
             const linkVideollamadaPaciente = construirLinkVideollamada(
@@ -80,14 +79,20 @@ Asegúrate de permitir el acceso a tu cámara y micrófono cuando el navegador t
 
 ¡Que tengas una excelente consulta!`;
 
-            const enlaceWhatsAppTwilio = `https://api.whatsapp.com/send?phone=${telefonoConPrefijo}&text=${encodeURIComponent(mensajeVideollamada)}`;
-
-            // Guardar el link del doctor ANTES de abrir WhatsApp
+            // Guardar el link del doctor
             wixStorage.local.setItem("linkVideollamadaDoctor", linkVideollamadaDoctor);
             wixStorage.local.setItem("roomNameActual", roomName);
 
-            // Abrir WhatsApp usando wixLocation.to()
-            wixLocation.to(enlaceWhatsAppTwilio);
+            // Formatear teléfono para sendTextMessage (sin el prefijo +)
+            const telefonoSinPrefijo = telefonoConPrefijo.substring(1);
+
+            // Enviar mensaje de WhatsApp usando la API de backend
+            try {
+                await sendTextMessage(telefonoSinPrefijo, mensajeVideollamada);
+                console.log("Mensaje de videollamada enviado exitosamente");
+            } catch (error) {
+                console.error("Error enviando mensaje de videollamada:", error);
+            }
         });
 
         return item;

@@ -1,7 +1,7 @@
 import wixData from 'wix-data';
 import wixWindow from 'wix-window';
 import wixStorage from 'wix-storage';
-import wixLocation from 'wix-location';
+import { sendTextMessage } from 'backend/WHATSAPP';
 
 // ==================================================
 // CONFIGURACION DE VIDEOLLAMADAS
@@ -237,7 +237,7 @@ async function actualizarDatos() {
                 // ==================================================
 
                 // Configurar evento onClick para generar sala y enviar mensaje
-                $item('#whpTwilio').onClick(() => {
+                $item('#whpTwilio').onClick(async () => {
                     // Generar sala SOLO cuando se hace clic
                     const roomName = generarNombreSala();
 
@@ -264,15 +264,21 @@ Asegúrate de permitir el acceso a tu cámara y micrófono cuando el navegador t
 
 ¡Que tengas una excelente consulta!`;
 
-                    const enlaceWhatsAppTwilio = `https://api.whatsapp.com/send?phone=${telefonoConPrefijo}&text=${encodeURIComponent(mensajeVideollamada)}`;
-
                     // Guardar el link de la sala del doctor en el storage local
                     // para que esté disponible cuando se abra el panel de consulta
                     wixStorage.local.setItem("linkVideollamadaDoctor", linkVideollamadaDoctor);
                     wixStorage.local.setItem("roomNameActual", roomName);
 
-                    // Abrir WhatsApp usando wixLocation.to()
-                    wixLocation.to(enlaceWhatsAppTwilio);
+                    // Formatear teléfono para sendTextMessage (sin el prefijo +)
+                    const telefonoSinPrefijo = telefonoConPrefijo.substring(1);
+
+                    // Enviar mensaje de WhatsApp usando la API de backend
+                    try {
+                        await sendTextMessage(telefonoSinPrefijo, mensajeVideollamada);
+                        console.log("Mensaje de videollamada enviado exitosamente");
+                    } catch (error) {
+                        console.error("Error enviando mensaje de videollamada:", error);
+                    }
                 });
 
                 // ==================================================
