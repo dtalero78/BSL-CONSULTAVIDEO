@@ -46,9 +46,9 @@ export const useBackgroundEffects = (): UseBackgroundEffectsReturn => {
         await track.removeProcessor(processor);
       }
 
-      // Crear y aplicar blur usando CDN de Twilio
+      // Crear y aplicar blur usando archivos locales
       const blurProcessor = new GaussianBlurBackgroundProcessor({
-        assetsPath: 'https://sdk.twilio.com/js/video-processors/2.8.0/build',
+        assetsPath: '/twilio-processors',
         maskBlurRadius: 15,
         blurFilterRadius: 15,
       });
@@ -87,9 +87,9 @@ export const useBackgroundEffects = (): UseBackgroundEffectsReturn => {
         img.onerror = reject;
       });
 
-      // Crear y aplicar virtual background usando CDN de Twilio
+      // Crear y aplicar virtual background usando archivos locales
       const virtualBgProcessor = new VirtualBackgroundProcessor({
-        assetsPath: 'https://sdk.twilio.com/js/video-processors/2.8.0/build',
+        assetsPath: '/twilio-processors',
         backgroundImage: img,
         maskBlurRadius: 5,
       });
