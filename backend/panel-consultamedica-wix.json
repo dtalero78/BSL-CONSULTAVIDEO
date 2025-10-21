@@ -94,8 +94,16 @@ Asegúrate de permitir el acceso a tu cámara y micrófono cuando el navegador t
             try {
                 await sendTextMessage(telefonoSinPrefijo, mensajeVideollamada);
                 console.log("Mensaje de videollamada enviado exitosamente");
+
+                // Actualizar el campo de texto para indicar que el mensaje fue enviado
+                $w('#estadoWhp').text = "✓ Mensaje enviado";
+                $w('#estadoWhp').show();
             } catch (error) {
                 console.error("Error enviando mensaje de videollamada:", error);
+
+                // Mostrar error en el campo de texto
+                $w('#estadoWhp').text = "✗ Error al enviar";
+                $w('#estadoWhp').show();
             }
         });
 
