@@ -126,6 +126,46 @@ $w.onReady(() => {
 **Track attachment pattern** (critical for video rendering):
 Twilio tracks must be attached to DOM elements in specific useEffect patterns. See `frontend/src/components/Participant.tsx` for the two-useEffect pattern used for reliable track rendering.
 
+### Virtual Background and Blur Effects
+
+**Architecture**: Uses `@twilio/video-processors` with locally hosted assets to avoid CDN permission issues.
+
+**Implementation**:
+- **Hook**: `frontend/src/hooks/useBackgroundEffects.ts` - Manages blur and virtual background processors
+- **Component**: `frontend/src/components/BackgroundControls.tsx` - UI dropdown menu in bottom control bar
+- **Assets**: `frontend/public/twilio-processors/` - TensorFlow Lite models and WASM files (5.1 MB)
+
+**Critical**: Assets MUST be hosted locally (not from Twilio CDN) due to 403 Forbidden errors. The `assetsPath` must point to `/twilio-processors`.
+
+**Features**:
+- Gaussian blur background (15px radius)
+- Virtual background replacement (office, nature, abstract presets)
+- Only visible for doctors (`role === 'doctor'`)
+- Located in bottom control bar (first button, left side)
+
+**How it works**:
+1. User clicks background button in control bar
+2. Dropdown menu shows options (blur, virtual backgrounds, remove)
+3. Processor loads TFLite model for person segmentation (~2-3 MB, cached after first load)
+4. Effect applied to `LocalVideoTrack` via `track.addProcessor()`
+5. Real-time processing without disconnecting from call
+
+### Phone Number Formatting (International Support)
+
+**Function**: `formatTelefono()` in `backend/panel-consultamedica-wix.json`
+
+**Supported formats**:
+- International with parentheses: `(+52) 2441564651` → `+522441564651`
+- With plus prefix: `+13053392098` → `+13053392098`
+- Without plus: `13053455190` → `+13053455190`
+- Colombian local: `3001234567` → `+573001234567`
+
+**Country codes recognized**: 1 (USA/Canada), 52 (Mexico), 57 (Colombia), 54 (Argentina), 55 (Brazil), 34 (Spain), 44 (UK), 49 (Germany), 33 (France)
+
+**Usage**:
+- For WhatsApp Web links: Use full number with `+`
+- For `sendTextMessage()`: Remove `+` prefix (use `.substring(1)`)
+
 ## Key Files and Their Roles
 
 ### Backend
@@ -137,15 +177,19 @@ Twilio tracks must be attached to DOM elements in specific useEffect patterns. S
 
 ### Frontend
 - `src/hooks/useVideoRoom.ts` - Core Twilio Video integration logic (connect, disconnect, tracks)
+- `src/hooks/useBackgroundEffects.ts` - Manages blur and virtual background processors
 - `src/components/VideoRoom.tsx` - Main video UI (grid layout, controls)
+- `src/components/VideoControls.tsx` - Bottom control bar (mic, camera, backgrounds, hang up)
+- `src/components/BackgroundControls.tsx` - Dropdown menu for background effects
 - `src/components/Participant.tsx` - Individual participant video/audio rendering
 - `src/pages/DoctorRoomPage.tsx` - Doctor joins pre-generated room from Wix
 - `src/pages/PatientPage.tsx` - Patient joins from WhatsApp link with pre-filled info
 - `src/services/api.service.ts` - Axios client for backend API calls
+- `public/twilio-processors/` - TFLite models and WASM for background effects (DO NOT DELETE)
 
 ### Wix Integration
-- `backend/wix.json` - Main repeater page (patient list)
-- `backend/panel-consultamedica-wix.json` - Consultation panel lightbox with videollamada button
+- `backend/wix.json` - Main repeater page (patient list with stats)
+- `backend/panel-consultamedica-wix.json` - Consultation panel lightbox with videollamada button and status indicator
 
 ## Environment Variables
 
@@ -209,8 +253,51 @@ Always use the pattern: `consulta-${timestamp36}-${random5}` (see `generarNombre
 ### WhatsApp message sending
 Use `sendTextMessage(phoneWithoutPlus, message)` from Wix backend module, NOT WhatsApp Web links.
 
+### Wix Status Indicators
+When performing async operations in Wix, show user feedback:
+```javascript
+// Before operation
+$w('#estadoWhp').text = "📤 ENVIANDO LINK...";
+$w('#estadoWhp').show();
+
+// On success
+$w('#estadoWhp').text = "✅ MENSAJE ENVIADO";
+
+// On error
+$w('#estadoWhp').text = "❌ ERROR AL ENVIAR";
+```
+
+### Wix Data Queries
+Main repeater in `wix.json` displays:
+- **programadosHoy**: Count of patients scheduled today (by `fechaAtencion`)
+- **atendidosHoy**: Count of patients attended today (by `fechaConsulta`)
+- **restantesHoy**: Count scheduled today with empty `fechaConsulta`
+- Patient list filtered by: `medico`, `fechaAtencion` (today), `isEmpty("fechaConsulta")`, sorted ascending
+
+### Critical Wix Events
+- `numeroId_click_1`: Opens consultation panel lightbox
+- `whpTwilio.onClick`: Generates room, sends WhatsApp link, configures doctor button
+- `iniciarConsultaTwilio`: Opens doctor video room (link set dynamically in whpTwilio.onClick)
+
 ## Testing Notes
 
 - Backend has Jest configured but tests not yet implemented
 - Frontend has test infrastructure but no test files yet
 - Manual testing workflow: Start backend, start frontend, test video call flow with two browser windows/devices
+
+## Known Issues and Solutions
+
+### Virtual Backgrounds
+- **Issue**: ERR_NAME_NOT_RESOLVED when using Twilio CDN
+- **Solution**: Assets MUST be hosted locally in `frontend/public/twilio-processors/`
+- **Don't**: Delete or move the `twilio-processors` folder (5.1 MB of TFLite models)
+
+### WhatsApp Integration
+- **Issue**: Different room names for doctor and patient
+- **Solution**: Generate room name ONCE in onClick, configure both links atomically
+- **Don't**: Generate room in `$w.onReady` or use separate onClick handlers
+
+### Phone Number Format
+- **Issue**: International numbers not recognized
+- **Solution**: Use `formatTelefono()` which supports multiple country codes
+- **Remember**: Remove `+` prefix when using `sendTextMessage()` API
