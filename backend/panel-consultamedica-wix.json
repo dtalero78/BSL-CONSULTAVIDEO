@@ -83,6 +83,10 @@ Asegúrate de permitir el acceso a tu cámara y micrófono cuando el navegador t
             wixStorage.local.setItem("linkVideollamadaDoctor", linkVideollamadaDoctor);
             wixStorage.local.setItem("roomNameActual", roomName);
 
+            // Configurar el botón iniciarConsultaTwilio INMEDIATAMENTE con el link correcto
+            $w('#iniciarConsultaTwilio').link = linkVideollamadaDoctor;
+            $w('#iniciarConsultaTwilio').target = "_blank";
+
             // Formatear teléfono para sendTextMessage (sin el prefijo +)
             const telefonoSinPrefijo = telefonoConPrefijo.substring(1);
 
