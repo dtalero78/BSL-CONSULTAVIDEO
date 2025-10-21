@@ -1,6 +1,8 @@
 import axios, { AxiosInstance } from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+// En producción (Digital Ocean), el frontend se sirve desde el mismo backend
+// entonces usamos URL relativa (vacía). En desarrollo, apuntamos a localhost:3000
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 class ApiService {
   private client: AxiosInstance;

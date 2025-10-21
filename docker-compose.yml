@@ -1,9 +1,14 @@
 version: '3.8'
 
+# Configuración para desarrollo local con Docker
+# En producción (Digital Ocean), se usa el mismo Dockerfile
+# pero con configuración optimizada de costos (un solo servicio)
+
 services:
-  backend:
+  # Servicio unificado: Backend + Frontend
+  app:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
@@ -15,24 +20,7 @@ services:
       - TWILIO_API_KEY_SID=${TWILIO_API_KEY_SID}
       - TWILIO_API_KEY_SECRET=${TWILIO_API_KEY_SECRET}
       - JWT_SECRET=${JWT_SECRET}
-      - ALLOWED_ORIGINS=http://localhost,http://localhost:80
-    volumes:
-      - ./backend:/app
-      - /app/node_modules
-    restart: unless-stopped
-    networks:
-      - bsl-network
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "80:80"
-    environment:
-      - VITE_API_BASE_URL=http://localhost:3000
-    depends_on:
-      - backend
+      - ALLOWED_ORIGINS=http://localhost:3000
     restart: unless-stopped
     networks:
       - bsl-network

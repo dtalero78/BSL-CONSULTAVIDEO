@@ -81,8 +81,7 @@ npm run dev
 ```bash
 # En la raíz del proyecto
 docker-compose up --build
-# Backend: http://localhost:3000
-# Frontend: http://localhost:80
+# Aplicación completa (Backend + Frontend): http://localhost:3000
 ```
 
 ## 🔑 Configuración de Twilio
@@ -178,7 +177,12 @@ docker-compose down
 
 ## ☁️ Despliegue en Digital Ocean
 
-Esta aplicacion esta configurada para desplegarse facilmente en Digital Ocean App Platform:
+Esta aplicacion esta configurada para desplegarse facilmente en Digital Ocean App Platform con **arquitectura optimizada de costos**.
+
+**Arquitectura simplificada:**
+- Un solo componente (Backend) que sirve tanto API como frontend estatico
+- Ahorro de costos: Solo pagas por 1 servicio en lugar de 2
+- No se requiere CORS entre frontend/backend (misma URL)
 
 **Pasos rapidos:**
 1. Push tu codigo a GitHub/GitLab
@@ -188,12 +192,20 @@ Esta aplicacion esta configurada para desplegarse facilmente en Digital Ocean Ap
 5. Configura las variables de entorno de Twilio
 6. Deploy!
 
+**Como funciona:**
+- El `Dockerfile` construye ambos proyectos (backend + frontend)
+- El backend Express sirve:
+  - `/health` → Health check
+  - `/api/*` → API REST
+  - `/*` → Frontend estatico (React SPA)
+- Digital Ocean solo necesita levantar 1 contenedor
+
 **Documentacion completa:**
 - Ver [.do/DEPLOYMENT_GUIDE.md](.do/DEPLOYMENT_GUIDE.md) para instrucciones detalladas
 - Configuracion ya lista en `.do/app.yaml`
 - Health checks y CORS pre-configurados
 
-**Costos estimados:** ~$5/mes con instancias Basic XXS
+**Costos:** $5/mes (1 servicio Basic XXS)
 
 ## 📚 Documentación Adicional
 

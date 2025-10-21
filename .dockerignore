@@ -1,0 +1,57 @@
+# Ignorar node_modules de ambos proyectos
+**/node_modules
+**/dist
+**/build
+
+# Git
+.git
+.gitignore
+
+# Archivos de entorno (solo se usan en desarrollo)
+**/.env
+**/.env.local
+**/.env.*.local
+
+# Documentación
+*.md
+docs/
+
+# Testing
+**/__tests__
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+**/coverage
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Logs
+**/logs
+**/*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Digital Ocean (ya está en el repo)
+.do/
+
+# Otros
+.claude/
+infrastructure/
+shared/
+agentes.txt
+logoBlanco.png
+WIX_INTEGRATION.md
+wix-integration-snippet.js

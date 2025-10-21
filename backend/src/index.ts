@@ -2,15 +2,21 @@ import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import path from 'path';
 import appConfig from './config/app.config';
 import videoRoutes from './routes/video.routes';
 
 const app: Application = express();
 
-// Middleware de seguridad
-app.use(helmet());
+// Middleware de seguridad - Configurado para servir archivos estaticos
+app.use(
+  helmet({
+    contentSecurityPolicy: false, // Permitir carga de recursos del frontend
+    crossOriginEmbedderPolicy: false, // Necesario para Twilio Video
+  })
+);
 
-// CORS
+// CORS - Solo necesario si se accede desde otro dominio
 app.use(
   cors({
     origin: appConfig.allowedOrigins,
@@ -36,15 +42,16 @@ app.get('/health', (_req: Request, res: Response) => {
   });
 });
 
-// Routes
+// API Routes
 app.use('/api/video', videoRoutes);
 
-// 404 handler
-app.use((req: Request, res: Response) => {
-  res.status(404).json({
-    error: 'Not Found',
-    path: req.path,
-  });
+// Servir archivos estaticos del frontend (despues de las rutas API)
+const frontendPath = path.join(__dirname, '..', 'frontend-dist');
+app.use(express.static(frontendPath));
+
+// SPA fallback - Todas las rutas no API devuelven index.html
+app.get('*', (_req: Request, res: Response) => {
+  res.sendFile(path.join(frontendPath, 'index.html'));
 });
 
 // Error handler

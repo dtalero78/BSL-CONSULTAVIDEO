@@ -102,47 +102,53 @@ Ver [QUICK_START.md](QUICK_START.md) para detalles.
 
 ```
 BSL-CONSULTAVIDEO/
+├── Dockerfile                  # Build unificado (Backend + Frontend)
 ├── backend/                    # Node.js + Express API
-│   ├── Dockerfile             # Backend Docker config
 │   ├── package.json           # Dependencies
 │   └── src/                   # Source code
 ├── frontend/                   # React + Vite SPA
-│   ├── Dockerfile             # Frontend Docker config
 │   ├── package.json           # Dependencies
 │   └── src/                   # Source code
 └── .do/                       # Digital Ocean config (AQUI ESTAS)
-    ├── app.yaml              # Configuracion principal
+    ├── app.yaml              # Configuracion principal (1 servicio)
     ├── QUICK_START.md        # Inicio rapido
     ├── DEPLOYMENT_GUIDE.md   # Guia completa
     ├── MANUAL_SETUP.md       # Setup manual
     └── CHECKLIST.md          # Checklist
 ```
 
+**Nota**: El `Dockerfile` en la raiz construye ambos proyectos y los combina en un solo contenedor.
+
 ---
 
 ## Componentes Desplegados
 
-Digital Ocean creara automaticamente:
+**ARQUITECTURA OPTIMIZADA DE COSTOS**
 
-### Backend Service
-- **Tipo**: Web Service
+Digital Ocean creara **UN SOLO COMPONENTE** que sirve tanto API como frontend:
+
+### App Service (Backend + Frontend)
+- **Tipo**: Web Service (Dockerfile)
 - **Puerto**: 3000
-- **Dockerfile**: `backend/Dockerfile`
-- **URL**: `https://backend-<app-name>.ondigitalocean.app`
-- **Health Check**: `/health`
-
-### Frontend Static Site
-- **Tipo**: Static Site
-- **Build**: Vite
-- **Output**: `dist/`
+- **Dockerfile**: `Dockerfile` (en la raiz del proyecto)
 - **URL**: `https://<app-name>.ondigitalocean.app`
-- **Routing**: SPA catchall
+- **Health Check**: `/health`
+- **Rutas**:
+  - `/health` → Health check
+  - `/api/*` → API REST del backend
+  - `/*` → Frontend estatico (React SPA)
+
+**Ventajas:**
+- Solo 1 componente = Solo 1 costo ($5/mes)
+- No requiere CORS (mismo dominio)
+- Deployment simplificado
+- Menor latencia (sin redirects)
 
 ---
 
 ## Variables de Entorno Requeridas
 
-### Backend (SECRET)
+### Secrets (configurar en Digital Ocean)
 ```
 TWILIO_ACCOUNT_SID=ACxxxxx...
 TWILIO_AUTH_TOKEN=xxxxx...
@@ -151,25 +157,23 @@ TWILIO_API_KEY_SECRET=xxxxx...
 JWT_SECRET=your-secret-here
 ```
 
-### Backend (PUBLIC)
+### Publicas (ya configuradas en app.yaml)
 ```
 NODE_ENV=production
 PORT=3000
 ALLOWED_ORIGINS=${APP_URL}
 ```
 
-### Frontend (BUILD TIME)
-```
-VITE_API_BASE_URL=${backend.PUBLIC_URL}
-```
+**Nota**: Ya NO necesitas `VITE_API_BASE_URL` porque el frontend se sirve desde el mismo backend.
 
 ---
 
 ## Costos Estimados
 
-- **Backend**: ~$5/mes (Basic XXS)
-- **Frontend**: Gratis (Static Site)
-- **Total**: ~$5/mes
+- **Servicio unificado (Backend + Frontend)**: $5/mes (Basic XXS)
+- **Total**: $5/mes
+
+**Ahorro**: Antes eran 2 componentes. Ahora es 1 solo componente.
 
 Puedes escalar cambiando `instance_size_slug` en `app.yaml`.
 

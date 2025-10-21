@@ -1,14 +1,12 @@
 name: bsl-consultavideo
 region: nyc
 
-# Backend Service (Node.js + Express API)
+# Backend Service (Node.js + Express API + Frontend estatico)
+# Un solo componente = $5/mes (ahorro de costos)
 services:
   - name: backend
-    # Specify the backend subdirectory
-    source_dir: backend
-
-    # Dockerfile-based deployment
-    dockerfile_path: backend/Dockerfile
+    # Dockerfile en el directorio raiz construye ambos (backend + frontend)
+    dockerfile_path: Dockerfile
 
     # Port configuration
     http_port: 3000
@@ -50,24 +48,6 @@ services:
     instance_count: 1
     instance_size_slug: basic-xxs
 
-# Frontend Service (React + Vite Static Site)
-static_sites:
-  - name: frontend
-    # Specify the frontend subdirectory
-    source_dir: frontend
-
-    # Build configuration
-    build_command: npm ci && npm run build
-    output_dir: dist
-
-    # Environment variables for build time
-    envs:
-      - key: VITE_API_BASE_URL
-        value: "${backend.PUBLIC_URL}"
-
-    # Routes configuration
+    # Rutas - El backend ahora sirve tanto API como frontend
     routes:
       - path: /
-
-    # Catchall route for SPA
-    catchall_document: index.html
