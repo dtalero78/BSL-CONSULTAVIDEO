@@ -1,6 +1,7 @@
 import wixData from 'wix-data';
 import wixStorage from 'wix-storage';
 import wixWindow from 'wix-window';
+import wixLocation from 'wix-location';
 import { sendTextMessage } from 'backend/WHATSAPP';
 
 let documento = wixStorage.local.getItem("documentoParaLightbox");
@@ -85,9 +86,8 @@ Asegúrate de permitir el acceso a tu cámara y micrófono cuando el navegador t
             wixStorage.local.setItem("linkVideollamadaDoctor", linkVideollamadaDoctor);
             wixStorage.local.setItem("roomNameActual", roomName);
 
-            // Configurar link de WhatsApp y abrirlo
-            $w('#whpTwilio').link = enlaceWhatsAppTwilio;
-            $w('#whpTwilio').target = "_blank";
+            // Abrir WhatsApp usando wixLocation.to()
+            wixLocation.to(enlaceWhatsAppTwilio);
         });
 
         return item;

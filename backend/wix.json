@@ -271,9 +271,8 @@ Asegúrate de permitir el acceso a tu cámara y micrófono cuando el navegador t
                     wixStorage.local.setItem("linkVideollamadaDoctor", linkVideollamadaDoctor);
                     wixStorage.local.setItem("roomNameActual", roomName);
 
-                    // Configurar y abrir el link de WhatsApp
-                    $item('#whpTwilio').link = enlaceWhatsAppTwilio;
-                    $item('#whpTwilio').target = "_blank";
+                    // Abrir WhatsApp usando wixLocation.to()
+                    wixLocation.to(enlaceWhatsAppTwilio);
                 });
 
                 // ==================================================
