@@ -5,8 +5,6 @@ import Video, {
   RemoteParticipant,
   LocalVideoTrack,
   LocalAudioTrack,
-  RemoteVideoTrack,
-  RemoteAudioTrack,
 } from 'twilio-video';
 import apiService from '../services/api.service';
 

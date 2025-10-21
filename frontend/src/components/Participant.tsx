@@ -5,6 +5,8 @@ import {
   RemoteAudioTrack,
   LocalVideoTrack,
   LocalAudioTrack,
+  LocalTrackPublication,
+  RemoteTrackPublication,
 } from 'twilio-video';
 
 interface ParticipantProps {
@@ -77,9 +79,26 @@ export const Participant = ({ participant, isLocal = false }: ParticipantProps) 
 
     // Attach existing tracks
     participant.tracks.forEach((publication) => {
-      console.log('Publication:', publication.trackName, publication.isSubscribed, publication.track);
-      if (publication.track) {
-        trackSubscribed(publication.track);
+      if ('isSubscribed' in publication) {
+        // Remote publication
+        const remotePublication = publication as RemoteTrackPublication;
+        console.log('Publication:', remotePublication.trackName, remotePublication.isSubscribed, remotePublication.track);
+        if (remotePublication.isSubscribed && remotePublication.track) {
+          const track = remotePublication.track;
+          if (track.kind === 'video' || track.kind === 'audio') {
+            trackSubscribed(track as RemoteVideoTrack | RemoteAudioTrack);
+          }
+        }
+      } else {
+        // Local publication
+        const localPublication = publication as LocalTrackPublication;
+        console.log('Publication:', localPublication.trackName, localPublication.track);
+        if (localPublication.track) {
+          const track = localPublication.track;
+          if (track.kind === 'video' || track.kind === 'audio') {
+            trackSubscribed(track as LocalVideoTrack | LocalAudioTrack);
+          }
+        }
       }
     });
 
@@ -90,12 +109,26 @@ export const Participant = ({ participant, isLocal = false }: ParticipantProps) 
     }
 
     return () => {
-      if (!isLocal) {
-        participant.removeAllListeners();
-      }
+      // Clean up tracks
       participant.tracks.forEach((publication) => {
-        if (publication.track) {
-          trackUnsubscribed(publication.track);
+        if ('isSubscribed' in publication) {
+          // Remote publication
+          const remotePublication = publication as RemoteTrackPublication;
+          if (remotePublication.track) {
+            const track = remotePublication.track;
+            if (track.kind === 'video' || track.kind === 'audio') {
+              trackUnsubscribed(track as RemoteVideoTrack | RemoteAudioTrack);
+            }
+          }
+        } else {
+          // Local publication
+          const localPublication = publication as LocalTrackPublication;
+          if (localPublication.track) {
+            const track = localPublication.track;
+            if (track.kind === 'video' || track.kind === 'audio') {
+              trackUnsubscribed(track as LocalVideoTrack | LocalAudioTrack);
+            }
+          }
         }
       });
     };
