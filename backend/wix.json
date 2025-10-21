@@ -236,21 +236,23 @@ async function actualizarDatos() {
                 // BOTON #whpTwilio - VIDEOLLAMADA CON LINK AUTOMATICO
                 // ==================================================
 
-                // Generar sala única para esta consulta
-                const roomName = generarNombreSala();
+                // Configurar evento onClick para generar sala y enviar mensaje
+                $item('#whpTwilio').onClick(() => {
+                    // Generar sala SOLO cuando se hace clic
+                    const roomName = generarNombreSala();
 
-                // Construir links de videollamada
-                const linkVideollamadaPaciente = construirLinkVideollamada(
-                    roomName,
-                    itemData.primerNombre,
-                    itemData.primerApellido,
-                    medico
-                );
+                    // Construir links de videollamada
+                    const linkVideollamadaPaciente = construirLinkVideollamada(
+                        roomName,
+                        itemData.primerNombre,
+                        itemData.primerApellido,
+                        medico
+                    );
 
-                const linkVideollamadaDoctor = construirLinkDoctor(roomName, medico);
+                    const linkVideollamadaDoctor = construirLinkDoctor(roomName, medico);
 
-                // Mensaje de WhatsApp con link de videollamada para el paciente
-                const mensajeVideollamada = `Hola ${itemData.nombre}. Te escribimos de BSL.
+                    // Mensaje de WhatsApp con link de videollamada para el paciente
+                    const mensajeVideollamada = `Hola ${itemData.nombre}. Te escribimos de BSL.
 
 Para tu consulta médica, haz clic en el siguiente link:
 
@@ -262,18 +264,16 @@ Asegúrate de permitir el acceso a tu cámara y micrófono cuando el navegador t
 
 ¡Que tengas una excelente consulta!`;
 
-                const enlaceWhatsAppTwilio = `https://api.whatsapp.com/send?phone=${telefonoConPrefijo}&text=${encodeURIComponent(mensajeVideollamada)}`;
+                    const enlaceWhatsAppTwilio = `https://api.whatsapp.com/send?phone=${telefonoConPrefijo}&text=${encodeURIComponent(mensajeVideollamada)}`;
 
-                // Configurar el link de WhatsApp como link principal del botón
-                $item('#whpTwilio').link = enlaceWhatsAppTwilio;
-                $item('#whpTwilio').target = "_blank";
-
-                // Configurar evento onClick para guardar el link de videollamada del doctor
-                $item('#whpTwilio').onClick(() => {
                     // Guardar el link de la sala del doctor en el storage local
                     // para que esté disponible cuando se abra el panel de consulta
                     wixStorage.local.setItem("linkVideollamadaDoctor", linkVideollamadaDoctor);
                     wixStorage.local.setItem("roomNameActual", roomName);
+
+                    // Configurar y abrir el link de WhatsApp
+                    $item('#whpTwilio').link = enlaceWhatsAppTwilio;
+                    $item('#whpTwilio').target = "_blank";
                 });
 
                 // ==================================================

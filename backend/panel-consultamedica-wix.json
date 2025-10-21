@@ -56,16 +56,18 @@ async function fetchHistoriaClinica(documento) {
         $w('#whp').target = "_blank";
 
         // Botón WhatsApp con videollamada (#whpTwilio)
-        const roomName = generarNombreSala();
-        const linkVideollamadaPaciente = construirLinkVideollamada(
-            roomName,
-            item.primerNombre,
-            item.primerApellido,
-            codEmpresa
-        );
-        const linkVideollamadaDoctor = construirLinkDoctor(roomName, codEmpresa);
+        $w('#whpTwilio').onClick(() => {
+            // Generar sala SOLO cuando se hace clic
+            const roomName = generarNombreSala();
+            const linkVideollamadaPaciente = construirLinkVideollamada(
+                roomName,
+                item.primerNombre,
+                item.primerApellido,
+                codEmpresa
+            );
+            const linkVideollamadaDoctor = construirLinkDoctor(roomName, codEmpresa);
 
-        const mensajeVideollamada = `Hola ${item.primerNombre}. Te escribimos de BSL.
+            const mensajeVideollamada = `Hola ${item.primerNombre}. Te escribimos de BSL.
 
 Para tu consulta médica, haz clic en el siguiente link:
 
@@ -77,14 +79,15 @@ Asegúrate de permitir el acceso a tu cámara y micrófono cuando el navegador t
 
 ¡Que tengas una excelente consulta!`;
 
-        const enlaceWhatsAppTwilio = `https://api.whatsapp.com/send?phone=${telefonoConPrefijo}&text=${encodeURIComponent(mensajeVideollamada)}`;
+            const enlaceWhatsAppTwilio = `https://api.whatsapp.com/send?phone=${telefonoConPrefijo}&text=${encodeURIComponent(mensajeVideollamada)}`;
 
-        $w('#whpTwilio').link = enlaceWhatsAppTwilio;
-        $w('#whpTwilio').target = "_blank";
-        $w('#whpTwilio').onClick(() => {
-            // Guardar el link del doctor para el botón iniciarConsultaTwilio
+            // Guardar el link del doctor ANTES de abrir WhatsApp
             wixStorage.local.setItem("linkVideollamadaDoctor", linkVideollamadaDoctor);
             wixStorage.local.setItem("roomNameActual", roomName);
+
+            // Configurar link de WhatsApp y abrirlo
+            $w('#whpTwilio').link = enlaceWhatsAppTwilio;
+            $w('#whpTwilio').target = "_blank";
         });
 
         return item;
