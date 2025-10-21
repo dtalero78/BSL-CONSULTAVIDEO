@@ -176,6 +176,25 @@ Detener servicios:
 docker-compose down
 ```
 
+## ☁️ Despliegue en Digital Ocean
+
+Esta aplicacion esta configurada para desplegarse facilmente en Digital Ocean App Platform:
+
+**Pasos rapidos:**
+1. Push tu codigo a GitHub/GitLab
+2. Ve a [Digital Ocean App Platform](https://cloud.digitalocean.com/apps)
+3. Click "Create App" y selecciona tu repositorio
+4. Digital Ocean detectara automaticamente la configuracion en `.do/app.yaml`
+5. Configura las variables de entorno de Twilio
+6. Deploy!
+
+**Documentacion completa:**
+- Ver [.do/DEPLOYMENT_GUIDE.md](.do/DEPLOYMENT_GUIDE.md) para instrucciones detalladas
+- Configuracion ya lista en `.do/app.yaml`
+- Health checks y CORS pre-configurados
+
+**Costos estimados:** ~$5/mes con instancias Basic XXS
+
 ## 📚 Documentación Adicional
 
 - [Arquitectura del Sistema](docs/architecture/README.md)
