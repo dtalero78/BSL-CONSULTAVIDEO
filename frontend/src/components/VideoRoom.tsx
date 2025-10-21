@@ -2,7 +2,6 @@ import { useVideoRoom } from '../hooks/useVideoRoom';
 import { useBackgroundEffects } from '../hooks/useBackgroundEffects';
 import { Participant } from './Participant';
 import { VideoControls } from './VideoControls';
-import { BackgroundControls } from './BackgroundControls';
 
 interface VideoRoomProps {
   identity: string;
@@ -206,19 +205,6 @@ export const VideoRoom = ({ identity, roomName, role, onLeave }: VideoRoomProps)
           </div>
         )}
 
-        {/* Controles de fondo virtual - Solo para doctores */}
-        {role === 'doctor' && localVideoTrack && (
-          <div className="absolute top-3 left-3 z-10">
-            <BackgroundControls
-              onApplyBlur={handleApplyBlur}
-              onApplyVirtualBackground={handleApplyVirtualBackground}
-              onRemoveEffect={handleRemoveEffect}
-              isProcessing={isProcessing}
-              currentEffect={currentEffect}
-            />
-          </div>
-        )}
-
         {/* Additional remote participants (if more than 1) */}
         {remoteParticipantArray.length > 1 && (
           <div className="absolute bottom-24 left-0 right-0 px-4 z-10">
@@ -240,6 +226,12 @@ export const VideoRoom = ({ identity, roomName, role, onLeave }: VideoRoomProps)
         onToggleAudio={toggleAudio}
         onToggleVideo={toggleVideo}
         onLeave={handleLeave}
+        showBackgroundControls={role === 'doctor' && !!localVideoTrack}
+        onApplyBlur={handleApplyBlur}
+        onApplyVirtualBackground={handleApplyVirtualBackground}
+        onRemoveEffect={handleRemoveEffect}
+        isProcessingBackground={isProcessing}
+        currentBackgroundEffect={currentEffect}
       />
     </div>
   );

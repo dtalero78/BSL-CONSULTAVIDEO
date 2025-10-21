@@ -1,9 +1,17 @@
+import { BackgroundControls } from './BackgroundControls';
+
 interface VideoControlsProps {
   isAudioEnabled: boolean;
   isVideoEnabled: boolean;
   onToggleAudio: () => void;
   onToggleVideo: () => void;
   onLeave: () => void;
+  showBackgroundControls?: boolean;
+  onApplyBlur?: () => void;
+  onApplyVirtualBackground?: (imageUrl: string) => void;
+  onRemoveEffect?: () => void;
+  isProcessingBackground?: boolean;
+  currentBackgroundEffect?: 'none' | 'blur' | 'virtual';
 }
 
 export const VideoControls = ({
@@ -12,19 +20,26 @@ export const VideoControls = ({
   onToggleAudio,
   onToggleVideo,
   onLeave,
+  showBackgroundControls = false,
+  onApplyBlur,
+  onApplyVirtualBackground,
+  onRemoveEffect,
+  isProcessingBackground = false,
+  currentBackgroundEffect = 'none',
 }: VideoControlsProps) => {
   return (
     <div className="bg-gradient-to-t from-black/80 via-black/60 to-transparent pb-safe">
       <div className="px-6 py-6 flex items-center justify-center gap-6">
-        {/* Flip Camera (placeholder for future) */}
-        <button
-          className="w-14 h-14 rounded-full bg-[#374045] hover:bg-[#4a5459] text-white transition-all flex items-center justify-center"
-          title="Rotar cámara"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-        </button>
+        {/* Background Effects - Solo para doctores */}
+        {showBackgroundControls && onApplyBlur && onApplyVirtualBackground && onRemoveEffect && (
+          <BackgroundControls
+            onApplyBlur={onApplyBlur}
+            onApplyVirtualBackground={onApplyVirtualBackground}
+            onRemoveEffect={onRemoveEffect}
+            isProcessing={isProcessingBackground}
+            currentEffect={currentBackgroundEffect}
+          />
+        )}
 
         {/* Video Toggle */}
         <button
