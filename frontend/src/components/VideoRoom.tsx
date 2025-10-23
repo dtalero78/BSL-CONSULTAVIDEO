@@ -41,11 +41,13 @@ export const VideoRoom = ({ identity, roomName, role, onLeave }: VideoRoomProps)
   } = useBackgroundEffects();
 
   // Initialize postural analysis
+  // El hook siempre está enabled para que Socket.io esté listo
+  // Pero el componente del paciente solo se muestra cuando sessionActive es true Y el doctor ha iniciado
   const posturalAnalysis = usePosturalAnalysis({
     roomName,
     doctorIdentity: identity,
     role: role || 'patient',
-    enabled: isPosturalAnalysisOpen || role === 'patient',
+    enabled: true, // Siempre enabled para mantener conexión Socket.io
   });
 
   const {

@@ -88,12 +88,19 @@ export const usePosturalAnalysis = ({
 
     socket.on('session-joined', (data: { roomName: string; doctorIdentity: string }) => {
       console.log('[Postural Analysis] Session joined:', data);
-      setSessionActive(true);
+      // NO marcar como activa aquí - solo cuando el doctor inicia (patient-connected event)
+      // El paciente espera a que el doctor active la sesión
     });
 
     socket.on('patient-connected', (data: { patientIdentity: string }) => {
       console.log('[Postural Analysis] Patient connected:', data);
       setPatientConnected(true);
+    });
+
+    socket.on('session-activated-by-doctor', (data: { doctorIdentity: string }) => {
+      console.log('[Postural Analysis] Session activated by doctor:', data);
+      // El doctor inició la sesión, ahora el paciente puede activar su overlay
+      setSessionActive(true);
     });
 
     socket.on('patient-disconnected', () => {
@@ -177,14 +184,15 @@ export const usePosturalAnalysis = ({
 
   // Auto-join session for patient when enabled
   useEffect(() => {
-    if (!enabled || !isConnected || role !== 'patient' || sessionActive) return;
+    if (!enabled || !isConnected || role !== 'patient') return;
 
-    console.log('[Postural Analysis] Patient auto-joining session:', roomName);
+    // Patient should try to join immediately when connected
+    console.log('[Postural Analysis] Patient attempting to join session:', roomName);
     socketRef.current?.emit('join-analysis-session', {
       roomName,
       patientIdentity: 'Patient', // Can be customized later
     });
-  }, [enabled, isConnected, role, roomName, sessionActive]);
+  }, [enabled, isConnected, role, roomName]);
 
   return {
     isConnected,

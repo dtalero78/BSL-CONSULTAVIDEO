@@ -2,9 +2,9 @@ import { Server, Socket } from 'socket.io';
 
 interface TelemedicineSession {
   roomName: string;
-  doctorSocketId: string;
+  doctorSocketId?: string;
   patientSocketId?: string;
-  doctorIdentity: string;
+  doctorIdentity?: string;
   patientIdentity?: string;
   createdAt: Date;
   isActive: boolean;
@@ -64,23 +64,41 @@ class TelemedicineSocketService {
   private handleCreateSession(socket: Socket, data: { roomName: string; doctorIdentity: string }) {
     const { roomName, doctorIdentity } = data;
 
-    console.log(`[Telemedicine] Creating session: ${roomName} by ${doctorIdentity}`);
+    console.log(`[Telemedicine] Doctor creating session: ${roomName} by ${doctorIdentity}`);
 
     // Verificar si ya existe una sesión
     if (this.sessions.has(roomName)) {
       const existingSession = this.sessions.get(roomName)!;
 
-      // Si la sesión existe pero está inactiva, reactivarla
+      // Si la sesión existe pero está inactiva (paciente esperando), activarla con el doctor
       if (!existingSession.isActive) {
         existingSession.doctorSocketId = socket.id;
+        existingSession.doctorIdentity = doctorIdentity;
         existingSession.isActive = true;
         socket.join(roomName);
+
+        const patientConnected = !!existingSession.patientSocketId;
 
         socket.emit('session-created', {
           roomName,
           sessionCode: roomName,
-          patientConnected: !!existingSession.patientSocketId,
+          patientConnected,
         });
+
+        // Si hay un paciente esperando, notificarle que el doctor se conectó y activó la sesión
+        if (patientConnected) {
+          console.log(`[Telemedicine] Notifying waiting patient that doctor activated session`);
+          // Notificar al doctor que el paciente ya estaba esperando
+          socket.emit('patient-connected', {
+            patientIdentity: existingSession.patientIdentity,
+          });
+          // Notificar al paciente que la sesión fue activada por el doctor
+          socket.to(roomName).emit('session-activated-by-doctor', {
+            doctorIdentity,
+          });
+        }
+
+        console.log(`[Telemedicine] Session activated: ${roomName}, patient connected: ${patientConnected}`);
         return;
       }
 
@@ -107,27 +125,58 @@ class TelemedicineSocketService {
       patientConnected: false,
     });
 
-    console.log(`[Telemedicine] Session created: ${roomName}`);
+    console.log(`[Telemedicine] New session created: ${roomName}`);
   }
 
   private handleJoinSession(socket: Socket, data: { roomName: string; patientIdentity: string }) {
     const { roomName, patientIdentity } = data;
 
-    console.log(`[Telemedicine] Patient joining: ${roomName} as ${patientIdentity}`);
+    console.log(`[Telemedicine] Patient attempting to join: ${roomName} as ${patientIdentity}`);
 
     const session = this.sessions.get(roomName);
 
+    // Si no existe sesión, crear una sesión pendiente esperando al doctor
     if (!session) {
-      socket.emit('join-error', { message: 'Session not found' });
+      console.log(`[Telemedicine] No session found, patient ${patientIdentity} will wait for doctor`);
+
+      // Crear sesión pendiente (sin doctor aún)
+      const pendingSession: TelemedicineSession = {
+        roomName,
+        patientSocketId: socket.id,
+        patientIdentity,
+        createdAt: new Date(),
+        isActive: false, // Inactiva hasta que el doctor la active
+      };
+
+      this.sessions.set(roomName, pendingSession);
+      socket.join(roomName);
+
+      // Notificar al paciente que está esperando
+      socket.emit('session-joined', {
+        roomName,
+        doctorIdentity: null, // Aún no hay doctor
+      });
+
+      console.log(`[Telemedicine] Patient ${patientIdentity} waiting in session ${roomName}`);
       return;
     }
 
+    // Si la sesión existe pero no está activa, actualizar con el paciente
     if (!session.isActive) {
-      socket.emit('join-error', { message: 'Session not active' });
+      session.patientSocketId = socket.id;
+      session.patientIdentity = patientIdentity;
+      socket.join(roomName);
+
+      socket.emit('session-joined', {
+        roomName,
+        doctorIdentity: session.doctorIdentity,
+      });
+
+      console.log(`[Telemedicine] Patient ${patientIdentity} joined inactive session ${roomName}`);
       return;
     }
 
-    // Actualizar sesión con info del paciente
+    // Si la sesión está activa, unir al paciente inmediatamente
     session.patientSocketId = socket.id;
     session.patientIdentity = patientIdentity;
 
@@ -144,7 +193,7 @@ class TelemedicineSocketService {
       patientIdentity,
     });
 
-    console.log(`[Telemedicine] Patient ${patientIdentity} joined session ${roomName}`);
+    console.log(`[Telemedicine] Patient ${patientIdentity} joined active session ${roomName}`);
   }
 
   private handlePoseData(socket: Socket, data: { roomName: string; poseData: PoseData }) {
