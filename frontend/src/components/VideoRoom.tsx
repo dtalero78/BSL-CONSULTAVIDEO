@@ -1,7 +1,11 @@
+import { useState } from 'react';
 import { useVideoRoom } from '../hooks/useVideoRoom';
 import { useBackgroundEffects } from '../hooks/useBackgroundEffects';
+import { usePosturalAnalysis } from '../hooks/usePosturalAnalysis';
 import { Participant } from './Participant';
 import { VideoControls } from './VideoControls';
+import { PosturalAnalysisModal } from './PosturalAnalysisModal';
+import { PosturalAnalysisPatient } from './PosturalAnalysisPatient';
 
 interface VideoRoomProps {
   identity: string;
@@ -11,6 +15,8 @@ interface VideoRoomProps {
 }
 
 export const VideoRoom = ({ identity, roomName, role, onLeave }: VideoRoomProps) => {
+  const [isPosturalAnalysisOpen, setIsPosturalAnalysisOpen] = useState(false);
+
   const {
     localParticipant,
     remoteParticipants,
@@ -34,6 +40,23 @@ export const VideoRoom = ({ identity, roomName, role, onLeave }: VideoRoomProps)
     removeEffect,
   } = useBackgroundEffects();
 
+  // Initialize postural analysis
+  const posturalAnalysis = usePosturalAnalysis({
+    roomName,
+    doctorIdentity: identity,
+    role: role || 'patient',
+    enabled: isPosturalAnalysisOpen || role === 'patient',
+  });
+
+  const {
+    sessionActive,
+    patientConnected,
+    latestPoseData,
+    startSession,
+    endSession,
+    sendPoseData,
+  } = posturalAnalysis;
+
   const handleLeave = () => {
     disconnectFromRoom();
     onLeave?.();
@@ -55,6 +78,17 @@ export const VideoRoom = ({ identity, roomName, role, onLeave }: VideoRoomProps)
     if (localVideoTrack) {
       removeEffect(localVideoTrack);
     }
+  };
+
+  const handleOpenPosturalAnalysis = () => {
+    setIsPosturalAnalysisOpen(true);
+  };
+
+  const handleClosePosturalAnalysis = () => {
+    if (sessionActive) {
+      endSession();
+    }
+    setIsPosturalAnalysisOpen(false);
   };
 
   if (error) {
@@ -232,7 +266,31 @@ export const VideoRoom = ({ identity, roomName, role, onLeave }: VideoRoomProps)
         onRemoveEffect={handleRemoveEffect}
         isProcessingBackground={isProcessing}
         currentBackgroundEffect={currentEffect}
+        showPosturalAnalysis={role === 'doctor'}
+        onOpenPosturalAnalysis={handleOpenPosturalAnalysis}
       />
+
+      {/* Postural Analysis Modal - Only for doctors */}
+      {role === 'doctor' && (
+        <PosturalAnalysisModal
+          isOpen={isPosturalAnalysisOpen}
+          onClose={handleClosePosturalAnalysis}
+          roomName={roomName}
+          sessionActive={sessionActive}
+          patientConnected={patientConnected}
+          latestPoseData={latestPoseData}
+          onStartSession={startSession}
+          onEndSession={endSession}
+        />
+      )}
+
+      {/* Postural Analysis Patient - Auto-activates when doctor starts session */}
+      {role === 'patient' && sessionActive && (
+        <PosturalAnalysisPatient
+          onPoseData={sendPoseData}
+          isActive={sessionActive}
+        />
+      )}
     </div>
   );
 };

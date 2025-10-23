@@ -12,6 +12,8 @@ interface VideoControlsProps {
   onRemoveEffect?: () => void;
   isProcessingBackground?: boolean;
   currentBackgroundEffect?: 'none' | 'blur' | 'virtual';
+  showPosturalAnalysis?: boolean;
+  onOpenPosturalAnalysis?: () => void;
 }
 
 export const VideoControls = ({
@@ -26,6 +28,8 @@ export const VideoControls = ({
   onRemoveEffect,
   isProcessingBackground = false,
   currentBackgroundEffect = 'none',
+  showPosturalAnalysis = false,
+  onOpenPosturalAnalysis,
 }: VideoControlsProps) => {
   return (
     <div className="bg-gradient-to-t from-black/80 via-black/60 to-transparent pb-safe">
@@ -84,15 +88,18 @@ export const VideoControls = ({
           )}
         </button>
 
-        {/* Add Participant (placeholder) */}
-        <button
-          className="w-14 h-14 rounded-full bg-[#374045] hover:bg-[#4a5459] text-white transition-all flex items-center justify-center"
-          title="Añadir participante"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-          </svg>
-        </button>
+        {/* Postural Analysis - Solo para doctores */}
+        {showPosturalAnalysis && onOpenPosturalAnalysis && (
+          <button
+            onClick={onOpenPosturalAnalysis}
+            className="w-14 h-14 rounded-full bg-[#374045] hover:bg-[#4a5459] text-white transition-all flex items-center justify-center"
+            title="Análisis Postural"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+          </button>
+        )}
 
         {/* End Call */}
         <button

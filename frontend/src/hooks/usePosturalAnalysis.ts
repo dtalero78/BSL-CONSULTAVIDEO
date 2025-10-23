@@ -1,0 +1,199 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { io, Socket } from 'socket.io-client';
+
+interface PoseData {
+  landmarks: any[];
+  metrics: {
+    posture: any;
+    joints: any;
+    symmetry: any;
+  };
+  timestamp: number;
+}
+
+interface UsePosturalAnalysisProps {
+  roomName: string;
+  doctorIdentity: string;
+  role: 'doctor' | 'patient';
+  enabled: boolean;
+}
+
+interface UsePosturalAnalysisReturn {
+  isConnected: boolean;
+  sessionActive: boolean;
+  patientConnected: boolean;
+  latestPoseData: PoseData | null;
+  error: string | null;
+  startSession: () => void;
+  endSession: () => void;
+  sendPoseData: (poseData: PoseData) => void;
+}
+
+export const usePosturalAnalysis = ({
+  roomName,
+  doctorIdentity,
+  role,
+  enabled,
+}: UsePosturalAnalysisProps): UsePosturalAnalysisReturn => {
+  const [isConnected, setIsConnected] = useState(false);
+  const [sessionActive, setSessionActive] = useState(false);
+  const [patientConnected, setPatientConnected] = useState(false);
+  const [latestPoseData, setLatestPoseData] = useState<PoseData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const socketRef = useRef<Socket | null>(null);
+
+  // Initialize Socket.io connection
+  useEffect(() => {
+    if (!enabled) return;
+
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
+    const socketUrl = apiBaseUrl || window.location.origin;
+
+    console.log('[Postural Analysis] Connecting to Socket.io:', socketUrl);
+
+    const socket = io(`${socketUrl}/telemedicine`, {
+      transports: ['websocket', 'polling'],
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: 5,
+    });
+
+    socketRef.current = socket;
+
+    // Connection events
+    socket.on('connect', () => {
+      console.log('[Postural Analysis] Connected to Socket.io');
+      setIsConnected(true);
+      setError(null);
+    });
+
+    socket.on('disconnect', () => {
+      console.log('[Postural Analysis] Disconnected from Socket.io');
+      setIsConnected(false);
+      setSessionActive(false);
+    });
+
+    socket.on('connect_error', (err) => {
+      console.error('[Postural Analysis] Connection error:', err);
+      setError('Error connecting to telemedicine service');
+    });
+
+    // Session events
+    socket.on('session-created', (data: { roomName: string; sessionCode: string; patientConnected: boolean }) => {
+      console.log('[Postural Analysis] Session created:', data);
+      setSessionActive(true);
+      setPatientConnected(data.patientConnected);
+    });
+
+    socket.on('session-joined', (data: { roomName: string; doctorIdentity: string }) => {
+      console.log('[Postural Analysis] Session joined:', data);
+      setSessionActive(true);
+    });
+
+    socket.on('patient-connected', (data: { patientIdentity: string }) => {
+      console.log('[Postural Analysis] Patient connected:', data);
+      setPatientConnected(true);
+    });
+
+    socket.on('patient-disconnected', () => {
+      console.log('[Postural Analysis] Patient disconnected');
+      setPatientConnected(false);
+    });
+
+    socket.on('session-ended', (data: { roomName: string }) => {
+      console.log('[Postural Analysis] Session ended:', data);
+      setSessionActive(false);
+      setPatientConnected(false);
+    });
+
+    // Pose data events (for doctor)
+    if (role === 'doctor') {
+      socket.on('pose-data-update', (poseData: PoseData) => {
+        setLatestPoseData(poseData);
+      });
+    }
+
+    // Error events
+    socket.on('session-error', (data: { message: string }) => {
+      console.error('[Postural Analysis] Session error:', data);
+      setError(data.message);
+    });
+
+    socket.on('join-error', (data: { message: string }) => {
+      console.error('[Postural Analysis] Join error:', data);
+      setError(data.message);
+    });
+
+    // Cleanup
+    return () => {
+      console.log('[Postural Analysis] Cleaning up Socket.io connection');
+      socket.disconnect();
+    };
+  }, [enabled, role]);
+
+  // Start session (doctor creates session)
+  const startSession = useCallback(() => {
+    if (!socketRef.current || !isConnected) {
+      console.warn('[Postural Analysis] Cannot start session: not connected');
+      return;
+    }
+
+    console.log('[Postural Analysis] Starting session:', roomName);
+    socketRef.current.emit('create-analysis-session', {
+      roomName,
+      doctorIdentity,
+    });
+  }, [isConnected, roomName, doctorIdentity]);
+
+  // End session
+  const endSession = useCallback(() => {
+    if (!socketRef.current || !isConnected) {
+      console.warn('[Postural Analysis] Cannot end session: not connected');
+      return;
+    }
+
+    console.log('[Postural Analysis] Ending session:', roomName);
+    socketRef.current.emit('end-analysis-session', { roomName });
+    setSessionActive(false);
+    setPatientConnected(false);
+    setLatestPoseData(null);
+  }, [isConnected, roomName]);
+
+  // Send pose data (patient sends data)
+  const sendPoseData = useCallback(
+    (poseData: PoseData) => {
+      if (!socketRef.current || !isConnected || !sessionActive) {
+        return;
+      }
+
+      socketRef.current.emit('pose-data', {
+        roomName,
+        poseData,
+      });
+    },
+    [isConnected, sessionActive, roomName]
+  );
+
+  // Auto-join session for patient when enabled
+  useEffect(() => {
+    if (!enabled || !isConnected || role !== 'patient' || sessionActive) return;
+
+    console.log('[Postural Analysis] Patient auto-joining session:', roomName);
+    socketRef.current?.emit('join-analysis-session', {
+      roomName,
+      patientIdentity: 'Patient', // Can be customized later
+    });
+  }, [enabled, isConnected, role, roomName, sessionActive]);
+
+  return {
+    isConnected,
+    sessionActive,
+    patientConnected,
+    latestPoseData,
+    error,
+    startSession,
+    endSession,
+    sendPoseData,
+  };
+};

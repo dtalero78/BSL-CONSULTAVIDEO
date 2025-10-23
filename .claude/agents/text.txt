@@ -1,0 +1,20 @@
+1. ¿Cómo quieres que se active la telemedicina durante la videollamada?
+Ideal la opción B pero lo que sea menos complicado para la plataforma de video. Es decir que no comiencen problemas de audio o video por iniciar la aplicación
+
+2. ¿Los dos sistemas deben funcionar simultáneamente?
+El médico hace el análisis postural en medio de la videollamada. Es decir es parte de la entrevista médica
+
+3. ¿El paciente también necesita acceso desde su interfaz?
+No 
+
+4. ¿Compartir códigos de sesión?
+Debe ser la misma sesión que ya comenzó en twilio con la llamada. Es decir, cuando comienza la llamada en twilio, después de que el médico hace unas preguntas debe disparar la aplicación del análisis postural, se debe abrir en el panel del doc el esqueleto y las métricas. Luego de terminar ese análisis el médico sigue con la consulta
+
+5. 5. ¿Dónde correr el servidor Socket.io de telemedicina?
+Lo que sea más eficiente
+
+En otras palabras lo único es que en medio de la videollamada el médico:
+1. Hace clic en el botón de la prueba osteomuscular
+2. Se abre el esqueleto y las métricas
+3. Termina la prueba y genera el pdf con los resultados de las métricas
+4. continúa con la video llamada 
