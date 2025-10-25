@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import { DoctorPage } from './pages/DoctorPage';
 import { DoctorRoomPage } from './pages/DoctorRoomPage';
 import { PatientPage } from './pages/PatientPage';
+import { MedicalPanelPage } from './pages/MedicalPanelPage';
 
 function HomePage() {
   return (
@@ -75,6 +76,7 @@ function App() {
         <Route path="/doctor" element={<DoctorPage />} />
         <Route path="/doctor/:roomName" element={<DoctorRoomPage />} />
         <Route path="/patient/:roomName" element={<PatientPage />} />
+        <Route path="/panel-medico" element={<MedicalPanelPage />} />
       </Routes>
     </BrowserRouter>
   );
