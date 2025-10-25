@@ -82,6 +82,29 @@ export function MedicalPanelPage() {
     }
   };
 
+  const formatPhoneNumber = (phone: string): string => {
+    // Limpiar espacios, paréntesis, guiones
+    let cleaned = phone.replace(/[\s\(\)\-]/g, '');
+
+    // Si ya tiene +, retornarlo limpio
+    if (cleaned.startsWith('+')) {
+      return cleaned;
+    }
+
+    // Detectar si ya tiene código de país (números largos internacionales)
+    // Códigos comunes: 1 (USA/Canada), 52 (Mexico), 57 (Colombia), 54 (Argentina), 55 (Brazil), 34 (Spain), 44 (UK), 49 (Germany), 33 (France)
+    const hasCountryCode = /^(1|52|57|54|55|34|44|49|33)\d{10,}/.test(cleaned);
+
+    if (hasCountryCode) {
+      // Ya tiene código de país, solo agregar +
+      return `+${cleaned}`;
+    }
+
+    // No tiene código de país, es número local colombiano (300xxxxxxx, 310xxxxxxx, etc.)
+    // Agregar +57
+    return `+57${cleaned}`;
+  };
+
   const handleAtender = async (patient: Patient) => {
     setAttendingPatient(patient._id);
     try {
@@ -97,15 +120,11 @@ export function MedicalPanelPage() {
       // Generar mensaje de WhatsApp con el link
       const whatsappMessage = `Hola ${patient.primerNombre}. Te escribimos de BSL. Tienes una cita médica programada conmigo\n\nConéctate al link:\n\n${patientLink}`;
 
-      // Formatear teléfono (sin + para WhatsApp API)
-      const phoneWithoutPlus = patient.celular.startsWith('+')
-        ? patient.celular.substring(1)
-        : patient.celular;
+      // Formatear teléfono con código de país internacional
+      const phoneWithPlus = formatPhoneNumber(patient.celular);
 
-      // Formatear teléfono (con + para Twilio Voice)
-      const phoneWithPlus = patient.celular.startsWith('+')
-        ? patient.celular
-        : `+${patient.celular}`;
+      // Formatear teléfono (sin + para WhatsApp API)
+      const phoneWithoutPlus = phoneWithPlus.substring(1);
 
       // 1. Enviar mensaje de WhatsApp por API
       await apiService.sendWhatsApp(phoneWithoutPlus, whatsappMessage);
@@ -113,10 +132,11 @@ export function MedicalPanelPage() {
 
       // 2. Realizar llamada telefónica con Twilio Voice
       try {
+        console.log(`📞 Iniciando llamada a: ${phoneWithPlus}`);
         await apiService.makeVoiceCall(phoneWithPlus, patient.primerNombre);
-        console.log('Llamada telefónica iniciada exitosamente');
+        console.log('✅ Llamada telefónica iniciada exitosamente');
       } catch (callError) {
-        console.error('Error realizando llamada telefónica:', callError);
+        console.error('❌ Error realizando llamada telefónica:', callError);
         // No interrumpir el flujo si la llamada falla
       }
 
