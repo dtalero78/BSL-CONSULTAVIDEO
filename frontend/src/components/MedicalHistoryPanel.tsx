@@ -287,63 +287,7 @@ export const MedicalHistoryPanel = ({ numeroId }: MedicalHistoryPanelProps) => {
         <h3 className="text-sm font-semibold mb-3 text-[#00a884]">Evaluación Médica</h3>
         <div className="space-y-3">
 
-        <div>
-          <label className="block text-xs text-gray-400 mb-1">Antecedentes</label>
-          <textarea
-            value={mdAntecedentes}
-            onChange={(e) => setMdAntecedentes(e.target.value)}
-            className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none min-h-[60px]"
-            placeholder="Antecedentes médicos..."
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs text-gray-400 mb-1">Obs. MiDocYa</label>
-          <textarea
-            value={mdObsParaMiDocYa}
-            onChange={(e) => setMdObsParaMiDocYa(e.target.value)}
-            className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none min-h-[60px]"
-            placeholder="Observaciones..."
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs text-gray-400 mb-1">Obs. Certificado</label>
-          <textarea
-            value={mdObservacionesCertificado}
-            onChange={(e) => setMdObservacionesCertificado(e.target.value)}
-            className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none min-h-[60px]"
-            placeholder="Observaciones..."
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs text-gray-400 mb-1">Recomendaciones</label>
-          <textarea
-            value={mdRecomendacionesMedicasAdicionales}
-            onChange={(e) => setMdRecomendacionesMedicasAdicionales(e.target.value)}
-            className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none min-h-[60px]"
-            placeholder="Recomendaciones..."
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs text-gray-400 mb-1">Concepto Final</label>
-          <select
-            value={mdConceptoFinal}
-            onChange={(e) => setMdConceptoFinal(e.target.value)}
-            className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none"
-          >
-            <option value="">Seleccione una opción</option>
-            <option value="ELEGIBLE PARA EL CARGO SIN RECOMENDACIONES LABORALES">ELEGIBLE PARA EL CARGO SIN RECOMENDACIONES LABORALES</option>
-            <option value="ELEGIBLE PARA EL CARGO CON RECOMENDACIONES LABORALES">ELEGIBLE PARA EL CARGO CON RECOMENDACIONES LABORALES</option>
-            <option value="NO ELEGIBLE PARA EL CARGO POR FUERA DEL PROFESIOGRAMA">NO ELEGIBLE PARA EL CARGO POR FUERA DEL PROFESIOGRAMA</option>
-            <option value="PENDIENTE">PENDIENTE</option>
-            <option value="NO PRESENTA DETERIORO FÍSICO POR ACTIVIDAD LABORAL">NO PRESENTA DETERIORO FÍSICO POR ACTIVIDAD LABORAL</option>
-            <option value="Puede realizar actividades escolares y grupales">Puede realizar actividades escolares y grupales</option>
-          </select>
-        </div>
-
+        {/* DIAGNÓSTICOS PRIMERO */}
         <div className="grid grid-cols-1 gap-2">
           <div>
             <label className="block text-xs text-gray-400 mb-1">Diagnóstico 1 (Principal)</label>
@@ -450,6 +394,70 @@ export const MedicalHistoryPanel = ({ numeroId }: MedicalHistoryPanelProps) => {
             </select>
           </div>
         </div>
+
+        {/* CAMPOS DE TEXTO DESPUÉS DE DIAGNÓSTICOS */}
+        <div>
+          <label className="block text-xs text-gray-400 mb-1">Antecedentes</label>
+          <textarea
+            value={mdAntecedentes}
+            onChange={(e) => setMdAntecedentes(e.target.value)}
+            className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none"
+            rows={3}
+            placeholder="Antecedentes médicos relevantes..."
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs text-gray-400 mb-1">Observaciones privadas para la empresa</label>
+          <textarea
+            value={mdObsParaMiDocYa}
+            onChange={(e) => setMdObsParaMiDocYa(e.target.value)}
+            className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none"
+            rows={3}
+            placeholder="Observaciones privadas para la empresa..."
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs text-gray-400 mb-1">Obs. Certificado</label>
+          <textarea
+            value={mdObservacionesCertificado}
+            onChange={(e) => setMdObservacionesCertificado(e.target.value)}
+            className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none"
+            rows={3}
+            placeholder="Observaciones para el certificado..."
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs text-gray-400 mb-1">Recomendaciones Médicas Adicionales</label>
+          <textarea
+            value={mdRecomendacionesMedicasAdicionales}
+            onChange={(e) => setMdRecomendacionesMedicasAdicionales(e.target.value)}
+            className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none"
+            rows={3}
+            placeholder="Recomendaciones médicas adicionales..."
+          />
+        </div>
+
+        {/* CONCEPTO FINAL AL ÚLTIMO */}
+        <div>
+          <label className="block text-xs text-gray-400 mb-1">Concepto Final</label>
+          <select
+            value={mdConceptoFinal}
+            onChange={(e) => setMdConceptoFinal(e.target.value)}
+            className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none"
+          >
+            <option value="">Seleccione una opción</option>
+            <option value="ELEGIBLE PARA EL CARGO SIN RECOMENDACIONES LABORALES">ELEGIBLE PARA EL CARGO SIN RECOMENDACIONES LABORALES</option>
+            <option value="ELEGIBLE PARA EL CARGO CON RECOMENDACIONES LABORALES">ELEGIBLE PARA EL CARGO CON RECOMENDACIONES LABORALES</option>
+            <option value="NO ELEGIBLE PARA EL CARGO POR FUERA DEL PROFESIOGRAMA">NO ELEGIBLE PARA EL CARGO POR FUERA DEL PROFESIOGRAMA</option>
+            <option value="PENDIENTE">PENDIENTE</option>
+            <option value="NO PRESENTA DETERIORO FÍSICO POR ACTIVIDAD LABORAL">NO PRESENTA DETERIORO FÍSICO POR ACTIVIDAD LABORAL</option>
+            <option value="Puede realizar actividades escolares y grupales">Puede realizar actividades escolares y grupales</option>
+          </select>
+        </div>
+
         </div>
       </div>
 
