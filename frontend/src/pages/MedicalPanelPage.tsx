@@ -91,7 +91,7 @@ export function MedicalPanelPage() {
       return cleaned;
     }
 
-    // Detectar si ya tiene código de país (números largos internacionales)
+    // Detectar si ya tiene código de país internacional (11+ dígitos)
     // Códigos comunes: 1 (USA/Canada), 52 (Mexico), 57 (Colombia), 54 (Argentina), 55 (Brazil), 34 (Spain), 44 (UK), 49 (Germany), 33 (France)
     const hasCountryCode = /^(1|52|57|54|55|34|44|49|33)\d{10,}/.test(cleaned);
 
@@ -100,9 +100,17 @@ export function MedicalPanelPage() {
       return `+${cleaned}`;
     }
 
-    // No tiene código de país, es número local colombiano (300xxxxxxx, 310xxxxxxx, etc.)
-    // Agregar +57
-    return `+57${cleaned}`;
+    // Detectar si es número local colombiano (10 dígitos que empiezan con 3)
+    const isColombian = /^3\d{9}$/.test(cleaned);
+
+    if (isColombian) {
+      // Es número local colombiano, agregar +57
+      return `+57${cleaned}`;
+    }
+
+    // Si no coincide con ningún patrón, retornar tal cual (con advertencia en consola)
+    console.warn(`⚠️ Número telefónico con formato desconocido: ${cleaned}`);
+    return cleaned;
   };
 
   const handleAtender = async (patient: Patient) => {
