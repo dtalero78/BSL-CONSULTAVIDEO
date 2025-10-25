@@ -126,14 +126,50 @@ export const MedicalHistoryPanel = ({ numeroId, onClose }: MedicalHistoryPanelPr
   }
 
   if (error || !data) {
+    const isWixNotConfigured = error && error.includes('Error al obtener historia clínica');
+
     return (
-      <div className="bg-[#1f2c34] rounded-xl p-6 text-white">
-        <div className="text-red-400">
-          {error || 'No se encontró historia clínica para este paciente'}
+      <div className="bg-[#1f2c34] rounded-xl p-6 text-white max-w-2xl">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold text-red-400">Error al Cargar Historia Clínica</h2>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-white text-2xl leading-none"
+            >
+              ×
+            </button>
+          )}
         </div>
+
+        <div className="bg-[#2a3942] rounded-lg p-4 mb-4">
+          <p className="text-red-400 mb-3">
+            {error || 'No se encontró historia clínica para este paciente'}
+          </p>
+
+          {isWixNotConfigured && (
+            <div className="mt-4 border-l-4 border-yellow-500 pl-4">
+              <p className="text-yellow-400 font-semibold mb-2">⚠️ Configuración Pendiente</p>
+              <p className="text-sm text-gray-300 mb-2">
+                Las funciones HTTP de Wix no están configuradas. Para activar esta funcionalidad:
+              </p>
+              <ol className="text-sm text-gray-300 space-y-1 list-decimal list-inside">
+                <li>Abre tu sitio de Wix (www.bsl.com.co)</li>
+                <li>Activa el Developer Mode (Velo)</li>
+                <li>Ve a Backend → http-functions.js</li>
+                <li>Copia las funciones de: <code className="bg-gray-700 px-1 rounded">backend/wix-backend-medical-history.js</code></li>
+                <li>Publica el sitio</li>
+              </ol>
+              <p className="text-sm text-gray-400 mt-3">
+                Documento del paciente: <span className="text-white font-mono">{numeroId}</span>
+              </p>
+            </div>
+          )}
+        </div>
+
         <button
           onClick={onClose}
-          className="mt-4 bg-gray-600 px-4 py-2 rounded-lg hover:bg-gray-700"
+          className="w-full bg-gray-600 px-4 py-2 rounded-lg hover:bg-gray-700 transition"
         >
           Cerrar
         </button>
