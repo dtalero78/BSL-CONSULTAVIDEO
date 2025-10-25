@@ -34,10 +34,9 @@ interface MedicalHistoryData {
 
 interface MedicalHistoryPanelProps {
   numeroId: string;
-  onClose?: () => void;
 }
 
-export const MedicalHistoryPanel = ({ numeroId, onClose }: MedicalHistoryPanelProps) => {
+export const MedicalHistoryPanel = ({ numeroId }: MedicalHistoryPanelProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -129,17 +128,9 @@ export const MedicalHistoryPanel = ({ numeroId, onClose }: MedicalHistoryPanelPr
     const isWixNotConfigured = error && error.includes('Error al obtener historia clínica');
 
     return (
-      <div className="bg-[#1f2c34] rounded-xl p-6 text-white max-w-2xl">
-        <div className="flex justify-between items-center mb-4">
+      <div className="h-full flex flex-col bg-[#1f2c34] text-white p-6">
+        <div className="mb-4">
           <h2 className="text-xl font-bold text-red-400">Error al Cargar Historia Clínica</h2>
-          {onClose && (
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-white text-2xl leading-none"
-            >
-              ×
-            </button>
-          )}
         </div>
 
         <div className="bg-[#2a3942] rounded-lg p-4 mb-4">
@@ -166,13 +157,6 @@ export const MedicalHistoryPanel = ({ numeroId, onClose }: MedicalHistoryPanelPr
             </div>
           )}
         </div>
-
-        <button
-          onClick={onClose}
-          className="w-full bg-gray-600 px-4 py-2 rounded-lg hover:bg-gray-700 transition"
-        >
-          Cerrar
-        </button>
       </div>
     );
   }
@@ -180,19 +164,8 @@ export const MedicalHistoryPanel = ({ numeroId, onClose }: MedicalHistoryPanelPr
   return (
     <div className="h-full flex flex-col bg-[#1f2c34] text-white">
       {/* Header fijo */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-700 bg-[#1f2c34] sticky top-0 z-10">
+      <div className="flex items-center p-4 border-b border-gray-700 bg-[#1f2c34] sticky top-0 z-10">
         <h2 className="text-lg font-bold text-[#00a884]">Historia Clínica</h2>
-        {onClose && (
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white p-2 hover:bg-white/10 rounded-full transition"
-            aria-label="Cerrar"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        )}
       </div>
 
       {/* Contenido scrollable */}
@@ -356,12 +329,19 @@ export const MedicalHistoryPanel = ({ numeroId, onClose }: MedicalHistoryPanelPr
 
         <div>
           <label className="block text-xs text-gray-400 mb-1">Concepto Final</label>
-          <textarea
+          <select
             value={mdConceptoFinal}
             onChange={(e) => setMdConceptoFinal(e.target.value)}
-            className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none min-h-[60px]"
-            placeholder="Concepto final..."
-          />
+            className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none"
+          >
+            <option value="">Seleccione una opción</option>
+            <option value="ELEGIBLE PARA EL CARGO SIN RECOMENDACIONES LABORALES">ELEGIBLE PARA EL CARGO SIN RECOMENDACIONES LABORALES</option>
+            <option value="ELEGIBLE PARA EL CARGO CON RECOMENDACIONES LABORALES">ELEGIBLE PARA EL CARGO CON RECOMENDACIONES LABORALES</option>
+            <option value="NO ELEGIBLE PARA EL CARGO POR FUERA DEL PROFESIOGRAMA">NO ELEGIBLE PARA EL CARGO POR FUERA DEL PROFESIOGRAMA</option>
+            <option value="PENDIENTE">PENDIENTE</option>
+            <option value="NO PRESENTA DETERIORO FÍSICO POR ACTIVIDAD LABORAL">NO PRESENTA DETERIORO FÍSICO POR ACTIVIDAD LABORAL</option>
+            <option value="Puede realizar actividades escolares y grupales">Puede realizar actividades escolares y grupales</option>
+          </select>
         </div>
 
         <div className="grid grid-cols-2 gap-2">

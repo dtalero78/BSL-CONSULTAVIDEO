@@ -18,7 +18,6 @@ interface VideoRoomProps {
 
 export const VideoRoom = ({ identity, roomName, role, numeroId, onLeave }: VideoRoomProps) => {
   const [isPosturalAnalysisOpen, setIsPosturalAnalysisOpen] = useState(false);
-  const [isMedicalHistoryOpen, setIsMedicalHistoryOpen] = useState(false);
 
   const {
     localParticipant,
@@ -186,18 +185,13 @@ export const VideoRoom = ({ identity, roomName, role, numeroId, onLeave }: Video
 
   return (
     <div className="min-h-screen bg-[#0b141a] flex">
-      {/* Panel lateral de Historia Clínica - Solo visible para doctores */}
+      {/* Panel lateral de Historia Clínica - Siempre visible para doctores */}
       {role === 'doctor' && numeroId && (
         <div
-          className={`fixed top-0 right-0 h-full bg-[#1f2c34] shadow-2xl z-50 transition-transform duration-300 ease-in-out ${
-            isMedicalHistoryOpen ? 'translate-x-0' : 'translate-x-full'
-          }`}
+          className="fixed top-0 right-0 h-full bg-[#1f2c34] shadow-2xl z-50"
           style={{ width: '450px', maxWidth: '90vw' }}
         >
-          <MedicalHistoryPanel
-            numeroId={numeroId}
-            onClose={() => setIsMedicalHistoryOpen(false)}
-          />
+          <MedicalHistoryPanel numeroId={numeroId} />
         </div>
       )}
 
@@ -226,20 +220,6 @@ export const VideoRoom = ({ identity, roomName, role, numeroId, onLeave }: Video
             <span>End-to-end Encrypted</span>
           </div>
         </div>
-
-        {/* Medical History button - Only for doctors with numeroId */}
-        {role === 'doctor' && numeroId && (
-          <button
-            onClick={() => setIsMedicalHistoryOpen(true)}
-            className="text-white p-2 hover:bg-white/10 rounded-full transition"
-            aria-label="Historia Clínica"
-            title="Ver Historia Clínica"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          </button>
-        )}
 
         {/* Info button */}
         <button
