@@ -52,12 +52,32 @@ export const MedicalHistoryPanel = ({ numeroId }: MedicalHistoryPanelProps) => {
   const [mdDx2, setMdDx2] = useState('');
   const [talla, setTalla] = useState('');
   const [peso, setPeso] = useState('');
+  const [imc, setImc] = useState('');
   const [aiSuggestions, setAiSuggestions] = useState('');
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
 
   useEffect(() => {
     loadMedicalHistory();
   }, [numeroId]);
+
+  // Calcular IMC automáticamente cuando cambian talla o peso
+  useEffect(() => {
+    if (talla && peso) {
+      const tallaNum = parseFloat(talla);
+      const pesoNum = parseFloat(peso);
+
+      if (!isNaN(tallaNum) && !isNaN(pesoNum) && tallaNum > 0) {
+        // IMC = peso(kg) / (talla(m))^2
+        const tallaMetros = tallaNum / 100;
+        const imcCalculado = pesoNum / (tallaMetros * tallaMetros);
+        setImc(imcCalculado.toFixed(2));
+      } else {
+        setImc('');
+      }
+    } else {
+      setImc('');
+    }
+  }, [talla, peso]);
 
   const loadMedicalHistory = async () => {
     try {
@@ -297,25 +317,35 @@ export const MedicalHistoryPanel = ({ numeroId }: MedicalHistoryPanelProps) => {
       {/* Medidas Físicas */}
       <div className="bg-[#2a3942] rounded-lg p-3">
         <h3 className="text-sm font-semibold mb-2 text-[#00a884]">Medidas Físicas</h3>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-2">
           <div>
-            <label className="block text-sm text-gray-400 mb-2">Talla (cm)</label>
+            <label className="block text-xs text-gray-400 mb-1">Talla (cm)</label>
             <input
               type="text"
               value={talla}
               onChange={(e) => setTalla(e.target.value)}
-              className="w-full bg-[#1f2c34] text-white px-3 py-2 rounded-lg border border-gray-600 focus:border-[#00a884] focus:outline-none"
-              placeholder="Ej: 170"
+              className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none"
+              placeholder="170"
             />
           </div>
           <div>
-            <label className="block text-sm text-gray-400 mb-2">Peso (kg)</label>
+            <label className="block text-xs text-gray-400 mb-1">Peso (kg)</label>
             <input
               type="text"
               value={peso}
               onChange={(e) => setPeso(e.target.value)}
-              className="w-full bg-[#1f2c34] text-white px-3 py-2 rounded-lg border border-gray-600 focus:border-[#00a884] focus:outline-none"
-              placeholder="Ej: 70"
+              className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none"
+              placeholder="70"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">IMC</label>
+            <input
+              type="text"
+              value={imc}
+              readOnly
+              className="w-full bg-[#2a3942] text-green-400 text-sm px-2 py-2 rounded border border-gray-600 cursor-not-allowed font-semibold"
+              placeholder="Auto"
             />
           </div>
         </div>
