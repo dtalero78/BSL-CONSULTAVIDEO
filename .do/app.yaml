@@ -34,6 +34,11 @@ services:
         type: SECRET
       - key: ALLOWED_ORIGINS
         value: "${APP_URL}"
+      - key: WIX_FUNCTIONS_URL
+        value: "https://www.bsl.com.co/_functions"
+      - key: WHAPI_TOKEN
+        scope: RUN_TIME
+        type: SECRET
 
     # Health check
     health_check:
