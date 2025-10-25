@@ -79,6 +79,24 @@ export const MedicalHistoryPanel = ({ numeroId }: MedicalHistoryPanelProps) => {
     }
   }, [talla, peso]);
 
+  // Función para determinar el color del IMC
+  const getImcColor = () => {
+    const imcNum = parseFloat(imc);
+    if (isNaN(imcNum)) return 'text-gray-400';
+    if (imcNum >= 25) return 'text-red-500'; // Sobrepeso u obesidad
+    return 'text-green-400'; // Normal o bajo peso
+  };
+
+  // Función para obtener el texto de interpretación del IMC
+  const getImcInterpretation = () => {
+    const imcNum = parseFloat(imc);
+    if (isNaN(imcNum)) return '';
+    if (imcNum < 18.5) return 'Bajo peso';
+    if (imcNum < 25) return 'Normal';
+    if (imcNum < 30) return 'Sobrepeso';
+    return 'Obesidad';
+  };
+
   const loadMedicalHistory = async () => {
     try {
       setIsLoading(true);
@@ -148,9 +166,18 @@ export const MedicalHistoryPanel = ({ numeroId }: MedicalHistoryPanelProps) => {
         ? `${aiSuggestions}\n\n${mdRecomendacionesMedicasAdicionales}`.trim()
         : mdRecomendacionesMedicasAdicionales;
 
+      // Concatenar IMC con antecedentes
+      let combinedAntecedentes = mdAntecedentes;
+      if (imc) {
+        const imcText = `IMC: ${imc} (${getImcInterpretation()})`;
+        combinedAntecedentes = mdAntecedentes
+          ? `${mdAntecedentes}\n\n${imcText}`
+          : imcText;
+      }
+
       await apiService.updateMedicalHistory({
         numeroId: data.numeroId,
-        mdAntecedentes,
+        mdAntecedentes: combinedAntecedentes,
         mdObsParaMiDocYa,
         mdObservacionesCertificado,
         mdRecomendacionesMedicasAdicionales: combinedRecommendations,
@@ -342,9 +369,9 @@ export const MedicalHistoryPanel = ({ numeroId }: MedicalHistoryPanelProps) => {
             <label className="block text-xs text-gray-400 mb-1">IMC</label>
             <input
               type="text"
-              value={imc}
+              value={imc ? `${imc} (${getImcInterpretation()})` : ''}
               readOnly
-              className="w-full bg-[#2a3942] text-green-400 text-sm px-2 py-2 rounded border border-gray-600 cursor-not-allowed font-semibold"
+              className={`w-full bg-[#2a3942] ${getImcColor()} text-sm px-2 py-2 rounded border border-gray-600 cursor-not-allowed font-semibold`}
               placeholder="Auto"
             />
           </div>
