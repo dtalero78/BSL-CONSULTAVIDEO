@@ -102,11 +102,25 @@ export function MedicalPanelPage() {
         ? patient.celular.substring(1)
         : patient.celular;
 
+      // Formatear teléfono (con + para Twilio Voice)
+      const phoneWithPlus = patient.celular.startsWith('+')
+        ? patient.celular
+        : `+${patient.celular}`;
+
       // 1. Enviar mensaje de WhatsApp por API
       await apiService.sendWhatsApp(phoneWithoutPlus, whatsappMessage);
       console.log('WhatsApp enviado exitosamente');
 
-      // 2. Abrir ventana del doctor en una nueva pestaña
+      // 2. Realizar llamada telefónica con Twilio Voice
+      try {
+        await apiService.makeVoiceCall(phoneWithPlus, patient.primerNombre);
+        console.log('Llamada telefónica iniciada exitosamente');
+      } catch (callError) {
+        console.error('Error realizando llamada telefónica:', callError);
+        // No interrumpir el flujo si la llamada falla
+      }
+
+      // 3. Abrir ventana del doctor en una nueva pestaña
       window.open(doctorUrl, '_blank');
     } catch (error) {
       console.error('Error al atender paciente:', error);

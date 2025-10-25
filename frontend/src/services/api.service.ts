@@ -135,6 +135,16 @@ class ApiService {
     });
     return response.data.data.suggestions;
   }
+
+  /**
+   * Realizar llamada telefónica con Twilio Voice
+   */
+  async makeVoiceCall(phoneNumber: string, patientName?: string): Promise<void> {
+    await this.client.post('/api/twilio/voice-call', {
+      phoneNumber,
+      patientName,
+    });
+  }
 }
 
 export default new ApiService();

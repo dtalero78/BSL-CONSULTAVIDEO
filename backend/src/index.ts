@@ -9,6 +9,7 @@ import appConfig from './config/app.config';
 import videoRoutes from './routes/video.routes';
 import telemedicineRoutes from './routes/telemedicine.routes';
 import medicalPanelRoutes from './routes/medical-panel.routes';
+import twilioVoiceRoutes from './routes/twilio-voice.routes';
 import { telemedicineSocketService } from './services/telemedicine-socket.service';
 
 const app: Application = express();
@@ -67,6 +68,7 @@ app.get('/health', (_req: Request, res: Response) => {
 app.use('/api/video', videoRoutes);
 app.use('/api/telemedicine', telemedicineRoutes);
 app.use('/api/medical-panel', medicalPanelRoutes);
+app.use('/api/twilio', twilioVoiceRoutes);
 
 // Servir archivos estaticos del frontend (despues de las rutas API)
 const frontendPath = path.join(__dirname, '..', 'frontend-dist');

@@ -48,7 +48,8 @@ export const usePosturalAnalysis = ({
     if (!enabled) return;
 
     const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
-    const socketUrl = apiBaseUrl || window.location.origin;
+    // En desarrollo, si no hay apiBaseUrl, usar localhost:3000
+    const socketUrl = apiBaseUrl || (import.meta.env.DEV ? 'http://localhost:3000' : window.location.origin);
 
     console.log('[Postural Analysis] Connecting to Socket.io:', socketUrl);
 
