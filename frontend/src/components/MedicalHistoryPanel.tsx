@@ -344,26 +344,110 @@ export const MedicalHistoryPanel = ({ numeroId }: MedicalHistoryPanelProps) => {
           </select>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 gap-2">
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Dx 1</label>
-            <input
-              type="text"
+            <label className="block text-xs text-gray-400 mb-1">Diagnóstico 1 (Principal)</label>
+            <select
               value={mdDx1}
               onChange={(e) => setMdDx1(e.target.value)}
               className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none"
-              placeholder="Principal..."
-            />
+            >
+              <option value="">Seleccione diagnóstico</option>
+              <option value="Asma ocupacional">Asma ocupacional</option>
+              <option value="Bronquitis crónica por polvos inorgánicos">Bronquitis crónica por polvos inorgánicos</option>
+              <option value="Bursitis de codo">Bursitis de codo</option>
+              <option value="Bursitis de hombro">Bursitis de hombro</option>
+              <option value="Bursitis de rodilla">Bursitis de rodilla</option>
+              <option value="Cervicalgia">Cervicalgia</option>
+              <option value="Dermatitis alérgica de contacto">Dermatitis alérgica de contacto</option>
+              <option value="Dermatitis irritativa de contacto">Dermatitis irritativa de contacto</option>
+              <option value="Dorsalgia">Dorsalgia</option>
+              <option value="Epicondilitis lateral (codo de tenista)">Epicondilitis lateral (codo de tenista)</option>
+              <option value="Epicondilitis medial">Epicondilitis medial</option>
+              <option value="Escoliosis">Escoliosis</option>
+              <option value="Espondiloartrosis cervical">Espondiloartrosis cervical</option>
+              <option value="Espondiloartrosis lumbar">Espondiloartrosis lumbar</option>
+              <option value="Espondilosis cervical">Espondilosis cervical</option>
+              <option value="Espondilosis lumbar">Espondilosis lumbar</option>
+              <option value="Estrés postraumático">Estrés postraumático</option>
+              <option value="Gonalgia (dolor de rodilla)">Gonalgia (dolor de rodilla)</option>
+              <option value="Hernia discal cervical">Hernia discal cervical</option>
+              <option value="Hernia discal lumbar">Hernia discal lumbar</option>
+              <option value="Hipoacusia neurosensorial bilateral">Hipoacusia neurosensorial bilateral</option>
+              <option value="Lumbalgia">Lumbalgia</option>
+              <option value="Mialgia">Mialgia</option>
+              <option value="Obesidad">Obesidad</option>
+              <option value="Onicomicosis">Onicomicosis</option>
+              <option value="Pérdida auditiva inducida por ruido">Pérdida auditiva inducida por ruido</option>
+              <option value="Presbiacusia">Presbiacusia</option>
+              <option value="Síndrome de Burnout">Síndrome de Burnout</option>
+              <option value="Síndrome de túnel carpiano">Síndrome de túnel carpiano</option>
+              <option value="Síndrome del manguito rotador">Síndrome del manguito rotador</option>
+              <option value="Sinovitis de muñeca">Sinovitis de muñeca</option>
+              <option value="Sobrepeso">Sobrepeso</option>
+              <option value="Tenosinovitis de De Quervain">Tenosinovitis de De Quervain</option>
+              <option value="Tendinitis de hombro">Tendinitis de hombro</option>
+              <option value="Tendinitis del manguito rotador">Tendinitis del manguito rotador</option>
+              <option value="Trastorno adaptativo con ansiedad">Trastorno adaptativo con ansiedad</option>
+              <option value="Trastorno de ansiedad generalizada">Trastorno de ansiedad generalizada</option>
+              <option value="Trastorno depresivo">Trastorno depresivo</option>
+              <option value="Trastornos del sueño">Trastornos del sueño</option>
+              <option value="Trauma acústico agudo">Trauma acústico agudo</option>
+              <option value="Vértigo posicional">Vértigo posicional</option>
+              <option value="Vitiligo">Vitiligo</option>
+            </select>
           </div>
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Dx 2</label>
-            <input
-              type="text"
+            <label className="block text-xs text-gray-400 mb-1">Diagnóstico 2 (Secundario)</label>
+            <select
               value={mdDx2}
               onChange={(e) => setMdDx2(e.target.value)}
               className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none"
-              placeholder="Secundario..."
-            />
+            >
+              <option value="">Seleccione diagnóstico</option>
+              <option value="Asma ocupacional">Asma ocupacional</option>
+              <option value="Bronquitis crónica por polvos inorgánicos">Bronquitis crónica por polvos inorgánicos</option>
+              <option value="Bursitis de codo">Bursitis de codo</option>
+              <option value="Bursitis de hombro">Bursitis de hombro</option>
+              <option value="Bursitis de rodilla">Bursitis de rodilla</option>
+              <option value="Cervicalgia">Cervicalgia</option>
+              <option value="Dermatitis alérgica de contacto">Dermatitis alérgica de contacto</option>
+              <option value="Dermatitis irritativa de contacto">Dermatitis irritativa de contacto</option>
+              <option value="Dorsalgia">Dorsalgia</option>
+              <option value="Epicondilitis lateral (codo de tenista)">Epicondilitis lateral (codo de tenista)</option>
+              <option value="Epicondilitis medial">Epicondilitis medial</option>
+              <option value="Escoliosis">Escoliosis</option>
+              <option value="Espondiloartrosis cervical">Espondiloartrosis cervical</option>
+              <option value="Espondiloartrosis lumbar">Espondiloartrosis lumbar</option>
+              <option value="Espondilosis cervical">Espondilosis cervical</option>
+              <option value="Espondilosis lumbar">Espondilosis lumbar</option>
+              <option value="Estrés postraumático">Estrés postraumático</option>
+              <option value="Gonalgia (dolor de rodilla)">Gonalgia (dolor de rodilla)</option>
+              <option value="Hernia discal cervical">Hernia discal cervical</option>
+              <option value="Hernia discal lumbar">Hernia discal lumbar</option>
+              <option value="Hipoacusia neurosensorial bilateral">Hipoacusia neurosensorial bilateral</option>
+              <option value="Lumbalgia">Lumbalgia</option>
+              <option value="Mialgia">Mialgia</option>
+              <option value="Obesidad">Obesidad</option>
+              <option value="Onicomicosis">Onicomicosis</option>
+              <option value="Pérdida auditiva inducida por ruido">Pérdida auditiva inducida por ruido</option>
+              <option value="Presbiacusia">Presbiacusia</option>
+              <option value="Síndrome de Burnout">Síndrome de Burnout</option>
+              <option value="Síndrome de túnel carpiano">Síndrome de túnel carpiano</option>
+              <option value="Síndrome del manguito rotador">Síndrome del manguito rotador</option>
+              <option value="Sinovitis de muñeca">Sinovitis de muñeca</option>
+              <option value="Sobrepeso">Sobrepeso</option>
+              <option value="Tenosinovitis de De Quervain">Tenosinovitis de De Quervain</option>
+              <option value="Tendinitis de hombro">Tendinitis de hombro</option>
+              <option value="Tendinitis del manguito rotador">Tendinitis del manguito rotador</option>
+              <option value="Trastorno adaptativo con ansiedad">Trastorno adaptativo con ansiedad</option>
+              <option value="Trastorno de ansiedad generalizada">Trastorno de ansiedad generalizada</option>
+              <option value="Trastorno depresivo">Trastorno depresivo</option>
+              <option value="Trastornos del sueño">Trastornos del sueño</option>
+              <option value="Trauma acústico agudo">Trauma acústico agudo</option>
+              <option value="Vértigo posicional">Vértigo posicional</option>
+              <option value="Vitiligo">Vitiligo</option>
+            </select>
           </div>
         </div>
         </div>
