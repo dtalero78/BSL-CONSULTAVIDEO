@@ -15,29 +15,28 @@ import wixData from 'wix-data';
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
- * 0A. OBTENER HISTORIA CLÍNICA COMPLETA POR DOCUMENTO (PARA VIDEOLLAMADA)
+ * 0A. OBTENER HISTORIA CLÍNICA COMPLETA POR _ID (PARA VIDEOLLAMADA)
  * ════════════════════════════════════════════════════════════════════════════
  */
-export async function obtenerHistoriaClinica(numeroId) {
-    if (!numeroId) {
-        return { success: false, error: "numeroId es requerido" };
+export async function obtenerHistoriaClinica(historiaId) {
+    if (!historiaId) {
+        return { success: false, error: "historiaId es requerido" };
     }
 
     try {
-        // 1. Buscar en HistoriaClinica por documento
-        const historiaResults = await wixData.query("HistoriaClinica")
-            .eq("numeroId", numeroId)
-            .find();
+        // 1. Buscar en HistoriaClinica por _id
+        const historia = await wixData.get("HistoriaClinica", historiaId);
 
-        if (historiaResults.items.length === 0) {
-            return { success: false, error: "No se encontró paciente con ese documento" };
+        if (!historia) {
+            return { success: false, error: "No se encontró historia clínica con ese ID" };
         }
 
-        const historia = historiaResults.items[0];
+        // 2. Obtener el idGeneral de la historia clínica
+        const idGeneral = historia.idGeneral || historia.numeroId;
 
-        // 2. Buscar en FORMULARIO usando el documento
+        // 3. Buscar en FORMULARIO usando el campo idGeneral
         const formularioResults = await wixData.query("FORMULARIO")
-            .eq("documentoIdentidad", numeroId)
+            .eq("idGeneral", idGeneral)
             .find();
 
         const formulario = formularioResults.items.length > 0
@@ -104,22 +103,18 @@ export async function obtenerHistoriaClinica(numeroId) {
  * 0B. ACTUALIZAR HISTORIA CLÍNICA (DURANTE VIDEOLLAMADA)
  * ════════════════════════════════════════════════════════════════════════════
  */
-export async function actualizarHistoriaClinica(numeroId, datos) {
-    if (!numeroId) {
-        return { success: false, error: "numeroId es requerido" };
+export async function actualizarHistoriaClinica(historiaId, datos) {
+    if (!historiaId) {
+        return { success: false, error: "historiaId es requerido" };
     }
 
     try {
-        // Buscar el registro por número de documento
-        const results = await wixData.query("HistoriaClinica")
-            .eq("numeroId", numeroId)
-            .find();
+        // Obtener el registro por _id
+        const item = await wixData.get("HistoriaClinica", historiaId);
 
-        if (results.items.length === 0) {
-            return { success: false, error: "No se encontró paciente con ese documento" };
+        if (!item) {
+            return { success: false, error: "No se encontró historia clínica con ese ID" };
         }
-
-        const item = results.items[0];
 
         // Actualizar campos del formulario médico
         if (datos.talla !== undefined) item.talla = datos.talla;

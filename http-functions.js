@@ -2154,24 +2154,24 @@ export async function get_datosCompletosFormulario(request) {
  */
 
 /**
- * GET: Obtener historia clínica completa por documento
- * URL: /_functions/getHistoriaClinica?documento=123456789
+ * GET: Obtener historia clínica completa por _id
+ * URL: /_functions/getHistoriaClinica?historiaId=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
  */
 export async function get_getHistoriaClinica(request) {
-  const { documento } = request.query;
+  const { historiaId } = request.query;
 
-  if (!documento) {
+  if (!historiaId) {
     return badRequest({
       headers: {
         "Content-Type": "application/json",
         "Access-Control-Allow-Origin": "*"
       },
-      body: { success: false, error: "El parámetro 'documento' es requerido" }
+      body: { success: false, error: "El parámetro 'historiaId' es requerido" }
     });
   }
 
   try {
-    const resultado = await obtenerHistoriaClinica(documento);
+    const resultado = await obtenerHistoriaClinica(historiaId);
 
     if (resultado.success) {
       return ok({
@@ -2205,24 +2205,24 @@ export async function get_getHistoriaClinica(request) {
 /**
  * POST: Actualizar historia clínica durante videollamada
  * URL: /_functions/updateHistoriaClinica
- * Body: { numeroId: "123456789", mdAntecedentes: "...", talla: "170", peso: "70", ... }
+ * Body: { historiaId: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", mdAntecedentes: "...", talla: "170", peso: "70", ... }
  */
 export async function post_updateHistoriaClinica(request) {
   try {
     const body = await request.body.json();
-    const { numeroId, ...datos } = body;
+    const { historiaId, ...datos } = body;
 
-    if (!numeroId) {
+    if (!historiaId) {
       return badRequest({
         headers: {
           "Content-Type": "application/json",
           "Access-Control-Allow-Origin": "*"
         },
-        body: { success: false, error: "El parámetro 'numeroId' es requerido" }
+        body: { success: false, error: "El parámetro 'historiaId' es requerido" }
       });
     }
 
-    const resultado = await actualizarHistoriaClinica(numeroId, datos);
+    const resultado = await actualizarHistoriaClinica(historiaId, datos);
 
     if (resultado.success) {
       return ok({
