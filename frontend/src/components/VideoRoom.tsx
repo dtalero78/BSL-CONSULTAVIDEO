@@ -185,7 +185,24 @@ export const VideoRoom = ({ identity, roomName, role, numeroId, onLeave }: Video
   const remoteParticipantArray = Array.from(remoteParticipants.values());
 
   return (
-    <div className="min-h-screen bg-[#0b141a] flex flex-col">
+    <div className="min-h-screen bg-[#0b141a] flex">
+      {/* Panel lateral de Historia Clínica - Solo visible para doctores */}
+      {role === 'doctor' && numeroId && (
+        <div
+          className={`fixed top-0 right-0 h-full bg-[#1f2c34] shadow-2xl z-50 transition-transform duration-300 ease-in-out ${
+            isMedicalHistoryOpen ? 'translate-x-0' : 'translate-x-full'
+          }`}
+          style={{ width: '450px', maxWidth: '90vw' }}
+        >
+          <MedicalHistoryPanel
+            numeroId={numeroId}
+            onClose={() => setIsMedicalHistoryOpen(false)}
+          />
+        </div>
+      )}
+
+      {/* Contenedor principal de la videollamada */}
+      <div className="flex-1 flex flex-col">
       {/* Header tipo WhatsApp */}
       <div className="bg-[#1f2c34] px-4 py-3 flex items-center justify-between shadow-lg">
         {/* Back button */}
@@ -310,18 +327,9 @@ export const VideoRoom = ({ identity, roomName, role, numeroId, onLeave }: Video
           isActive={sessionActive}
         />
       )}
-
-      {/* Medical History Modal - Only for doctors with numeroId */}
-      {role === 'doctor' && numeroId && isMedicalHistoryOpen && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <MedicalHistoryPanel
-              numeroId={numeroId}
-              onClose={() => setIsMedicalHistoryOpen(false)}
-            />
-          </div>
-        </div>
-      )}
+      </div>
+      {/* Cierre del contenedor principal de videollamada */}
     </div>
+    // Cierre del contenedor flex principal
   );
 };

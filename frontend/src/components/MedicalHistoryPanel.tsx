@@ -178,24 +178,30 @@ export const MedicalHistoryPanel = ({ numeroId, onClose }: MedicalHistoryPanelPr
   }
 
   return (
-    <div className="bg-[#1f2c34] rounded-xl p-6 text-white max-h-[80vh] overflow-y-auto">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-600">
-        <h2 className="text-2xl font-bold text-[#00a884]">Historia Clínica</h2>
+    <div className="h-full flex flex-col bg-[#1f2c34] text-white">
+      {/* Header fijo */}
+      <div className="flex items-center justify-between p-4 border-b border-gray-700 bg-[#1f2c34] sticky top-0 z-10">
+        <h2 className="text-lg font-bold text-[#00a884]">Historia Clínica</h2>
         {onClose && (
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white text-2xl leading-none"
+            className="text-gray-400 hover:text-white p-2 hover:bg-white/10 rounded-full transition"
+            aria-label="Cerrar"
           >
-            ×
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         )}
       </div>
 
+      {/* Contenido scrollable */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+
       {/* Información del Paciente (Solo lectura) */}
-      <div className="mb-6 bg-[#2a3942] rounded-lg p-4">
-        <h3 className="text-lg font-semibold mb-3 text-[#00a884]">Datos del Paciente</h3>
-        <div className="grid grid-cols-2 gap-3 text-sm">
+      <div className="bg-[#2a3942] rounded-lg p-3">
+        <h3 className="text-sm font-semibold mb-2 text-[#00a884]">Datos del Paciente</h3>
+        <div className="grid grid-cols-1 gap-2 text-xs">
           <div>
             <span className="text-gray-400">Nombre:</span>
             <span className="text-white ml-2">
@@ -251,9 +257,9 @@ export const MedicalHistoryPanel = ({ numeroId, onClose }: MedicalHistoryPanelPr
 
       {/* Antecedentes (Solo lectura) */}
       {(data.antecedentesFamiliares || data.encuestaSalud || data.empresa1) && (
-        <div className="mb-6 bg-[#2a3942] rounded-lg p-4">
-          <h3 className="text-lg font-semibold mb-3 text-[#00a884]">Antecedentes</h3>
-          <div className="space-y-2 text-sm">
+        <div className="bg-[#2a3942] rounded-lg p-3">
+          <h3 className="text-sm font-semibold mb-2 text-[#00a884]">Antecedentes</h3>
+          <div className="space-y-2 text-xs">
             {data.antecedentesFamiliares && (
               <div>
                 <span className="text-gray-400">Antecedentes Familiares:</span>
@@ -277,9 +283,9 @@ export const MedicalHistoryPanel = ({ numeroId, onClose }: MedicalHistoryPanelPr
       )}
 
       {/* Medidas Físicas */}
-      <div className="mb-6 bg-[#2a3942] rounded-lg p-4">
-        <h3 className="text-lg font-semibold mb-3 text-[#00a884]">Medidas Físicas</h3>
-        <div className="grid grid-cols-2 gap-4">
+      <div className="bg-[#2a3942] rounded-lg p-3">
+        <h3 className="text-sm font-semibold mb-2 text-[#00a884]">Medidas Físicas</h3>
+        <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-sm text-gray-400 mb-2">Talla (cm)</label>
             <input
@@ -304,91 +310,106 @@ export const MedicalHistoryPanel = ({ numeroId, onClose }: MedicalHistoryPanelPr
       </div>
 
       {/* Campos Médicos Editables */}
-      <div className="space-y-4 mb-6">
-        <h3 className="text-lg font-semibold text-[#00a884]">Evaluación Médica</h3>
+      <div className="bg-[#2a3942] rounded-lg p-3">
+        <h3 className="text-sm font-semibold mb-3 text-[#00a884]">Evaluación Médica</h3>
+        <div className="space-y-3">
 
         <div>
-          <label className="block text-sm text-gray-400 mb-2">Antecedentes</label>
+          <label className="block text-xs text-gray-400 mb-1">Antecedentes</label>
           <textarea
             value={mdAntecedentes}
             onChange={(e) => setMdAntecedentes(e.target.value)}
-            className="w-full bg-[#2a3942] text-white px-3 py-2 rounded-lg border border-gray-600 focus:border-[#00a884] focus:outline-none min-h-[80px]"
-            placeholder="Ingrese los antecedentes médicos..."
+            className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none min-h-[60px]"
+            placeholder="Antecedentes médicos..."
           />
         </div>
 
         <div>
-          <label className="block text-sm text-gray-400 mb-2">Observaciones para MiDocYa</label>
+          <label className="block text-xs text-gray-400 mb-1">Obs. MiDocYa</label>
           <textarea
             value={mdObsParaMiDocYa}
             onChange={(e) => setMdObsParaMiDocYa(e.target.value)}
-            className="w-full bg-[#2a3942] text-white px-3 py-2 rounded-lg border border-gray-600 focus:border-[#00a884] focus:outline-none min-h-[80px]"
-            placeholder="Observaciones para MiDocYa..."
+            className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none min-h-[60px]"
+            placeholder="Observaciones..."
           />
         </div>
 
         <div>
-          <label className="block text-sm text-gray-400 mb-2">Observaciones del Certificado</label>
+          <label className="block text-xs text-gray-400 mb-1">Obs. Certificado</label>
           <textarea
             value={mdObservacionesCertificado}
             onChange={(e) => setMdObservacionesCertificado(e.target.value)}
-            className="w-full bg-[#2a3942] text-white px-3 py-2 rounded-lg border border-gray-600 focus:border-[#00a884] focus:outline-none min-h-[80px]"
-            placeholder="Observaciones del certificado..."
+            className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none min-h-[60px]"
+            placeholder="Observaciones..."
           />
         </div>
 
         <div>
-          <label className="block text-sm text-gray-400 mb-2">Recomendaciones Médicas Adicionales</label>
+          <label className="block text-xs text-gray-400 mb-1">Recomendaciones</label>
           <textarea
             value={mdRecomendacionesMedicasAdicionales}
             onChange={(e) => setMdRecomendacionesMedicasAdicionales(e.target.value)}
-            className="w-full bg-[#2a3942] text-white px-3 py-2 rounded-lg border border-gray-600 focus:border-[#00a884] focus:outline-none min-h-[80px]"
-            placeholder="Recomendaciones médicas..."
+            className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none min-h-[60px]"
+            placeholder="Recomendaciones..."
           />
         </div>
 
         <div>
-          <label className="block text-sm text-gray-400 mb-2">Concepto Final</label>
+          <label className="block text-xs text-gray-400 mb-1">Concepto Final</label>
           <textarea
             value={mdConceptoFinal}
             onChange={(e) => setMdConceptoFinal(e.target.value)}
-            className="w-full bg-[#2a3942] text-white px-3 py-2 rounded-lg border border-gray-600 focus:border-[#00a884] focus:outline-none min-h-[80px]"
-            placeholder="Concepto final del médico..."
+            className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none min-h-[60px]"
+            placeholder="Concepto final..."
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="block text-sm text-gray-400 mb-2">Diagnóstico 1</label>
+            <label className="block text-xs text-gray-400 mb-1">Dx 1</label>
             <input
               type="text"
               value={mdDx1}
               onChange={(e) => setMdDx1(e.target.value)}
-              className="w-full bg-[#2a3942] text-white px-3 py-2 rounded-lg border border-gray-600 focus:border-[#00a884] focus:outline-none"
-              placeholder="Diagnóstico principal..."
+              className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none"
+              placeholder="Principal..."
             />
           </div>
           <div>
-            <label className="block text-sm text-gray-400 mb-2">Diagnóstico 2</label>
+            <label className="block text-xs text-gray-400 mb-1">Dx 2</label>
             <input
               type="text"
               value={mdDx2}
               onChange={(e) => setMdDx2(e.target.value)}
-              className="w-full bg-[#2a3942] text-white px-3 py-2 rounded-lg border border-gray-600 focus:border-[#00a884] focus:outline-none"
-              placeholder="Diagnóstico secundario..."
+              className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none"
+              placeholder="Secundario..."
             />
           </div>
         </div>
+        </div>
       </div>
 
-      {/* Botón Guardar */}
-      <div className="sticky bottom-0 bg-[#1f2c34] pt-4 pb-2">
+      </div>
+      {/* Cierre del contenido scrollable */}
+
+      {/* Botón Guardar - Footer fijo */}
+      <div className="border-t border-gray-700 p-4 bg-[#1f2c34]">
         <button
           onClick={handleSave}
           disabled={isSaving}
-          className="w-full bg-[#00a884] text-white px-6 py-3 rounded-lg hover:bg-[#008f6f] transition font-semibold disabled:bg-gray-600 disabled:cursor-not-allowed"
+          className="w-full bg-[#00a884] text-white px-6 py-3 rounded-lg hover:bg-[#008f6f] transition font-semibold disabled:bg-gray-600 disabled:cursor-not-allowed shadow-lg"
         >
-          {isSaving ? 'Guardando...' : 'Guardar Historia Clínica'}
+          {isSaving ? (
+            <span className="flex items-center justify-center gap-2">
+              <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Guardando...
+            </span>
+          ) : (
+            'Guardar Historia Clínica'
+          )}
         </button>
       </div>
     </div>
