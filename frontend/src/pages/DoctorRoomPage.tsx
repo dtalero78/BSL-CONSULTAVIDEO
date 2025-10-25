@@ -8,8 +8,9 @@ export const DoctorRoomPage = () => {
   const [doctorName, setDoctorName] = useState('');
   const [isInCall, setIsInCall] = useState(false);
 
-  // Extraer parámetro del doctor de la URL
+  // Extraer parámetros de la URL
   const doctorParam = searchParams.get('doctor');
+  const documentoParam = searchParams.get('documento'); // Documento del paciente
 
   // Auto-llenar nombre del doctor si viene en la URL
   useEffect(() => {
@@ -34,6 +35,7 @@ export const DoctorRoomPage = () => {
         identity={`Dr. ${doctorName}`}
         roomName={roomName}
         role="doctor"
+        numeroId={documentoParam || undefined}
         onLeave={handleLeaveCall}
       />
     );

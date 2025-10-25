@@ -98,6 +98,33 @@ class ApiService {
       message,
     });
   }
+
+  /**
+   * Obtener historia clínica de un paciente
+   */
+  async getMedicalHistory(numeroId: string): Promise<any> {
+    const response = await this.client.get(`/api/video/medical-history/${numeroId}`);
+    return response.data.data;
+  }
+
+  /**
+   * Actualizar historia clínica de un paciente
+   */
+  async updateMedicalHistory(payload: {
+    numeroId: string;
+    mdAntecedentes?: string;
+    mdObsParaMiDocYa?: string;
+    mdObservacionesCertificado?: string;
+    mdRecomendacionesMedicasAdicionales?: string;
+    mdConceptoFinal?: string;
+    mdDx1?: string;
+    mdDx2?: string;
+    talla?: string;
+    peso?: string;
+    cargo?: string;
+  }): Promise<void> {
+    await this.client.post('/api/video/medical-history', payload);
+  }
 }
 
 export default new ApiService();

@@ -6,16 +6,19 @@ import { Participant } from './Participant';
 import { VideoControls } from './VideoControls';
 import { PosturalAnalysisModal } from './PosturalAnalysisModal';
 import { PosturalAnalysisPatient } from './PosturalAnalysisPatient';
+import { MedicalHistoryPanel } from './MedicalHistoryPanel';
 
 interface VideoRoomProps {
   identity: string;
   roomName: string;
   role?: 'doctor' | 'patient';
+  numeroId?: string; // Documento del paciente
   onLeave?: () => void;
 }
 
-export const VideoRoom = ({ identity, roomName, role, onLeave }: VideoRoomProps) => {
+export const VideoRoom = ({ identity, roomName, role, numeroId, onLeave }: VideoRoomProps) => {
   const [isPosturalAnalysisOpen, setIsPosturalAnalysisOpen] = useState(false);
+  const [isMedicalHistoryOpen, setIsMedicalHistoryOpen] = useState(false);
 
   const {
     localParticipant,
@@ -207,6 +210,20 @@ export const VideoRoom = ({ identity, roomName, role, onLeave }: VideoRoomProps)
           </div>
         </div>
 
+        {/* Medical History button - Only for doctors with numeroId */}
+        {role === 'doctor' && numeroId && (
+          <button
+            onClick={() => setIsMedicalHistoryOpen(true)}
+            className="text-white p-2 hover:bg-white/10 rounded-full transition"
+            aria-label="Historia Clínica"
+            title="Ver Historia Clínica"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </button>
+        )}
+
         {/* Info button */}
         <button
           className="text-white p-2 hover:bg-white/10 rounded-full transition"
@@ -292,6 +309,18 @@ export const VideoRoom = ({ identity, roomName, role, onLeave }: VideoRoomProps)
           onPoseData={sendPoseData}
           isActive={sessionActive}
         />
+      )}
+
+      {/* Medical History Modal - Only for doctors with numeroId */}
+      {role === 'doctor' && numeroId && isMedicalHistoryOpen && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <MedicalHistoryPanel
+              numeroId={numeroId}
+              onClose={() => setIsMedicalHistoryOpen(false)}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

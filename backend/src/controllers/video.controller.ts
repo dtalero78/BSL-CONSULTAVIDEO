@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import twilioService from '../services/twilio.service';
 import { sessionTracker } from '../services/session-tracker.service';
 import whatsappService from '../services/whatsapp.service';
+import medicalHistoryService from '../services/medical-history.service';
 
 class VideoController {
   /**
@@ -266,6 +267,77 @@ class VideoController {
       console.error('Error sending WhatsApp:', error);
       res.status(500).json({
         error: 'Failed to send WhatsApp',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  /**
+   * Obtener historia clínica de un paciente
+   * GET /api/video/medical-history/:numeroId
+   */
+  async getMedicalHistory(req: Request, res: Response): Promise<void> {
+    try {
+      const { numeroId } = req.params;
+
+      if (!numeroId) {
+        res.status(400).json({ error: 'numeroId is required' });
+        return;
+      }
+
+      const medicalHistory = await medicalHistoryService.getMedicalHistory(numeroId);
+
+      if (!medicalHistory) {
+        res.status(404).json({
+          success: false,
+          error: 'Medical history not found for this patient',
+        });
+        return;
+      }
+
+      res.status(200).json({
+        success: true,
+        data: medicalHistory,
+      });
+    } catch (error) {
+      console.error('Error fetching medical history:', error);
+      res.status(500).json({
+        error: 'Failed to fetch medical history',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  /**
+   * Actualizar historia clínica de un paciente
+   * POST /api/video/medical-history
+   */
+  async updateMedicalHistory(req: Request, res: Response): Promise<void> {
+    try {
+      const payload = req.body;
+
+      if (!payload.numeroId) {
+        res.status(400).json({ error: 'numeroId is required' });
+        return;
+      }
+
+      const result = await medicalHistoryService.updateMedicalHistory(payload);
+
+      if (result.success) {
+        res.status(200).json({
+          success: true,
+          message: 'Medical history updated successfully',
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          error: result.error || 'Failed to update medical history',
+        });
+      }
+    } catch (error) {
+      console.error('Error updating medical history:', error);
+      res.status(500).json({
+        error: 'Failed to update medical history',
         message: error instanceof Error ? error.message : 'Unknown error',
       });
     }

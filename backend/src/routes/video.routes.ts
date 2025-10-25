@@ -25,4 +25,8 @@ router.post('/events/participant-disconnected', videoController.trackParticipant
 // WhatsApp
 router.post('/whatsapp/send', videoController.sendWhatsApp);
 
+// Medical History
+router.get('/medical-history/:numeroId', videoController.getMedicalHistory);
+router.post('/medical-history', videoController.updateMedicalHistory);
+
 export default router;
