@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import twilioService from '../services/twilio.service';
 import { sessionTracker } from '../services/session-tracker.service';
+import whatsappService from '../services/whatsapp.service';
 
 class VideoController {
   /**
@@ -227,6 +228,44 @@ class VideoController {
       console.error('Error tracking participant disconnection:', error);
       res.status(500).json({
         error: 'Failed to track participant disconnection',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  /**
+   * Enviar mensaje de WhatsApp
+   * POST /api/video/whatsapp/send
+   * Body: { phone: string, message: string }
+   */
+  async sendWhatsApp(req: Request, res: Response): Promise<void> {
+    try {
+      const { phone, message } = req.body;
+
+      if (!phone || !message) {
+        res.status(400).json({
+          error: 'phone and message are required',
+        });
+        return;
+      }
+
+      const result = await whatsappService.sendTextMessage(phone, message);
+
+      if (result.success) {
+        res.status(200).json({
+          success: true,
+          message: 'WhatsApp message sent successfully',
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          error: result.error || 'Failed to send WhatsApp message',
+        });
+      }
+    } catch (error) {
+      console.error('Error sending WhatsApp:', error);
+      res.status(500).json({
+        error: 'Failed to send WhatsApp',
         message: error instanceof Error ? error.message : 'Unknown error',
       });
     }

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import medicalPanelService, { Patient, PatientStats } from '../services/medical-panel.service';
+import apiService from '../services/api.service';
 
 export function MedicalPanelPage() {
   const [medicoCode, setMedicoCode] = useState('');
@@ -77,6 +78,37 @@ export function MedicalPanelPage() {
       await loadData(); // Recargar datos
     } catch (err) {
       console.error('Error marcando como no contesta:', err);
+    }
+  };
+
+  const handleAtender = async (patient: Patient) => {
+    try {
+      // Generar sala única
+      const roomName = medicalPanelService.generateRoomName();
+
+      // Construir URL del doctor con documento del paciente (URL completa)
+      const doctorUrl = `${window.location.origin}/doctor/${roomName}?doctor=${medicoCode}&documento=${patient.numeroId}`;
+
+      // Construir URL del paciente
+      const patientLink = `${window.location.origin}/patient/${roomName}?nombre=${patient.primerNombre}&apellido=${patient.primerApellido}&documento=${patient.numeroId}&doctor=${medicoCode}`;
+
+      // Generar mensaje de WhatsApp con el link
+      const whatsappMessage = `Hola ${patient.primerNombre}. Te escribimos de BSL. Tienes una cita médica programada conmigo\n\nConéctate al link:\n\n${patientLink}`;
+
+      // Formatear teléfono (sin + para WhatsApp API)
+      const phoneWithoutPlus = patient.celular.startsWith('+')
+        ? patient.celular.substring(1)
+        : patient.celular;
+
+      // 1. Enviar mensaje de WhatsApp por API
+      await apiService.sendWhatsApp(phoneWithoutPlus, whatsappMessage);
+      console.log('WhatsApp enviado exitosamente');
+
+      // 2. Abrir ventana del doctor en una nueva pestaña
+      window.open(doctorUrl, '_blank');
+    } catch (error) {
+      console.error('Error al atender paciente:', error);
+      alert('Error al procesar la solicitud. Inténtalo nuevamente.');
     }
   };
 
@@ -349,6 +381,13 @@ export function MedicalPanelPage() {
                     </a>
 
                     <button
+                      onClick={() => handleAtender(searchResult)}
+                      className="bg-[#00a884] text-white px-4 py-2 rounded-lg hover:bg-[#008f6f] transition text-sm font-medium"
+                    >
+                      Atender
+                    </button>
+
+                    <button
                       onClick={() => handleNoAnswer(searchResult._id)}
                       className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition text-sm font-medium"
                     >
@@ -449,6 +488,13 @@ export function MedicalPanelPage() {
                         >
                           📱 WhatsApp + Link
                         </a>
+
+                        <button
+                          onClick={() => handleAtender(patient)}
+                          className="bg-[#00a884] text-white px-4 py-2 rounded-lg hover:bg-[#008f6f] transition text-sm font-medium"
+                        >
+                          Atender
+                        </button>
 
                         <button
                           onClick={() => handleNoAnswer(patient._id)}

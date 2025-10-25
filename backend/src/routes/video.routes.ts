@@ -22,4 +22,7 @@ router.post(
 router.post('/events/participant-connected', videoController.trackParticipantConnected);
 router.post('/events/participant-disconnected', videoController.trackParticipantDisconnected);
 
+// WhatsApp
+router.post('/whatsapp/send', videoController.sendWhatsApp);
+
 export default router;

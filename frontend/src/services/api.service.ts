@@ -88,6 +88,16 @@ class ApiService {
       identity,
     });
   }
+
+  /**
+   * Enviar mensaje de WhatsApp
+   */
+  async sendWhatsApp(phone: string, message: string): Promise<void> {
+    await this.client.post('/api/video/whatsapp/send', {
+      phone,
+      message,
+    });
+  }
 }
 
 export default new ApiService();
