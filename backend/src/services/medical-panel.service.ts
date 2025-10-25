@@ -55,7 +55,7 @@ class MedicalPanelService {
   private wixBaseUrl: string;
 
   constructor() {
-    this.wixBaseUrl = process.env.WIX_FUNCTIONS_URL || 'https://www.bslmedicinaocupacional.com/_functions';
+    this.wixBaseUrl = process.env.WIX_FUNCTIONS_URL || 'https://www.bsl.com.co/_functions';
 
     this.wixClient = axios.create({
       baseURL: this.wixBaseUrl,
