@@ -483,13 +483,13 @@ export const MedicalHistoryPanel = ({ numeroId }: MedicalHistoryPanelProps) => {
         </div>
 
         {/* 6. SUGERENCIAS IA */}
-        <div className="border-2 border-purple-500/30 rounded-lg p-3 bg-purple-900/10">
+        <div className="border-2 border-blue-500/30 rounded-lg p-3 bg-blue-900/10">
           <div className="flex items-center justify-between mb-2">
-            <label className="block text-xs text-purple-400 font-semibold">Sugerencias IA</label>
+            <label className="block text-xs text-blue-400 font-semibold">Sugerencias IA</label>
             <button
               onClick={handleGenerateAISuggestions}
               disabled={isGeneratingAI}
-              className="px-3 py-1 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 transition disabled:bg-gray-600 disabled:cursor-not-allowed flex items-center gap-1"
+              className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition disabled:bg-gray-600 disabled:cursor-not-allowed flex items-center gap-1"
             >
               {isGeneratingAI ? (
                 <>
@@ -512,11 +512,11 @@ export const MedicalHistoryPanel = ({ numeroId }: MedicalHistoryPanelProps) => {
           <textarea
             value={aiSuggestions}
             onChange={(e) => setAiSuggestions(e.target.value)}
-            className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-purple-500/30 focus:border-purple-400 focus:outline-none"
+            className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-blue-500/30 focus:border-blue-400 focus:outline-none"
             rows={5}
             placeholder="Haz clic en 'Generar con IA' para obtener recomendaciones médicas personalizadas basadas en los datos del paciente..."
           />
-          <p className="text-xs text-purple-400/70 mt-1">
+          <p className="text-xs text-blue-400/70 mt-1">
             Estas sugerencias se concatenarán automáticamente con las recomendaciones médicas adicionales al guardar
           </p>
         </div>
