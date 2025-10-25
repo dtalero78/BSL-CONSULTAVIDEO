@@ -287,7 +287,55 @@ export const MedicalHistoryPanel = ({ numeroId }: MedicalHistoryPanelProps) => {
         <h3 className="text-sm font-semibold mb-3 text-[#00a884]">Evaluación Médica</h3>
         <div className="space-y-3">
 
-        {/* DIAGNÓSTICOS PRIMERO */}
+        {/* 1. ANTECEDENTES */}
+        <div>
+          <label className="block text-xs text-gray-400 mb-1">Antecedentes</label>
+          <textarea
+            value={mdAntecedentes}
+            onChange={(e) => setMdAntecedentes(e.target.value)}
+            className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none"
+            rows={3}
+            placeholder="Antecedentes médicos relevantes..."
+          />
+        </div>
+
+        {/* 2. OBS. CERTIFICADO */}
+        <div>
+          <label className="block text-xs text-gray-400 mb-1">Obs. Certificado</label>
+          <textarea
+            value={mdObservacionesCertificado}
+            onChange={(e) => setMdObservacionesCertificado(e.target.value)}
+            className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none"
+            rows={3}
+            placeholder="Observaciones para el certificado..."
+          />
+        </div>
+
+        {/* 3. RECOMENDACIONES MÉDICAS ADICIONALES */}
+        <div>
+          <label className="block text-xs text-gray-400 mb-1">Recomendaciones Médicas Adicionales</label>
+          <textarea
+            value={mdRecomendacionesMedicasAdicionales}
+            onChange={(e) => setMdRecomendacionesMedicasAdicionales(e.target.value)}
+            className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none"
+            rows={3}
+            placeholder="Recomendaciones médicas adicionales..."
+          />
+        </div>
+
+        {/* 4. OBSERVACIONES PRIVADAS PARA LA EMPRESA */}
+        <div>
+          <label className="block text-xs text-gray-400 mb-1">Observaciones privadas para la empresa</label>
+          <textarea
+            value={mdObsParaMiDocYa}
+            onChange={(e) => setMdObsParaMiDocYa(e.target.value)}
+            className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none"
+            rows={3}
+            placeholder="Observaciones privadas para la empresa..."
+          />
+        </div>
+
+        {/* 5. DIAGNÓSTICOS */}
         <div className="grid grid-cols-1 gap-2">
           <div>
             <label className="block text-xs text-gray-400 mb-1">Diagnóstico 1 (Principal)</label>
@@ -395,52 +443,7 @@ export const MedicalHistoryPanel = ({ numeroId }: MedicalHistoryPanelProps) => {
           </div>
         </div>
 
-        {/* CAMPOS DE TEXTO DESPUÉS DE DIAGNÓSTICOS */}
-        <div>
-          <label className="block text-xs text-gray-400 mb-1">Antecedentes</label>
-          <textarea
-            value={mdAntecedentes}
-            onChange={(e) => setMdAntecedentes(e.target.value)}
-            className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none"
-            rows={3}
-            placeholder="Antecedentes médicos relevantes..."
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs text-gray-400 mb-1">Observaciones privadas para la empresa</label>
-          <textarea
-            value={mdObsParaMiDocYa}
-            onChange={(e) => setMdObsParaMiDocYa(e.target.value)}
-            className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none"
-            rows={3}
-            placeholder="Observaciones privadas para la empresa..."
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs text-gray-400 mb-1">Obs. Certificado</label>
-          <textarea
-            value={mdObservacionesCertificado}
-            onChange={(e) => setMdObservacionesCertificado(e.target.value)}
-            className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none"
-            rows={3}
-            placeholder="Observaciones para el certificado..."
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs text-gray-400 mb-1">Recomendaciones Médicas Adicionales</label>
-          <textarea
-            value={mdRecomendacionesMedicasAdicionales}
-            onChange={(e) => setMdRecomendacionesMedicasAdicionales(e.target.value)}
-            className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none"
-            rows={3}
-            placeholder="Recomendaciones médicas adicionales..."
-          />
-        </div>
-
-        {/* CONCEPTO FINAL AL ÚLTIMO */}
+        {/* 6. CONCEPTO FINAL */}
         <div>
           <label className="block text-xs text-gray-400 mb-1">Concepto Final</label>
           <select
