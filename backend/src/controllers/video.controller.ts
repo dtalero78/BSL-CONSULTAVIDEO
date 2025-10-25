@@ -274,19 +274,19 @@ class VideoController {
   }
 
   /**
-   * Obtener historia clínica de un paciente
-   * GET /api/video/medical-history/:numeroId
+   * Obtener historia clínica de un paciente por _id
+   * GET /api/video/medical-history/:historiaId
    */
   async getMedicalHistory(req: Request, res: Response): Promise<void> {
     try {
-      const { numeroId } = req.params;
+      const { historiaId } = req.params;
 
-      if (!numeroId) {
-        res.status(400).json({ error: 'numeroId is required' });
+      if (!historiaId) {
+        res.status(400).json({ error: 'historiaId is required' });
         return;
       }
 
-      const medicalHistory = await medicalHistoryService.getMedicalHistory(numeroId);
+      const medicalHistory = await medicalHistoryService.getMedicalHistory(historiaId);
 
       if (!medicalHistory) {
         res.status(404).json({
@@ -310,15 +310,15 @@ class VideoController {
   }
 
   /**
-   * Actualizar historia clínica de un paciente
+   * Actualizar historia clínica de un paciente por _id
    * POST /api/video/medical-history
    */
   async updateMedicalHistory(req: Request, res: Response): Promise<void> {
     try {
       const payload = req.body;
 
-      if (!payload.numeroId) {
-        res.status(400).json({ error: 'numeroId is required' });
+      if (!payload.historiaId) {
+        res.status(400).json({ error: 'historiaId is required' });
         return;
       }
 

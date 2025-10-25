@@ -44,7 +44,7 @@ interface MedicalHistoryData {
 }
 
 interface UpdateMedicalHistoryPayload {
-  numeroId: string;
+  historiaId: string;
   mdAntecedentes?: string;
   mdObsParaMiDocYa?: string;
   mdObservacionesCertificado?: string;
@@ -65,22 +65,22 @@ class MedicalHistoryService {
   }
 
   /**
-   * Obtiene la historia clínica de un paciente desde Wix
+   * Obtiene la historia clínica de un paciente desde Wix por _id
    */
-  async getMedicalHistory(numeroId: string): Promise<MedicalHistoryData | null> {
+  async getMedicalHistory(historiaId: string): Promise<MedicalHistoryData | null> {
     try {
-      console.log(`📋 Obteniendo historia clínica para documento: ${numeroId}`);
+      console.log(`📋 Obteniendo historia clínica para ID: ${historiaId}`);
 
       const response = await axios.get(`${this.wixBaseUrl}/getHistoriaClinica`, {
-        params: { documento: numeroId },
+        params: { historiaId: historiaId },
       });
 
       if (response.data && response.data.success && response.data.data) {
-        console.log(`✅ Historia clínica encontrada para ${numeroId}`);
+        console.log(`✅ Historia clínica encontrada para ${historiaId}`);
         return response.data.data as MedicalHistoryData;
       }
 
-      console.warn(`⚠️  No se encontró historia clínica para ${numeroId}`);
+      console.warn(`⚠️  No se encontró historia clínica para ${historiaId}`);
       return null;
     } catch (error: any) {
       console.error('❌ Error obteniendo historia clínica:', error.message);
@@ -89,14 +89,14 @@ class MedicalHistoryService {
   }
 
   /**
-   * Actualiza la historia clínica de un paciente en Wix
+   * Actualiza la historia clínica de un paciente en Wix por _id
    */
   async updateMedicalHistory(payload: UpdateMedicalHistoryPayload): Promise<{ success: boolean; error?: string }> {
     try {
-      console.log(`💾 Actualizando historia clínica para documento: ${payload.numeroId}`);
+      console.log(`💾 Actualizando historia clínica para ID: ${payload.historiaId}`);
 
       const response = await axios.post(`${this.wixBaseUrl}/updateHistoriaClinica`, {
-        numeroId: payload.numeroId,
+        historiaId: payload.historiaId,
         mdAntecedentes: payload.mdAntecedentes,
         mdObsParaMiDocYa: payload.mdObsParaMiDocYa,
         mdObservacionesCertificado: payload.mdObservacionesCertificado,
@@ -112,7 +112,7 @@ class MedicalHistoryService {
       });
 
       if (response.data && response.data.success) {
-        console.log(`✅ Historia clínica actualizada exitosamente para ${payload.numeroId}`);
+        console.log(`✅ Historia clínica actualizada exitosamente para ${payload.historiaId}`);
         return { success: true };
       }
 

@@ -12,11 +12,11 @@ interface VideoRoomProps {
   identity: string;
   roomName: string;
   role?: 'doctor' | 'patient';
-  numeroId?: string; // Documento del paciente
+  historiaId?: string; // ID de la historia clínica
   onLeave?: () => void;
 }
 
-export const VideoRoom = ({ identity, roomName, role, numeroId, onLeave }: VideoRoomProps) => {
+export const VideoRoom = ({ identity, roomName, role, historiaId, onLeave }: VideoRoomProps) => {
   const [isPosturalAnalysisOpen, setIsPosturalAnalysisOpen] = useState(false);
 
   const {
@@ -186,12 +186,12 @@ export const VideoRoom = ({ identity, roomName, role, numeroId, onLeave }: Video
   return (
     <div className="min-h-screen bg-[#0b141a] flex">
       {/* Panel lateral de Historia Clínica - Siempre visible para doctores */}
-      {role === 'doctor' && numeroId && (
+      {role === 'doctor' && historiaId && (
         <div
           className="fixed top-0 right-0 h-full bg-[#1f2c34] shadow-2xl z-50"
           style={{ width: '450px', maxWidth: '90vw' }}
         >
-          <MedicalHistoryPanel numeroId={numeroId} />
+          <MedicalHistoryPanel historiaId={historiaId} />
         </div>
       )}
 

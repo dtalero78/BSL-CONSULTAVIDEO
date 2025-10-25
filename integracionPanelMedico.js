@@ -31,12 +31,9 @@ export async function obtenerHistoriaClinica(historiaId) {
             return { success: false, error: "No se encontró historia clínica con ese ID" };
         }
 
-        // 2. Obtener el idGeneral de la historia clínica
-        const idGeneral = historia.idGeneral || historia.numeroId;
-
-        // 3. Buscar en FORMULARIO usando el campo idGeneral
+        // 2. Buscar en FORMULARIO usando el _id de HistoriaClinica en el campo idGeneral
         const formularioResults = await wixData.query("FORMULARIO")
-            .eq("idGeneral", idGeneral)
+            .eq("idGeneral", historia._id)
             .find();
 
         const formulario = formularioResults.items.length > 0
@@ -49,6 +46,7 @@ export async function obtenerHistoriaClinica(historiaId) {
             data: {
                 // Datos de identificación
                 _id: historia._id,
+                historiaId: historia._id,
                 numeroId: historia.numeroId,
                 primerNombre: historia.primerNombre,
                 segundoNombre: historia.segundoNombre || "",

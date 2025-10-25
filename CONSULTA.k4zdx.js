@@ -2,6 +2,7 @@ import wixData from 'wix-data';
 import wixStorage from 'wix-storage';
 import wixWindow from 'wix-window';
 import { sendTextMessage } from 'backend/WHATSAPP';
+import { makeVoiceCall } from 'backend/TWILIO';
 
 let documento = wixStorage.local.getItem("documentoParaLightbox");
 let codEmpresa = wixStorage.local.getItem("codEmpresaParaLightbox");
@@ -35,8 +36,8 @@ function construirLinkVideollamada(roomName, nombre, apellido, codMedico) {
 /**
  * Construye el link de videollamada para el doctor
  */
-function construirLinkDoctor(roomName, codMedico, historiaId) {
-    return `${VIDEO_APP_DOMAIN}/doctor/${roomName}?doctor=${encodeURIComponent(codMedico.trim())}&documento=${historiaId}`;
+function construirLinkDoctor(roomName, codMedico) {
+    return `${VIDEO_APP_DOMAIN}/doctor/${roomName}?doctor=${encodeURIComponent(codMedico.trim())}`;
 }
 
 async function fetchHistoriaClinica(documento) {
@@ -55,6 +56,29 @@ async function fetchHistoriaClinica(documento) {
         $w('#whp').link = enlaceWhatsApp;
         $w('#whp').target = "_blank";
 
+        // Botón para hacer solo la llamada (#segundaLlamada)
+        $w('#segundaLlamada').onClick(async () => {
+            // Mostrar estado
+            $w('#estadoSegundaLlamada').text = "📞 REALIZANDO LLAMADA...";
+            $w('#estadoSegundaLlamada').show();
+
+            try {
+                // Hacer la llamada con el teléfono que incluye el prefijo +
+                const resultadoLlamada = await makeVoiceCall(telefonoConPrefijo, item.primerNombre);
+
+                if (resultadoLlamada.success) {
+                    console.log("Segunda llamada iniciada exitosamente");
+                    $w('#estadoSegundaLlamada').text = "✅ LLAMADA REALIZADA";
+                } else {
+                    console.error("Error en la segunda llamada:", resultadoLlamada.error);
+                    $w('#estadoSegundaLlamada').text = "❌ LLAMADA FALLÓ";
+                }
+            } catch (errorLlamada) {
+                console.error("Error realizando segunda llamada:", errorLlamada);
+                $w('#estadoSegundaLlamada').text = "❌ LLAMADA FALLÓ";
+            }
+        });
+
         // Botón WhatsApp con videollamada (#whpTwilio)
         $w('#whpTwilio').onClick(async () => {
             // Generar sala SOLO cuando se hace clic
@@ -65,7 +89,7 @@ async function fetchHistoriaClinica(documento) {
                 item.primerApellido,
                 codEmpresa
             );
-            const linkVideollamadaDoctor = construirLinkDoctor(roomName, codEmpresa, item._id);
+            const linkVideollamadaDoctor = construirLinkDoctor(roomName, codEmpresa);
 
             const mensajeVideollamada = `Hola ${item.primerNombre}. Te escribimos de BSL.
 
@@ -106,6 +130,25 @@ Asegúrate de permitir el acceso a tu cámara y micrófono cuando el navegador t
 
                 // Mostrar error en el campo de texto
                 $w('#estadoWhp').text = "❌ ERROR AL ENVIAR";
+            }
+
+            // 📞 Realizar llamada de voz después de enviar el mensaje de WhatsApp
+            try {
+                $w('#estadoWhp').text = "📞 REALIZANDO LLAMADA...";
+
+                // Hacer la llamada con el teléfono que incluye el prefijo +
+                const resultadoLlamada = await makeVoiceCall(telefonoConPrefijo, item.primerNombre);
+
+                if (resultadoLlamada.success) {
+                    console.log("Llamada de voz iniciada exitosamente");
+                    $w('#estadoWhp').text = "✅ MENSAJE ENVIADO Y LLAMADA REALIZADA";
+                } else {
+                    console.error("Error en la llamada:", resultadoLlamada.error);
+                    $w('#estadoWhp').text = "⚠️ MENSAJE ENVIADO, LLAMADA FALLÓ";
+                }
+            } catch (errorLlamada) {
+                console.error("Error realizando llamada de voz:", errorLlamada);
+                $w('#estadoWhp').text = "⚠️ MENSAJE ENVIADO, LLAMADA FALLÓ";
             }
         });
 

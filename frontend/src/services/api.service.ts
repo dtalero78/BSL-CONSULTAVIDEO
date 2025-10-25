@@ -102,8 +102,8 @@ class ApiService {
   /**
    * Obtener historia clínica de un paciente
    */
-  async getMedicalHistory(numeroId: string): Promise<any> {
-    const response = await this.client.get(`/api/video/medical-history/${numeroId}`);
+  async getMedicalHistory(historiaId: string): Promise<any> {
+    const response = await this.client.get(`/api/video/medical-history/${historiaId}`);
     return response.data.data;
   }
 
@@ -111,7 +111,7 @@ class ApiService {
    * Actualizar historia clínica de un paciente
    */
   async updateMedicalHistory(payload: {
-    numeroId: string;
+    historiaId: string;
     mdAntecedentes?: string;
     mdObsParaMiDocYa?: string;
     mdObservacionesCertificado?: string;

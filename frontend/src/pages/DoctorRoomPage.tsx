@@ -10,7 +10,7 @@ export const DoctorRoomPage = () => {
 
   // Extraer parámetros de la URL
   const doctorParam = searchParams.get('doctor');
-  const documentoParam = searchParams.get('documento'); // Documento del paciente
+  const historiaIdParam = searchParams.get('documento'); // ID de la historia clínica (el parámetro aún se llama "documento" en la URL)
 
   // Auto-llenar nombre del doctor si viene en la URL
   useEffect(() => {
@@ -35,7 +35,7 @@ export const DoctorRoomPage = () => {
         identity={`Dr. ${doctorName}`}
         roomName={roomName}
         role="doctor"
-        numeroId={documentoParam || undefined}
+        historiaId={historiaIdParam || undefined}
         onLeave={handleLeaveCall}
       />
     );

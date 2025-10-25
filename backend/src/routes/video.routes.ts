@@ -26,7 +26,7 @@ router.post('/events/participant-disconnected', videoController.trackParticipant
 router.post('/whatsapp/send', videoController.sendWhatsApp);
 
 // Medical History
-router.get('/medical-history/:numeroId', videoController.getMedicalHistory);
+router.get('/medical-history/:historiaId', videoController.getMedicalHistory);
 router.post('/medical-history', videoController.updateMedicalHistory);
 
 // AI Suggestions

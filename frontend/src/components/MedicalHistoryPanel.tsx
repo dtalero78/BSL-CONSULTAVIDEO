@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import apiService from '../services/api.service';
 
 interface MedicalHistoryData {
+  historiaId: string;
   numeroId: string;
   primerNombre: string;
   segundoNombre?: string;
@@ -33,10 +34,10 @@ interface MedicalHistoryData {
 }
 
 interface MedicalHistoryPanelProps {
-  numeroId: string;
+  historiaId: string;
 }
 
-export const MedicalHistoryPanel = ({ numeroId }: MedicalHistoryPanelProps) => {
+export const MedicalHistoryPanel = ({ historiaId }: MedicalHistoryPanelProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +59,7 @@ export const MedicalHistoryPanel = ({ numeroId }: MedicalHistoryPanelProps) => {
 
   useEffect(() => {
     loadMedicalHistory();
-  }, [numeroId]);
+  }, [historiaId]);
 
   // Calcular IMC automáticamente cuando cambian talla o peso
   useEffect(() => {
@@ -101,7 +102,7 @@ export const MedicalHistoryPanel = ({ numeroId }: MedicalHistoryPanelProps) => {
     try {
       setIsLoading(true);
       setError(null);
-      const history = await apiService.getMedicalHistory(numeroId);
+      const history = await apiService.getMedicalHistory(historiaId);
       setData(history);
 
       // Pre-llenar campos editables
@@ -176,7 +177,7 @@ export const MedicalHistoryPanel = ({ numeroId }: MedicalHistoryPanelProps) => {
       }
 
       await apiService.updateMedicalHistory({
-        numeroId: data.numeroId,
+        historiaId: data.historiaId,
         mdAntecedentes: combinedAntecedentes,
         mdObsParaMiDocYa,
         mdObservacionesCertificado,
@@ -238,7 +239,7 @@ export const MedicalHistoryPanel = ({ numeroId }: MedicalHistoryPanelProps) => {
                 <li>Publica el sitio</li>
               </ol>
               <p className="text-sm text-gray-400 mt-3">
-                Documento del paciente: <span className="text-white font-mono">{numeroId}</span>
+                ID de Historia: <span className="text-white font-mono">{historiaId}</span>
               </p>
             </div>
           )}
