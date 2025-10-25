@@ -125,6 +125,16 @@ class ApiService {
   }): Promise<void> {
     await this.client.post('/api/video/medical-history', payload);
   }
+
+  /**
+   * Generar sugerencias médicas con IA
+   */
+  async generateAISuggestions(patientData: any): Promise<string> {
+    const response = await this.client.post('/api/video/ai-suggestions', {
+      patientData,
+    });
+    return response.data.data.suggestions;
+  }
 }
 
 export default new ApiService();

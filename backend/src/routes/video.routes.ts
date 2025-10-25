@@ -29,4 +29,7 @@ router.post('/whatsapp/send', videoController.sendWhatsApp);
 router.get('/medical-history/:numeroId', videoController.getMedicalHistory);
 router.post('/medical-history', videoController.updateMedicalHistory);
 
+// AI Suggestions
+router.post('/ai-suggestions', videoController.generateAISuggestions);
+
 export default router;

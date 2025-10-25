@@ -3,6 +3,7 @@ import twilioService from '../services/twilio.service';
 import { sessionTracker } from '../services/session-tracker.service';
 import whatsappService from '../services/whatsapp.service';
 import medicalHistoryService from '../services/medical-history.service';
+import openaiService from '../services/openai.service';
 
 class VideoController {
   /**
@@ -338,6 +339,37 @@ class VideoController {
       console.error('Error updating medical history:', error);
       res.status(500).json({
         error: 'Failed to update medical history',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  /**
+   * Generar sugerencias médicas con IA
+   * POST /api/video/ai-suggestions
+   * Body: { patientData: PatientData }
+   */
+  async generateAISuggestions(req: Request, res: Response): Promise<void> {
+    try {
+      const { patientData } = req.body;
+
+      if (!patientData) {
+        res.status(400).json({ error: 'patientData is required' });
+        return;
+      }
+
+      const suggestions = await openaiService.generateMedicalRecommendations(patientData);
+
+      res.status(200).json({
+        success: true,
+        data: {
+          suggestions,
+        },
+      });
+    } catch (error) {
+      console.error('Error generating AI suggestions:', error);
+      res.status(500).json({
+        error: 'Failed to generate AI suggestions',
         message: error instanceof Error ? error.message : 'Unknown error',
       });
     }
