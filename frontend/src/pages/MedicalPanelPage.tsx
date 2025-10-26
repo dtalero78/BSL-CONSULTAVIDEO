@@ -224,12 +224,7 @@ export function MedicalPanelPage() {
     e.preventDefault();
 
     if (!searchDocument.trim()) {
-      setSearchError('Por favor ingrese un documento');
-      return;
-    }
-
-    if (!medicoCode) {
-      setSearchError('Código de médico no disponible');
+      setSearchError('Por favor ingrese un documento o celular');
       return;
     }
 
@@ -238,15 +233,16 @@ export function MedicalPanelPage() {
     setSearchResult(null);
 
     try {
+      // Buscar sin filtro de médico (busca en toda la base de datos)
       const result = await medicalPanelService.searchPatientByDocument(
-        searchDocument.trim(),
-        medicoCode
+        searchDocument.trim()
+        // No enviamos medicoCode para buscar en todos los pacientes
       );
 
       if (result) {
         setSearchResult(result);
       } else {
-        setSearchError('No se encontró paciente con ese documento');
+        setSearchError('No se encontró paciente con ese documento o celular');
       }
     } catch (err) {
       console.error('Error buscando paciente:', err);
@@ -390,7 +386,7 @@ export function MedicalPanelPage() {
             <div className="flex gap-2">
               <input
                 type="text"
-                placeholder="Buscar por documento de identidad..."
+                placeholder="Buscar por documento o celular..."
                 value={searchDocument}
                 onChange={(e) => setSearchDocument(e.target.value)}
                 className="flex-1 px-4 py-3 bg-[#2a3942] border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-[#00a884] transition"

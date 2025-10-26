@@ -1841,24 +1841,25 @@ export async function get_pacientesPendientes(request) {
 }
 
 /**
- * GET: Buscar paciente por número de documento
- * URL: /_functions/buscarPaciente?documento=123456&medicoCode=CODIGO
+ * GET: Buscar paciente por número de documento o celular (SIN filtro de médico)
+ * URL: /_functions/buscarPaciente?searchTerm=123456
  */
 export async function get_buscarPaciente(request) {
-  const { documento, medicoCode } = request.query;
+  const { searchTerm } = request.query;
 
-  if (!documento || !medicoCode) {
+  if (!searchTerm) {
     return badRequest({
       headers: {
         "Content-Type": "application/json",
         "Access-Control-Allow-Origin": "*"
       },
-      body: { error: "Los parámetros 'documento' y 'medicoCode' son requeridos" }
+      body: { error: "El parámetro 'searchTerm' es requerido" }
     });
   }
 
   try {
-    const resultado = await buscarPacientePorDocumento(documento, medicoCode);
+    // Buscar sin filtro de médico (null en segundo parámetro)
+    const resultado = await buscarPacientePorDocumento(searchTerm, null);
 
     if (resultado.success) {
       return ok({

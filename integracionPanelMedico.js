@@ -323,23 +323,23 @@ export async function obtenerPacientesPendientes(medicoCode, page = 0, pageSize 
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
- * 3. BUSCAR PACIENTE POR DOCUMENTO
+ * 3. BUSCAR PACIENTE POR DOCUMENTO O CELULAR (SIN FILTRO DE MÉDICO)
  * ════════════════════════════════════════════════════════════════════════════
  */
-export async function buscarPacientePorDocumento(documento, medicoCode = null) {
-    if (!documento) {
-        throw new Error("documento es requerido");
+export async function buscarPacientePorDocumento(searchTerm, medicoCode = null) {
+    if (!searchTerm) {
+        throw new Error("searchTerm es requerido");
     }
 
     try {
-        let query = wixData.query("HistoriaClinica")
-            .eq("numeroId", documento);
-
-        if (medicoCode) {
-            query = query.eq("medico", medicoCode);
-        }
-
-        const results = await query.find();
+        // Buscar en TODA la base de datos (sin filtro de médico)
+        // Buscar por numeroId O celular
+        const results = await wixData.query("HistoriaClinica")
+            .or(
+                wixData.query("HistoriaClinica").eq("numeroId", searchTerm),
+                wixData.query("HistoriaClinica").eq("celular", searchTerm)
+            )
+            .find();
 
         if (results.items.length === 0) {
             return {
@@ -350,9 +350,9 @@ export async function buscarPacientePorDocumento(documento, medicoCode = null) {
 
         const item = results.items[0];
 
-        // Buscar foto en FORMULARIO
+        // Buscar foto en FORMULARIO usando el numeroId del resultado
         const formularioResults = await wixData.query("FORMULARIO")
-            .eq("documentoIdentidad", documento)
+            .eq("documentoIdentidad", item.numeroId)
             .find();
 
         const foto = formularioResults.items.length > 0
