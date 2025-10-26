@@ -19,7 +19,6 @@ export function MedicalPanelPage() {
   const [error, setError] = useState<string | null>(null);
   const [attendingPatient, setAttendingPatient] = useState<string | null>(null);
   const [connectedPatients, setConnectedPatients] = useState<Set<string>>(new Set());
-  const [socket, setSocket] = useState<Socket | null>(null);
 
   const pageSize = 10;
 
@@ -120,8 +119,6 @@ export function MedicalPanelPage() {
         return updated;
       });
     });
-
-    setSocket(newSocket);
 
     // Cleanup al desmontar
     return () => {
