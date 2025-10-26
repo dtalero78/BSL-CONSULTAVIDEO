@@ -177,8 +177,15 @@ export function MedicalPanelPage() {
       const roomName = medicalPanelService.generateRoomName();
       setPatientRooms(prev => ({ ...prev, [patient._id]: roomName }));
 
-      // Construir URL del paciente
-      const patientLink = `${window.location.origin}/patient/${roomName}?nombre=${patient.primerNombre}&apellido=${patient.primerApellido}&documento=${patient._id}&doctor=${medicoCode}`;
+      // Construir URL del paciente con URLSearchParams para codificación correcta
+      const baseUrl = `${window.location.origin}/patient/${roomName}`;
+      const params = new URLSearchParams({
+        nombre: patient.primerNombre,
+        apellido: patient.primerApellido,
+        documento: patient._id,
+        doctor: medicoCode
+      });
+      const patientLink = `${baseUrl}?${params.toString()}`;
 
       // Generar mensaje de WhatsApp con el link
       const whatsappMessage = `Hola ${patient.primerNombre}. Te escribimos de BSL. Tienes una cita médica programada conmigo\n\nConéctate al link:\n\n${patientLink}`;
