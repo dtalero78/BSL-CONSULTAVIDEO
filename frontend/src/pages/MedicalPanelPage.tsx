@@ -381,7 +381,7 @@ export function MedicalPanelPage() {
 
           <div className="mt-6 pt-6 border-t border-gray-700">
             <a
-              href="https://api.whatsapp.com/send?phone=573014152706&text=Hola"
+              href="https://api.whatsapp.com/send?phone=573008021701&text=Hola"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 text-sm text-gray-400 hover:text-[#00a884] transition"
