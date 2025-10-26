@@ -116,7 +116,7 @@ export const VideoControls = ({
       {/* WhatsApp attribution */}
       <div className="flex items-center justify-center gap-2 pb-4 text-xs text-gray-500">
         <span>Powered by</span>
-        <span className="font-medium">BSL Video</span>
+        <span className="font-medium">BSL Tech. +</span>
       </div>
     </div>
   );

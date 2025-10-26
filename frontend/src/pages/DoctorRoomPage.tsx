@@ -11,6 +11,7 @@ export const DoctorRoomPage = () => {
   // Extraer parámetros de la URL
   const doctorParam = searchParams.get('doctor');
   const historiaIdParam = searchParams.get('documento'); // ID de la historia clínica (el parámetro aún se llama "documento" en la URL)
+  const pacienteParam = searchParams.get('paciente'); // Nombre del paciente
 
   // Auto-llenar nombre del doctor si viene en la URL
   useEffect(() => {
@@ -59,10 +60,18 @@ export const DoctorRoomPage = () => {
           <p className="text-gray-400 text-sm">Panel del Médico</p>
         </div>
 
-        {/* Información de la sala */}
-        <div className="bg-[#2a3942] rounded-xl p-4 mb-6 border border-gray-600">
-          <p className="text-xs text-gray-400 mb-2">Sala de Consulta</p>
-          <p className="text-white font-medium text-sm break-all">{roomName}</p>
+        {/* Información de la sala y paciente */}
+        <div className="bg-[#2a3942] rounded-xl p-4 mb-6 border border-gray-600 space-y-3">
+          <div>
+            <p className="text-xs text-gray-400 mb-2">Sala de Consulta</p>
+            <p className="text-white font-medium text-sm break-all">{roomName}</p>
+          </div>
+          {pacienteParam && (
+            <div className="pt-3 border-t border-gray-600">
+              <p className="text-xs text-gray-400 mb-2">Paciente</p>
+              <p className="text-white font-semibold text-base">{pacienteParam}</p>
+            </div>
+          )}
         </div>
 
         {/* Formulario del médico */}

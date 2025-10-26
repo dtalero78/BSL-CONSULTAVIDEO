@@ -175,7 +175,7 @@ export function MedicalPanelPage() {
       const roomName = medicalPanelService.generateRoomName();
 
       // Construir URL del doctor con _id de la historia clínica (URL completa)
-      const doctorUrl = `${window.location.origin}/doctor/${roomName}?doctor=${medicoCode}&documento=${patient._id}`;
+      const doctorUrl = `${window.location.origin}/doctor/${roomName}?doctor=${medicoCode}&documento=${patient._id}&paciente=${encodeURIComponent(patient.nombres)}`;
 
       // Construir URL del paciente
       const patientLink = `${window.location.origin}/patient/${roomName}?nombre=${patient.primerNombre}&apellido=${patient.primerApellido}&documento=${patient._id}&doctor=${medicoCode}`;
@@ -426,9 +426,22 @@ export function MedicalPanelPage() {
                 </h3>
                 <div className="space-y-2">
                   <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <span className="text-gray-400">Nombre:</span>
-                      <span className="text-white ml-2 font-semibold">{searchResult.nombres}</span>
+                    <div className="col-span-2 flex items-center gap-3 mb-2">
+                      <div>
+                        <span className="text-gray-400">Nombre:</span>
+                        <span className="text-white ml-2 font-semibold">{searchResult.nombres}</span>
+                      </div>
+                      {connectedPatients.has(searchResult._id) && (
+                        <div className="flex items-center gap-2 bg-green-500/20 px-3 py-1 rounded-full border border-green-500/50">
+                          <div className="relative flex items-center justify-center w-2 h-2">
+                            <div className="absolute w-2 h-2 bg-green-500 rounded-full animate-ping"></div>
+                            <div className="relative w-2 h-2 bg-green-500 rounded-full"></div>
+                          </div>
+                          <span className="text-green-400 text-xs font-medium uppercase tracking-wide">
+                            Conectado
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <div>
                       <span className="text-gray-400">Doc:</span>
