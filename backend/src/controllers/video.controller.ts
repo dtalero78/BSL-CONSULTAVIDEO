@@ -169,11 +169,11 @@ class VideoController {
   /**
    * Registrar que un participante se conectó
    * POST /api/video/events/participant-connected
-   * Body: { roomName: string, identity: string, role: 'doctor' | 'patient' }
+   * Body: { roomName: string, identity: string, role: 'doctor' | 'patient', documento?: string }
    */
   async trackParticipantConnected(req: Request, res: Response): Promise<void> {
     try {
-      const { roomName, identity, role } = req.body;
+      const { roomName, identity, role, documento } = req.body;
 
       if (!roomName || !identity || !role) {
         res.status(400).json({
@@ -189,7 +189,7 @@ class VideoController {
         return;
       }
 
-      sessionTracker.trackParticipantConnected(roomName, identity, role);
+      sessionTracker.trackParticipantConnected(roomName, identity, role, documento);
 
       res.status(200).json({
         success: true,

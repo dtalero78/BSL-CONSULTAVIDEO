@@ -70,12 +70,14 @@ class ApiService {
   async trackParticipantConnected(
     roomName: string,
     identity: string,
-    role: 'doctor' | 'patient'
+    role: 'doctor' | 'patient',
+    documento?: string
   ): Promise<void> {
     await this.client.post('/api/video/events/participant-connected', {
       roomName,
       identity,
       role,
+      documento,
     });
   }
 

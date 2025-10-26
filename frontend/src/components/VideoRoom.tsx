@@ -13,10 +13,11 @@ interface VideoRoomProps {
   roomName: string;
   role?: 'doctor' | 'patient';
   historiaId?: string; // ID de la historia clínica
+  documento?: string; // Documento del paciente (para notificaciones en tiempo real)
   onLeave?: () => void;
 }
 
-export const VideoRoom = ({ identity, roomName, role, historiaId, onLeave }: VideoRoomProps) => {
+export const VideoRoom = ({ identity, roomName, role, historiaId, documento, onLeave }: VideoRoomProps) => {
   const [isPosturalAnalysisOpen, setIsPosturalAnalysisOpen] = useState(false);
 
   const {
@@ -32,7 +33,7 @@ export const VideoRoom = ({ identity, roomName, role, historiaId, onLeave }: Vid
     isAudioEnabled,
     isVideoEnabled,
     localVideoTrack,
-  } = useVideoRoom({ identity, roomName, role });
+  } = useVideoRoom({ identity, roomName, role, documento });
 
   const {
     currentEffect,

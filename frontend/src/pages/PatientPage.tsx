@@ -12,6 +12,7 @@ export const PatientPage = () => {
   const nombreParam = searchParams.get('nombre');
   const apellidoParam = searchParams.get('apellido');
   const doctorParam = searchParams.get('doctor');
+  const documentoParam = searchParams.get('documento');
 
   // Auto-llenar nombre del paciente si viene en la URL
   useEffect(() => {
@@ -38,6 +39,7 @@ export const PatientPage = () => {
         identity={patientName}
         roomName={roomName}
         role="patient"
+        documento={documentoParam || undefined}
         onLeave={handleLeaveCall}
       />
     );

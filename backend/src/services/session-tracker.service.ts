@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { Server as SocketIOServer } from 'socket.io';
 
 interface SessionParticipant {
   identity: string;
@@ -12,6 +13,7 @@ interface VideoSession {
   participants: Map<string, SessionParticipant>;
   createdAt: Date;
   completedAt?: Date;
+  patientDocumento?: string; // ID del documento del paciente
 }
 
 class SessionTrackerService {
@@ -19,11 +21,20 @@ class SessionTrackerService {
   private readonly ADMIN_PHONE = '573008021701';
   private readonly WHAPI_TOKEN = process.env.WHAPI_TOKEN || 'due3eWCwuBM2Xqd6cPujuTRqSbMb68lt';
   private readonly WHAPI_URL = 'https://gate.whapi.cloud/messages/text';
+  private io: SocketIOServer | null = null;
+
+  /**
+   * Inicializa el servicio con la instancia de Socket.io
+   */
+  initialize(io: SocketIOServer): void {
+    this.io = io;
+    console.log('[SessionTracker] Socket.io initialized');
+  }
 
   /**
    * Registra que un participante se conectó a la sala
    */
-  trackParticipantConnected(roomName: string, identity: string, role: 'doctor' | 'patient'): void {
+  trackParticipantConnected(roomName: string, identity: string, role: 'doctor' | 'patient', documento?: string): void {
     console.log(`[SessionTracker] Participant connected: ${identity} (${role}) to room ${roomName}`);
 
     if (!this.sessions.has(roomName)) {
@@ -31,10 +42,17 @@ class SessionTrackerService {
         roomName,
         participants: new Map(),
         createdAt: new Date(),
+        patientDocumento: documento,
       });
     }
 
     const session = this.sessions.get(roomName)!;
+
+    // Si es un paciente y tenemos el documento, guardarlo en la sesión
+    if (role === 'patient' && documento) {
+      session.patientDocumento = documento;
+    }
+
     session.participants.set(identity, {
       identity,
       role,
@@ -42,6 +60,17 @@ class SessionTrackerService {
     });
 
     console.log(`[SessionTracker] Current participants in ${roomName}: ${session.participants.size}`);
+
+    // Emitir evento Socket.io cuando un paciente se conecta
+    if (role === 'patient' && this.io && documento) {
+      console.log(`[SessionTracker] Emitting patient-connected event for documento: ${documento}`);
+      this.io.emit('patient-connected', {
+        documento,
+        roomName,
+        identity,
+        connectedAt: new Date().toISOString(),
+      });
+    }
   }
 
   /**
@@ -59,6 +88,17 @@ class SessionTrackerService {
     const participant = session.participants.get(identity);
     if (participant) {
       participant.disconnectedAt = new Date();
+
+      // Emitir evento Socket.io cuando un paciente se desconecta
+      if (participant.role === 'patient' && this.io && session.patientDocumento) {
+        console.log(`[SessionTracker] Emitting patient-disconnected event for documento: ${session.patientDocumento}`);
+        this.io.emit('patient-disconnected', {
+          documento: session.patientDocumento,
+          roomName,
+          identity,
+          disconnectedAt: new Date().toISOString(),
+        });
+      }
     }
 
     // Verificar si todos los participantes se desconectaron

@@ -11,6 +11,7 @@ import telemedicineRoutes from './routes/telemedicine.routes';
 import medicalPanelRoutes from './routes/medical-panel.routes';
 import twilioVoiceRoutes from './routes/twilio-voice.routes';
 import { telemedicineSocketService } from './services/telemedicine-socket.service';
+import { sessionTracker } from './services/session-tracker.service';
 
 const app: Application = express();
 const httpServer = createServer(app);
@@ -27,6 +28,10 @@ const io = new Server(httpServer, {
 // Initialize telemedicine socket service
 telemedicineSocketService.initialize(io);
 console.log('[Socket.io] Telemedicine service initialized');
+
+// Initialize session tracker with Socket.io
+sessionTracker.initialize(io);
+console.log('[Socket.io] Session tracker initialized');
 
 // Middleware de seguridad - Configurado para servir archivos estaticos
 app.use(

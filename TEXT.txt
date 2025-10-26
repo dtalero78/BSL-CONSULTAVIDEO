@@ -1,0 +1,17 @@
+Si. En producción si sirve. Ok. 
+
+Ahora si tratemos de integrar la función para que al hacer clic en Atender 
+además de enviar el mensaje por whapi haga una llamada telefónica por twilio. 
+
+Eso ya funciona en la aplicación paralela en wix. En wix hay un backend llamado
+TWILIO.js. Es este: @TWILIO.js. y en el frontend se usa así @CONSULTA.k4zdx.js. 
+
+Los secrets de wix son los siguientes: 
+TWILIO_ACCOUNT_SID
+ACbae12b4b366c5bbad9dc5e9ecefe3574
+
+TWILIO_AUTH_TOKEN
+d5d8552c8d772f57b6a8f4768c5ea290 
+
+
+TEN CUIDADO PORQUE TENEMOS TAMBIÉN LAS VARIABLES DE ENTORNO DE TWILIO DE LA VIDEO LLAMADA
