@@ -126,18 +126,11 @@ class MedicalPanelService {
    * La búsqueda se realiza en toda la base de datos, sin filtro de médico
    */
   async searchPatientByDocument(
-    searchTerm: string,
-    medicoCode?: string
+    searchTerm: string
   ): Promise<Patient | null> {
     try {
       // Enviar el término de búsqueda como 'searchTerm' para que Wix busque por documento o celular
       const params: any = { searchTerm };
-
-      // NO enviar medicoCode para buscar en toda la base de datos
-      // (comentado intencionalmente para buscar en todos los pacientes)
-      // if (medicoCode) {
-      //   params.medicoCode = medicoCode;
-      // }
 
       const response = await this.wixClient.get(`/buscarPaciente`, { params });
 

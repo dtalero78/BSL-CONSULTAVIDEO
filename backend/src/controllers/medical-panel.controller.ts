@@ -50,14 +50,13 @@ class MedicalPanelController {
   async searchPatientByDocument(req: Request, res: Response): Promise<void> {
     try {
       const { documento } = req.params;
-      const { medicoCode } = req.query;
 
       if (!documento) {
-        res.status(400).json({ error: 'Documento de identidad requerido' });
+        res.status(400).json({ error: 'Documento de identidad o celular requerido' });
         return;
       }
 
-      const patient = await medicalPanelService.searchPatientByDocument(documento, medicoCode as string);
+      const patient = await medicalPanelService.searchPatientByDocument(documento);
 
       if (!patient) {
         res.status(404).json({ error: 'Paciente no encontrado' });
