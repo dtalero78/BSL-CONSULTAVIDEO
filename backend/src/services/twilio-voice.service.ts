@@ -46,6 +46,8 @@ class TwilioVoiceService {
     try {
       console.log(`📞 Iniciando llamada a: ${toNumber}`);
       console.log(`📞 Desde número: ${this.twilioPhoneNumber}`);
+      console.log(`📞 Using Account SID: ${this.accountSid.substring(0, 8)}...${this.accountSid.substring(this.accountSid.length - 4)}`);
+      console.log(`📞 Using Auth Token: ***${this.authToken.substring(this.authToken.length - 4)}`);
 
       // Construir URL del webhook de voz
       const webhookUrl = `https://www.bsl.com.co/_functions/voice?nombre=${encodeURIComponent(nombrePaciente)}`;
