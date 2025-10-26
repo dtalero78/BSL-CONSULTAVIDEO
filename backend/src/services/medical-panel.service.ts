@@ -146,7 +146,7 @@ class MedicalPanelService {
    */
   async markPatientAsNoAnswer(patientId: string): Promise<boolean> {
     try {
-      await this.wixClient.patch(`/marcarNoContesta`, {
+      await this.wixClient.post(`/marcarNoContesta`, {
         patientId
       });
 
