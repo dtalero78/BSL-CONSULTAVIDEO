@@ -31,6 +31,22 @@ interface UseVideoRoomReturn {
   localVideoTrack: LocalVideoTrack | null;
 }
 
+// Helper function para text-to-speech
+const speakText = (text: string) => {
+  if ('speechSynthesis' in window) {
+    // Cancelar cualquier speech en progreso
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'es-ES'; // Español
+    utterance.rate = 1.0; // Velocidad normal
+    utterance.pitch = 1.0; // Tono normal
+    utterance.volume = 1.0; // Volumen máximo
+
+    window.speechSynthesis.speak(utterance);
+  }
+};
+
 export const useVideoRoom = ({
   identity,
   roomName,
@@ -96,6 +112,12 @@ export const useVideoRoom = ({
       connectedRoom.on('participantConnected', (participant: RemoteParticipant) => {
         console.log(`Participant connected: ${participant.identity}`);
         setRemoteParticipants((prev) => new Map(prev).set(participant.sid, participant));
+
+        // Anunciar con voz cuando un paciente se conecta (solo para doctores)
+        if (role === 'doctor') {
+          const participantName = participant.identity;
+          speakText(`Paciente ${participantName} conectado`);
+        }
       });
 
       connectedRoom.on('participantDisconnected', (participant: RemoteParticipant) => {
