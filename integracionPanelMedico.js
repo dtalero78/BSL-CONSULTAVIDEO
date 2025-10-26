@@ -420,13 +420,14 @@ export async function marcarPacienteNoContesta(patientId) {
 
         let item = results.items[0];
         item.pvEstado = "No Contesta";
+        item.medico = "RESERVA";  // Cambiar médico a RESERVA
 
         // Actualizar el registro
         await wixData.update("HistoriaClinica", item);
 
         return {
             success: true,
-            message: "Paciente marcado como 'No Contesta'"
+            message: "Paciente marcado como 'No Contesta' y asignado a RESERVA"
         };
     } catch (error) {
         console.error("Error en marcarPacienteNoContesta:", error);
