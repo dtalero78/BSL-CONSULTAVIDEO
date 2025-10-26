@@ -333,13 +333,17 @@ export async function buscarPacientePorDocumento(searchTerm, medicoCode = null) 
 
     try {
         // Buscar en TODA la base de datos (sin filtro de médico)
-        // Buscar por numeroId O celular
-        const results = await wixData.query("HistoriaClinica")
-            .or(
-                wixData.query("HistoriaClinica").eq("numeroId", searchTerm),
-                wixData.query("HistoriaClinica").eq("celular", searchTerm)
-            )
+        // Primero intentar buscar por numeroId
+        let results = await wixData.query("HistoriaClinica")
+            .eq("numeroId", searchTerm)
             .find();
+
+        // Si no se encuentra por documento, buscar por celular
+        if (results.items.length === 0) {
+            results = await wixData.query("HistoriaClinica")
+                .eq("celular", searchTerm)
+                .find();
+        }
 
         if (results.items.length === 0) {
             return {
