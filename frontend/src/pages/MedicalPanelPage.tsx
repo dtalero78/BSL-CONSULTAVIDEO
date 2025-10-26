@@ -19,6 +19,7 @@ export function MedicalPanelPage() {
   const [error, setError] = useState<string | null>(null);
   const [attendingPatient, setAttendingPatient] = useState<string | null>(null);
   const [contactingPatient, setContactingPatient] = useState<string | null>(null);
+  const [recallingPatient, setRecallingPatient] = useState<string | null>(null);
   const [connectedPatients, setConnectedPatients] = useState<Set<string>>(new Set());
   const [patientRooms, setPatientRooms] = useState<{ [patientId: string]: string }>({});
 
@@ -216,6 +217,26 @@ export function MedicalPanelPage() {
       alert('Error al contactar paciente. Inténtalo nuevamente.');
     } finally {
       setContactingPatient(null);
+    }
+  };
+
+  const handleRellamar = async (patient: Patient) => {
+    setRecallingPatient(patient._id);
+    try {
+      // Formatear teléfono con código de país internacional
+      const phoneWithPlus = formatPhoneNumber(patient.celular);
+
+      // Realizar llamada telefónica con Twilio Voice
+      console.log(`📞 Rellamando a: ${phoneWithPlus}`);
+      await apiService.makeVoiceCall(phoneWithPlus, patient.primerNombre);
+      console.log('✅ Rellamada iniciada exitosamente');
+
+      alert(`✅ Llamada iniciada a ${patient.primerNombre}`);
+    } catch (error) {
+      console.error('❌ Error al rellamar paciente:', error);
+      alert('Error al realizar la llamada. Inténtalo nuevamente.');
+    } finally {
+      setRecallingPatient(null);
     }
   };
 
@@ -537,6 +558,29 @@ export function MedicalPanelPage() {
                     </button>
 
                     <button
+                      onClick={() => handleRellamar(searchResult)}
+                      disabled={recallingPatient === searchResult._id}
+                      className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      {recallingPatient === searchResult._id ? (
+                        <>
+                          <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Llamando...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/>
+                          </svg>
+                          Rellamar
+                        </>
+                      )}
+                    </button>
+
+                    <button
                       onClick={() => handleAtender(searchResult)}
                       disabled={attendingPatient === searchResult._id}
                       className="bg-[#00a884] text-white px-4 py-2 rounded-lg hover:bg-[#008f6f] transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
@@ -686,6 +730,29 @@ export function MedicalPanelPage() {
                                 <path d="M13 8c2.103 0 3 .897 3 3h2c0-3.225-1.775-5-5-5v2zm3.422 5.443a1.001 1.001 0 0 0-1.391.043l-2.393 2.461c-.576-.11-1.734-.471-2.926-1.66-1.192-1.193-1.553-2.354-1.66-2.926l2.459-2.394a1 1 0 0 0 .043-1.391L6.859 3.513a1 1 0 0 0-1.391-.087l-2.17 1.861a1 1 0 0 0-.29.649c-.015.25-.301 6.172 4.291 10.766C11.305 20.707 16.323 21 17.705 21c.202 0 .326-.006.359-.008a.992.992 0 0 0 .648-.291l1.86-2.171a.997.997 0 0 0-.086-1.391l-4.064-3.696z"/>
                               </svg>
                               Contactar
+                            </>
+                          )}
+                        </button>
+
+                        <button
+                          onClick={() => handleRellamar(patient)}
+                          disabled={recallingPatient === patient._id}
+                          className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                          {recallingPatient === patient._id ? (
+                            <>
+                              <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              Llamando...
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/>
+                              </svg>
+                              Rellamar
                             </>
                           )}
                         </button>
