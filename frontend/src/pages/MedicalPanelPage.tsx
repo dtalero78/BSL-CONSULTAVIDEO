@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { io } from 'socket.io-client';
 import medicalPanelService, { Patient, PatientStats } from '../services/medical-panel.service';
 import apiService from '../services/api.service';
 
