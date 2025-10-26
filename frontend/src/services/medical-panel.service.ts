@@ -20,6 +20,7 @@ export interface Patient {
   fechaAtencion: Date;
   empresaListado: string;
   pvEstado?: string;
+  tipoExamen?: string;
 }
 
 export interface PaginatedPatients {

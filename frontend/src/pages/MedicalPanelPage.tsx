@@ -476,7 +476,14 @@ export function MedicalPanelPage() {
                     <div className="col-span-2 flex items-center gap-3 mb-2">
                       <div>
                         <span className="text-gray-400">Nombre:</span>
-                        <span className="text-white ml-2 font-semibold">{searchResult.nombres}</span>
+                        <span className="text-white ml-2 font-semibold">
+                          {searchResult.nombres}
+                          {searchResult.tipoExamen && (
+                            <span className="ml-2 text-sm font-normal text-gray-400">
+                              ({searchResult.tipoExamen})
+                            </span>
+                          )}
+                        </span>
                       </div>
                       {connectedPatients.has(searchResult._id) && (
                         <div className="flex items-center gap-2 bg-green-500/20 px-3 py-1 rounded-full border border-green-500/50">
@@ -647,6 +654,11 @@ export function MedicalPanelPage() {
                         <div className="flex items-center gap-3 mb-2">
                           <h3 className="text-lg font-semibold text-white">
                             {patient.nombres}
+                            {patient.tipoExamen && (
+                              <span className="ml-2 text-sm font-normal text-gray-400">
+                                ({patient.tipoExamen})
+                              </span>
+                            )}
                           </h3>
                           {connectedPatients.has(patient._id) && (
                             <div className="flex items-center gap-2 bg-green-500/20 px-3 py-1 rounded-full border border-green-500/50">

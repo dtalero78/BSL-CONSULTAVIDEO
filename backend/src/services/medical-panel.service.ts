@@ -29,6 +29,7 @@ interface Patient {
   segundoApellido?: string;
   medico?: string;
   motivoConsulta?: string;
+  tipoExamen?: string;
 }
 
 interface PaginatedPatients {

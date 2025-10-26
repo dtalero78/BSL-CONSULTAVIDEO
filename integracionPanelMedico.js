@@ -300,7 +300,8 @@ export async function obtenerPacientesPendientes(medicoCode, page = 0, pageSize 
             fechaConsulta: item.fechaConsulta,
             empresaListado: item.codEmpresa || item.empresa || "SIN EMPRESA",
             medico: item.medico,
-            motivoConsulta: item.motivoConsulta || ""
+            motivoConsulta: item.motivoConsulta || "",
+            tipoExamen: item.tipoExamen || ""
         }));
 
         return {
@@ -379,7 +380,8 @@ export async function buscarPacientePorDocumento(searchTerm, medicoCode = null) 
             fechaConsulta: item.fechaConsulta,
             empresaListado: item.codEmpresa || item.empresa || "SIN EMPRESA",
             medico: item.medico,
-            motivoConsulta: item.motivoConsulta || ""
+            motivoConsulta: item.motivoConsulta || "",
+            tipoExamen: item.tipoExamen || ""
         };
 
         return {
