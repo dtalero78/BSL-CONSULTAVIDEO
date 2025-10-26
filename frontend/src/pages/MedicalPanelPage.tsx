@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { io, Socket } from 'socket.io-client';
 import medicalPanelService, { Patient, PatientStats } from '../services/medical-panel.service';
 import apiService from '../services/api.service';
 
@@ -17,6 +18,8 @@ export function MedicalPanelPage() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attendingPatient, setAttendingPatient] = useState<string | null>(null);
+  const [connectedPatients, setConnectedPatients] = useState<Set<string>>(new Set());
+  const [socket, setSocket] = useState<Socket | null>(null);
 
   const pageSize = 10;
 
@@ -71,6 +74,61 @@ export function MedicalPanelPage() {
       loadData();
     }
   }, [currentPage]);
+
+  // Socket.io para notificaciones en tiempo real de pacientes conectados
+  useEffect(() => {
+    if (!isLoggedIn) return;
+
+    // Determinar URL del servidor Socket.io
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
+    const socketUrl = apiBaseUrl || (import.meta.env.DEV ? 'http://localhost:3000' : window.location.origin);
+
+    console.log('[MedicalPanel] Connecting to Socket.io at:', socketUrl);
+
+    // Crear conexión Socket.io
+    const newSocket = io(socketUrl, {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+    });
+
+    newSocket.on('connect', () => {
+      console.log('[MedicalPanel] Socket.io connected');
+    });
+
+    newSocket.on('disconnect', () => {
+      console.log('[MedicalPanel] Socket.io disconnected');
+    });
+
+    // Escuchar cuando un paciente se conecta
+    newSocket.on('patient-connected', (data: { documento: string; roomName: string; identity: string; connectedAt: string }) => {
+      console.log('[MedicalPanel] Patient connected:', data);
+      setConnectedPatients((prev) => {
+        const updated = new Set(prev);
+        updated.add(data.documento);
+        return updated;
+      });
+    });
+
+    // Escuchar cuando un paciente se desconecta
+    newSocket.on('patient-disconnected', (data: { documento: string; roomName: string; identity: string; disconnectedAt: string }) => {
+      console.log('[MedicalPanel] Patient disconnected:', data);
+      setConnectedPatients((prev) => {
+        const updated = new Set(prev);
+        updated.delete(data.documento);
+        return updated;
+      });
+    });
+
+    setSocket(newSocket);
+
+    // Cleanup al desmontar
+    return () => {
+      console.log('[MedicalPanel] Disconnecting Socket.io');
+      newSocket.disconnect();
+    };
+  }, [isLoggedIn]);
 
   const handleNoAnswer = async (patientId: string) => {
     try {
@@ -473,9 +531,22 @@ export function MedicalPanelPage() {
                   <div className="p-4">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-white mb-2">
-                          {patient.nombres}
-                        </h3>
+                        <div className="flex items-center gap-3 mb-2">
+                          <h3 className="text-lg font-semibold text-white">
+                            {patient.nombres}
+                          </h3>
+                          {connectedPatients.has(patient._id) && (
+                            <div className="flex items-center gap-2 bg-green-500/20 px-3 py-1 rounded-full border border-green-500/50">
+                              <div className="relative flex items-center justify-center w-2 h-2">
+                                <div className="absolute w-2 h-2 bg-green-500 rounded-full animate-ping"></div>
+                                <div className="relative w-2 h-2 bg-green-500 rounded-full"></div>
+                              </div>
+                              <span className="text-green-400 text-xs font-medium uppercase tracking-wide">
+                                Conectado
+                              </span>
+                            </div>
+                          )}
+                        </div>
                         <div className="grid grid-cols-2 gap-2 text-sm">
                           <div>
                             <span className="text-gray-400">Doc:</span>
