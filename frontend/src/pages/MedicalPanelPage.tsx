@@ -22,6 +22,7 @@ export function MedicalPanelPage() {
   const [recallingPatient, setRecallingPatient] = useState<string | null>(null);
   const [connectedPatients, setConnectedPatients] = useState<Set<string>>(new Set());
   const [patientRooms, setPatientRooms] = useState<{ [patientId: string]: string }>({});
+  const [contactedPatients, setContactedPatients] = useState<Set<string>>(new Set()); // Pacientes que ya fueron contactados
 
   const pageSize = 10;
 
@@ -210,6 +211,13 @@ export function MedicalPanelPage() {
         console.error('❌ Error realizando llamada telefónica:', callError);
         // No interrumpir el flujo si la llamada falla
       }
+
+      // Marcar paciente como contactado (deshabilitar botón permanentemente)
+      setContactedPatients(prev => {
+        const updated = new Set(prev);
+        updated.add(patient._id);
+        return updated;
+      });
 
       alert(`✅ Mensaje de WhatsApp enviado y llamada iniciada a ${patient.primerNombre}`);
     } catch (error) {
@@ -543,7 +551,7 @@ export function MedicalPanelPage() {
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleContactar(searchResult)}
-                        disabled={contactingPatient === searchResult._id}
+                        disabled={contactingPatient === searchResult._id || contactedPatients.has(searchResult._id)}
                         className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       >
                         {contactingPatient === searchResult._id ? (
@@ -553,6 +561,13 @@ export function MedicalPanelPage() {
                               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
                             Contactando...
+                          </>
+                        ) : contactedPatients.has(searchResult._id) ? (
+                          <>
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                            </svg>
+                            Contactado
                           </>
                         ) : (
                           <>
@@ -729,7 +744,7 @@ export function MedicalPanelPage() {
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleContactar(patient)}
-                            disabled={contactingPatient === patient._id}
+                            disabled={contactingPatient === patient._id || contactedPatients.has(patient._id)}
                             className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                           >
                             {contactingPatient === patient._id ? (
@@ -739,6 +754,13 @@ export function MedicalPanelPage() {
                                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                 </svg>
                                 Contactando...
+                              </>
+                            ) : contactedPatients.has(patient._id) ? (
+                              <>
+                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                                </svg>
+                                Contactado
                               </>
                             ) : (
                               <>
