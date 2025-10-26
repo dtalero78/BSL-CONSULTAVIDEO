@@ -20,6 +20,7 @@ export function MedicalPanelPage() {
   const [attendingPatient, setAttendingPatient] = useState<string | null>(null);
   const [contactingPatient, setContactingPatient] = useState<string | null>(null);
   const [connectedPatients, setConnectedPatients] = useState<Set<string>>(new Set());
+  const [patientRooms, setPatientRooms] = useState<{ [patientId: string]: string }>({});
 
   const pageSize = 10;
 
@@ -172,8 +173,9 @@ export function MedicalPanelPage() {
   const handleContactar = async (patient: Patient) => {
     setContactingPatient(patient._id);
     try {
-      // Generar sala única
+      // Generar sala única y guardarla para este paciente
       const roomName = medicalPanelService.generateRoomName();
+      setPatientRooms(prev => ({ ...prev, [patient._id]: roomName }));
 
       // Construir URL del paciente
       const patientLink = `${window.location.origin}/patient/${roomName}?nombre=${patient.primerNombre}&apellido=${patient.primerApellido}&documento=${patient._id}&doctor=${medicoCode}`;
@@ -213,8 +215,13 @@ export function MedicalPanelPage() {
   const handleAtender = async (patient: Patient) => {
     setAttendingPatient(patient._id);
     try {
-      // Generar sala única
-      const roomName = medicalPanelService.generateRoomName();
+      // Usar la sala guardada si existe (si ya se contactó al paciente)
+      // Si no existe, generar una nueva sala
+      let roomName = patientRooms[patient._id];
+      if (!roomName) {
+        roomName = medicalPanelService.generateRoomName();
+        setPatientRooms(prev => ({ ...prev, [patient._id]: roomName }));
+      }
 
       // Construir URL del doctor con _id de la historia clínica (URL completa)
       const doctorUrl = `${window.location.origin}/doctor/${roomName}?doctor=${medicoCode}&documento=${patient._id}&paciente=${encodeURIComponent(patient.nombres)}`;
