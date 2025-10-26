@@ -251,7 +251,7 @@ export const VideoRoom = ({ identity, roomName, role, historiaId, documento, onL
 
         {/* Local participant (floating) - MÁS GRANDE en móvil */}
         {localParticipant && (
-          <div className="absolute top-3 right-3 w-36 h-48 sm:w-40 sm:h-56 md:w-32 md:h-48 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/30 z-10">
+          <div className={`absolute top-3 ${role === 'doctor' ? 'left-3' : 'right-3'} w-36 h-48 sm:w-40 sm:h-56 md:w-32 md:h-48 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/30 z-10`}>
             <Participant participant={localParticipant} isLocal={true} />
           </div>
         )}
