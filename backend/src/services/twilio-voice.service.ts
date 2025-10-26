@@ -20,6 +20,10 @@ class TwilioVoiceService {
     this.twilioPhoneNumber = '+576015148805'; // Número de Twilio Voice
     this.baseUrl = `https://api.twilio.com/2010-04-01/Accounts/${this.accountSid}/Calls.json`;
 
+    // Log para debugging (solo primeros/últimos caracteres por seguridad)
+    console.log(`[TwilioVoice] Account SID: ${this.accountSid.substring(0, 8)}...${this.accountSid.substring(this.accountSid.length - 4)}`);
+    console.log(`[TwilioVoice] Auth Token configured: ${this.authToken ? 'YES (***' + this.authToken.substring(this.authToken.length - 4) + ')' : 'NO'}`);
+
     if (!this.accountSid || !this.authToken) {
       console.warn('⚠️  Twilio Voice credentials not configured');
     }
