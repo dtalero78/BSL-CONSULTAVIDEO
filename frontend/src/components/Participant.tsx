@@ -102,10 +102,23 @@ export const Participant = ({ participant, isLocal = false }: ParticipantProps) 
       }
     });
 
-    // Listen for new tracks (for remote participants)
+    // Listen for new tracks
     if (!isLocal) {
+      // Remote participants: use trackSubscribed/trackUnsubscribed
       participant.on('trackSubscribed', trackSubscribed);
       participant.on('trackUnsubscribed', trackUnsubscribed);
+    } else {
+      // Local participant: use trackPublished/trackUnpublished
+      participant.on('trackPublished', (publication: LocalTrackPublication) => {
+        if (publication.track && (publication.track.kind === 'video' || publication.track.kind === 'audio')) {
+          trackSubscribed(publication.track as LocalVideoTrack | LocalAudioTrack);
+        }
+      });
+      participant.on('trackUnpublished', (publication: LocalTrackPublication) => {
+        if (publication.track && (publication.track.kind === 'video' || publication.track.kind === 'audio')) {
+          trackUnsubscribed(publication.track as LocalVideoTrack | LocalAudioTrack);
+        }
+      });
     }
 
     return () => {
