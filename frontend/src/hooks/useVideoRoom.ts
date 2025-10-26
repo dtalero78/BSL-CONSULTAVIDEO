@@ -174,14 +174,41 @@ export const useVideoRoom = ({
     }
   }, [localParticipant]);
 
-  // Cleanup on unmount
+  // Cleanup on unmount or window close
   useEffect(() => {
-    return () => {
-      if (room) {
+    const handleBeforeUnload = () => {
+      if (room && role) {
+        // Usar sendBeacon para asegurar que la solicitud se envíe incluso si la ventana se cierra
+        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
+        const url = `${apiBaseUrl}/api/video/events/participant-disconnected`;
+        const data = JSON.stringify({ roomName, identity });
+
+        // sendBeacon es síncrono y garantiza que se envíe
+        navigator.sendBeacon(url, new Blob([data], { type: 'application/json' }));
+
         room.disconnect();
       }
     };
-  }, [room]);
+
+    // Agregar listener para cierre de ventana
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+
+      if (room) {
+        // Registrar desconexión para reportes (si se proporcionó rol)
+        if (role) {
+          try {
+            apiService.trackParticipantDisconnected(roomName, identity);
+          } catch (err) {
+            console.error('Error tracking participant disconnection:', err);
+          }
+        }
+        room.disconnect();
+      }
+    };
+  }, [room, role, roomName, identity]);
 
   return {
     room,
