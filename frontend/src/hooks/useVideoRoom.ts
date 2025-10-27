@@ -31,19 +31,64 @@ interface UseVideoRoomReturn {
   localVideoTrack: LocalVideoTrack | null;
 }
 
+// Helper function para reproducir sonido de notificación
+const playNotificationSound = () => {
+  try {
+    // Crear un contexto de audio
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    // Configurar el sonido: tono de notificación agradable
+    oscillator.frequency.value = 800; // Frecuencia en Hz
+    oscillator.type = 'sine'; // Tipo de onda
+
+    // Configurar volumen con fade
+    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+    gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.01);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+
+    // Reproducir
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.5);
+
+    console.log('🔔 Notification sound played');
+  } catch (error) {
+    console.error('Error playing notification sound:', error);
+  }
+};
+
 // Helper function para text-to-speech
 const speakText = (text: string) => {
-  if ('speechSynthesis' in window) {
-    // Cancelar cualquier speech en progreso
-    window.speechSynthesis.cancel();
+  try {
+    if ('speechSynthesis' in window) {
+      // Cancelar cualquier speech en progreso
+      window.speechSynthesis.cancel();
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'es-ES'; // Español
-    utterance.rate = 1.0; // Velocidad normal
-    utterance.pitch = 1.0; // Tono normal
-    utterance.volume = 1.0; // Volumen máximo
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'es-ES'; // Español
+      utterance.rate = 1.0; // Velocidad normal
+      utterance.pitch = 1.0; // Tono normal
+      utterance.volume = 1.0; // Volumen máximo
 
-    window.speechSynthesis.speak(utterance);
+      // Primero reproducir el sonido de notificación
+      playNotificationSound();
+
+      // Luego hablar el texto
+      setTimeout(() => {
+        window.speechSynthesis.speak(utterance);
+        console.log('🔊 Speaking:', text);
+      }, 600); // Esperar a que termine el sonido
+    } else {
+      console.warn('speechSynthesis no está disponible en este navegador');
+      // Si no hay speech synthesis, al menos reproducir el sonido
+      playNotificationSound();
+    }
+  } catch (error) {
+    console.error('Error in speakText:', error);
   }
 };
 
