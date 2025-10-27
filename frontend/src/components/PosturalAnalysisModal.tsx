@@ -12,6 +12,11 @@ interface PoseData {
   timestamp: number;
 }
 
+interface CapturedSnapshot extends PoseData {
+  description: string;
+  canvasImage?: string; // Base64 image of the skeleton
+}
+
 interface PosturalAnalysisModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -35,7 +40,18 @@ export const PosturalAnalysisModal: React.FC<PosturalAnalysisModalProps> = ({
   onStartSession,
   onEndSession,
 }) => {
-  const [capturedSnapshots, setCapturedSnapshots] = useState<PoseData[]>([]);
+  const [capturedSnapshots, setCapturedSnapshots] = useState<CapturedSnapshot[]>([]);
+  const [snapshotDescription, setSnapshotDescription] = useState('');
+  const [showCaptureDialog, setShowCaptureDialog] = useState(false);
+
+  const handleOpenCaptureDialog = () => {
+    if (!latestPoseData) {
+      alert('No hay datos de pose disponibles para capturar');
+      return;
+    }
+    setSnapshotDescription(`Ejercicio ${capturedSnapshots.length + 1}`);
+    setShowCaptureDialog(true);
+  };
 
   const handleCaptureSnapshot = () => {
     if (!latestPoseData) {
@@ -43,8 +59,24 @@ export const PosturalAnalysisModal: React.FC<PosturalAnalysisModalProps> = ({
       return;
     }
 
-    setCapturedSnapshots((prev) => [...prev, latestPoseData]);
-    console.log('[Capture] Snapshot captured:', latestPoseData);
+    // Capturar imagen del canvas
+    const canvas = document.querySelector('canvas') as HTMLCanvasElement;
+    const canvasImage = canvas ? canvas.toDataURL('image/png') : undefined;
+
+    const snapshot: CapturedSnapshot = {
+      ...latestPoseData,
+      description: snapshotDescription || `Ejercicio ${capturedSnapshots.length + 1}`,
+      canvasImage,
+    };
+
+    setCapturedSnapshots((prev) => [...prev, snapshot]);
+    console.log('[Capture] Snapshot captured:', snapshot);
+    setShowCaptureDialog(false);
+    setSnapshotDescription('');
+  };
+
+  const handleDeleteSnapshot = (index: number) => {
+    setCapturedSnapshots((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleGeneratePDF = () => {
@@ -72,20 +104,36 @@ export const PosturalAnalysisModal: React.FC<PosturalAnalysisModalProps> = ({
 
       // Add snapshots data
       capturedSnapshots.forEach((snapshot, index) => {
-        if (yPosition > pageHeight - 60) {
+        // Nueva página para cada snapshot
+        if (index > 0) {
           doc.addPage();
-          yPosition = 20;
         }
+        yPosition = 20;
 
-        doc.setFontSize(16);
+        // Título del snapshot
+        doc.setFontSize(18);
         doc.setTextColor(0, 100, 200);
-        doc.text(`Snapshot ${index + 1}`, 20, yPosition);
+        doc.text(`${snapshot.description}`, pageWidth / 2, yPosition, { align: 'center' });
         yPosition += 10;
 
         doc.setFontSize(10);
-        doc.setTextColor(0, 0, 0);
-        doc.text(`Timestamp: ${new Date(snapshot.timestamp).toLocaleTimeString('es-CO')}`, 25, yPosition);
-        yPosition += 10;
+        doc.setTextColor(100, 100, 100);
+        doc.text(`Capturado: ${new Date(snapshot.timestamp).toLocaleString('es-CO')}`, pageWidth / 2, yPosition, { align: 'center' });
+        yPosition += 15;
+
+        // Agregar imagen del esqueleto si existe
+        if (snapshot.canvasImage) {
+          try {
+            const imgWidth = 120;
+            const imgHeight = 90;
+            const imgX = (pageWidth - imgWidth) / 2;
+            doc.addImage(snapshot.canvasImage, 'PNG', imgX, yPosition, imgWidth, imgHeight);
+            yPosition += imgHeight + 10;
+          } catch (err) {
+            console.error('[PDF] Error adding image:', err);
+          }
+        }
+        yPosition += 5;
 
         // Posture
         if (snapshot.metrics.posture) {
@@ -426,12 +474,50 @@ export const PosturalAnalysisModal: React.FC<PosturalAnalysisModalProps> = ({
               )}
             </div>
 
+            {/* Captured Snapshots List */}
+            {capturedSnapshots.length > 0 && (
+              <div className="p-4 border-t border-gray-700 max-h-48 overflow-y-auto">
+                <h4 className="text-sm font-semibold text-gray-400 mb-3">Snapshots Capturados ({capturedSnapshots.length})</h4>
+                <div className="space-y-2">
+                  {capturedSnapshots.map((snapshot, index) => (
+                    <div key={index} className="flex items-center gap-3 bg-[#1a2730] p-2 rounded-lg border border-gray-700">
+                      {/* Miniatura */}
+                      {snapshot.canvasImage && (
+                        <img
+                          src={snapshot.canvasImage}
+                          alt={snapshot.description}
+                          className="w-16 h-12 object-cover rounded border border-gray-600"
+                        />
+                      )}
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-white truncate">{snapshot.description}</p>
+                        <p className="text-xs text-gray-500">
+                          {new Date(snapshot.timestamp).toLocaleTimeString('es-CO')}
+                        </p>
+                      </div>
+                      {/* Delete button */}
+                      <button
+                        onClick={() => handleDeleteSnapshot(index)}
+                        className="p-1 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded transition-colors"
+                        title="Eliminar"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Control Buttons */}
             <div className="p-4 border-t border-gray-700 space-y-3">
               {sessionActive && patientConnected && (
                 <>
                   <button
-                    onClick={handleCaptureSnapshot}
+                    onClick={handleOpenCaptureDialog}
                     disabled={!latestPoseData}
                     className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
@@ -474,6 +560,49 @@ export const PosturalAnalysisModal: React.FC<PosturalAnalysisModalProps> = ({
           </p>
         </div>
       </div>
+
+      {/* Capture Snapshot Dialog */}
+      {showCaptureDialog && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50">
+          <div className="bg-[#1a2730] rounded-lg shadow-2xl p-6 max-w-md w-full mx-4 border border-gray-700">
+            <h3 className="text-xl font-semibold text-white mb-4">Capturar Snapshot</h3>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Nombre del ejercicio o postura:
+              </label>
+              <input
+                type="text"
+                value={snapshotDescription}
+                onChange={(e) => setSnapshotDescription(e.target.value)}
+                placeholder="Ej: Brazos levantados, Inclinación lateral..."
+                className="w-full px-3 py-2 bg-[#0b141a] border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                autoFocus
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handleCaptureSnapshot();
+                  }
+                }}
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowCaptureDialog(false)}
+                className="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleCaptureSnapshot}
+                className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
+              >
+                Capturar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
