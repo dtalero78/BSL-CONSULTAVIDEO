@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { jsPDF } from 'jspdf';
 import { PosturalAnalysisCanvas } from './PosturalAnalysisCanvas';
+import { formatPosturalMetricsAsText } from '../utils/posturalMetricsFormatter';
 
 interface PoseData {
   landmarks: any[];
@@ -27,7 +28,7 @@ interface PosturalAnalysisModalProps {
   hasReceivedFirstFrame?: boolean;
   onStartSession: () => void;
   onEndSession: () => void;
-  onSnapshotsCaptured?: (snapshots: CapturedSnapshot[]) => void;
+  onAppendToObservaciones?: ((text: string) => void) | null;
 }
 
 export const PosturalAnalysisModal: React.FC<PosturalAnalysisModalProps> = ({
@@ -40,19 +41,11 @@ export const PosturalAnalysisModal: React.FC<PosturalAnalysisModalProps> = ({
   hasReceivedFirstFrame = false,
   onStartSession,
   onEndSession,
-  onSnapshotsCaptured,
+  onAppendToObservaciones,
 }) => {
   const [capturedSnapshots, setCapturedSnapshots] = useState<CapturedSnapshot[]>([]);
   const [snapshotDescription, setSnapshotDescription] = useState('');
   const [showCaptureDialog, setShowCaptureDialog] = useState(false);
-
-  const handleClose = () => {
-    // Pass snapshots to parent before closing
-    if (onSnapshotsCaptured && capturedSnapshots.length > 0) {
-      onSnapshotsCaptured(capturedSnapshots);
-    }
-    onClose();
-  };
 
   const handleOpenCaptureDialog = () => {
     if (!latestPoseData) {
@@ -78,6 +71,13 @@ export const PosturalAnalysisModal: React.FC<PosturalAnalysisModalProps> = ({
       description: snapshotDescription || `Ejercicio ${capturedSnapshots.length + 1}`,
       canvasImage,
     };
+
+    // Agregar INMEDIATAMENTE al campo de observaciones
+    if (onAppendToObservaciones) {
+      const snapshotText = formatPosturalMetricsAsText([snapshot]);
+      onAppendToObservaciones(snapshotText);
+      console.log('[Capture] Snapshot data appended to observations field');
+    }
 
     setCapturedSnapshots((prev) => [...prev, snapshot]);
     console.log('[Capture] Snapshot captured:', snapshot);
@@ -265,7 +265,7 @@ export const PosturalAnalysisModal: React.FC<PosturalAnalysisModalProps> = ({
 
             {/* Close Button */}
             <button
-              onClick={handleClose}
+              onClick={onClose}
               className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
               aria-label="Cerrar"
             >

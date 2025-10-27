@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react';
 import apiService from '../services/api.service';
-import { CapturedSnapshot } from './PosturalAnalysisModal';
-import { formatPosturalMetricsAsText } from '../utils/posturalMetricsFormatter';
 
 interface MedicalHistoryData {
   historiaId: string;
@@ -37,10 +35,10 @@ interface MedicalHistoryData {
 
 interface MedicalHistoryPanelProps {
   historiaId: string;
-  posturalSnapshots?: CapturedSnapshot[];
+  onAppendToObservaciones?: (text: string) => void;
 }
 
-export const MedicalHistoryPanel = ({ historiaId, posturalSnapshots }: MedicalHistoryPanelProps) => {
+export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones }: MedicalHistoryPanelProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,6 +61,25 @@ export const MedicalHistoryPanel = ({ historiaId, posturalSnapshots }: MedicalHi
   useEffect(() => {
     loadMedicalHistory();
   }, [historiaId]);
+
+  // Exponer función para agregar texto a observaciones desde componentes externos
+  useEffect(() => {
+    if (onAppendToObservaciones) {
+      // Crear función que agrega texto al campo actual
+      const appendText = (text: string) => {
+        setMdObservacionesCertificado(prev => {
+          if (prev) {
+            return `${prev}\n\n${text}`;
+          }
+          return text;
+        });
+      };
+
+      // "Registrar" la función llamándola inmediatamente
+      // Esto permite que el padre llame a esta función cuando sea necesario
+      onAppendToObservaciones(appendText as any);
+    }
+  }, [onAppendToObservaciones]);
 
   // Calcular IMC automáticamente cuando cambian talla o peso
   useEffect(() => {
@@ -179,20 +196,11 @@ export const MedicalHistoryPanel = ({ historiaId, posturalSnapshots }: MedicalHi
           : imcText;
       }
 
-      // Concatenar métricas posturales con observaciones del certificado
-      let combinedObsCertificado = mdObservacionesCertificado;
-      if (posturalSnapshots && posturalSnapshots.length > 0) {
-        const metricsText = formatPosturalMetricsAsText(posturalSnapshots);
-        combinedObsCertificado = mdObservacionesCertificado
-          ? `${mdObservacionesCertificado}\n\n${metricsText}`
-          : metricsText;
-      }
-
       await apiService.updateMedicalHistory({
         historiaId: data.historiaId,
         mdAntecedentes: combinedAntecedentes,
         mdObsParaMiDocYa,
-        mdObservacionesCertificado: combinedObsCertificado,
+        mdObservacionesCertificado,
         mdRecomendacionesMedicasAdicionales: combinedRecommendations,
         mdConceptoFinal,
         mdDx1,
