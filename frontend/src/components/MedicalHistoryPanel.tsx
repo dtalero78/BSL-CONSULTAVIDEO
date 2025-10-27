@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import apiService from '../services/api.service';
+import { CapturedSnapshot } from './PosturalAnalysisModal';
+import { formatPosturalMetricsAsText } from '../utils/posturalMetricsFormatter';
 
 interface MedicalHistoryData {
   historiaId: string;
@@ -35,9 +37,10 @@ interface MedicalHistoryData {
 
 interface MedicalHistoryPanelProps {
   historiaId: string;
+  posturalSnapshots?: CapturedSnapshot[];
 }
 
-export const MedicalHistoryPanel = ({ historiaId }: MedicalHistoryPanelProps) => {
+export const MedicalHistoryPanel = ({ historiaId, posturalSnapshots }: MedicalHistoryPanelProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -176,11 +179,20 @@ export const MedicalHistoryPanel = ({ historiaId }: MedicalHistoryPanelProps) =>
           : imcText;
       }
 
+      // Concatenar métricas posturales con observaciones del certificado
+      let combinedObsCertificado = mdObservacionesCertificado;
+      if (posturalSnapshots && posturalSnapshots.length > 0) {
+        const metricsText = formatPosturalMetricsAsText(posturalSnapshots);
+        combinedObsCertificado = mdObservacionesCertificado
+          ? `${mdObservacionesCertificado}\n\n${metricsText}`
+          : metricsText;
+      }
+
       await apiService.updateMedicalHistory({
         historiaId: data.historiaId,
         mdAntecedentes: combinedAntecedentes,
         mdObsParaMiDocYa,
-        mdObservacionesCertificado,
+        mdObservacionesCertificado: combinedObsCertificado,
         mdRecomendacionesMedicasAdicionales: combinedRecommendations,
         mdConceptoFinal,
         mdDx1,

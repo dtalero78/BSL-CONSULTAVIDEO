@@ -12,7 +12,7 @@ interface PoseData {
   timestamp: number;
 }
 
-interface CapturedSnapshot extends PoseData {
+export interface CapturedSnapshot extends PoseData {
   description: string;
   canvasImage?: string; // Base64 image of the skeleton
 }
@@ -27,6 +27,7 @@ interface PosturalAnalysisModalProps {
   hasReceivedFirstFrame?: boolean;
   onStartSession: () => void;
   onEndSession: () => void;
+  onSnapshotsCaptured?: (snapshots: CapturedSnapshot[]) => void;
 }
 
 export const PosturalAnalysisModal: React.FC<PosturalAnalysisModalProps> = ({
@@ -39,10 +40,19 @@ export const PosturalAnalysisModal: React.FC<PosturalAnalysisModalProps> = ({
   hasReceivedFirstFrame = false,
   onStartSession,
   onEndSession,
+  onSnapshotsCaptured,
 }) => {
   const [capturedSnapshots, setCapturedSnapshots] = useState<CapturedSnapshot[]>([]);
   const [snapshotDescription, setSnapshotDescription] = useState('');
   const [showCaptureDialog, setShowCaptureDialog] = useState(false);
+
+  const handleClose = () => {
+    // Pass snapshots to parent before closing
+    if (onSnapshotsCaptured && capturedSnapshots.length > 0) {
+      onSnapshotsCaptured(capturedSnapshots);
+    }
+    onClose();
+  };
 
   const handleOpenCaptureDialog = () => {
     if (!latestPoseData) {
@@ -255,7 +265,7 @@ export const PosturalAnalysisModal: React.FC<PosturalAnalysisModalProps> = ({
 
             {/* Close Button */}
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
               aria-label="Cerrar"
             >

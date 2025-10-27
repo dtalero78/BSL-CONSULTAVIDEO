@@ -4,7 +4,7 @@ import { useBackgroundEffects } from '../hooks/useBackgroundEffects';
 import { usePosturalAnalysis } from '../hooks/usePosturalAnalysis';
 import { Participant } from './Participant';
 import { VideoControls } from './VideoControls';
-import { PosturalAnalysisModal } from './PosturalAnalysisModal';
+import { PosturalAnalysisModal, CapturedSnapshot } from './PosturalAnalysisModal';
 import { PosturalAnalysisPatient } from './PosturalAnalysisPatient';
 import { MedicalHistoryPanel } from './MedicalHistoryPanel';
 
@@ -19,6 +19,7 @@ interface VideoRoomProps {
 
 export const VideoRoom = ({ identity, roomName, role, historiaId, documento, onLeave }: VideoRoomProps) => {
   const [isPosturalAnalysisOpen, setIsPosturalAnalysisOpen] = useState(false);
+  const [posturalSnapshots, setPosturalSnapshots] = useState<CapturedSnapshot[]>([]);
 
   const {
     localParticipant,
@@ -200,7 +201,7 @@ export const VideoRoom = ({ identity, roomName, role, historiaId, documento, onL
           className="fixed top-0 right-0 h-full bg-[#1f2c34] shadow-2xl z-50"
           style={{ width: '450px', maxWidth: '90vw' }}
         >
-          <MedicalHistoryPanel historiaId={historiaId} />
+          <MedicalHistoryPanel historiaId={historiaId} posturalSnapshots={posturalSnapshots} />
         </div>
       )}
 
@@ -313,6 +314,7 @@ export const VideoRoom = ({ identity, roomName, role, historiaId, documento, onL
           hasReceivedFirstFrame={hasReceivedFirstFrame}
           onStartSession={startSession}
           onEndSession={endSession}
+          onSnapshotsCaptured={setPosturalSnapshots}
         />
       )}
 
