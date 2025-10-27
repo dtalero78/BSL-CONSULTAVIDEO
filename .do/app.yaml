@@ -1,6 +1,13 @@
 name: bsl-consultavideo
 region: nyc
 
+# Dominio personalizado
+domains:
+  - domain: medico-bsl.com
+    type: PRIMARY
+  - domain: www.medico-bsl.com
+    type: ALIAS
+
 # Backend Service (Node.js + Express API + Frontend estatico)
 # Un solo componente = $5/mes (ahorro de costos)
 services:
