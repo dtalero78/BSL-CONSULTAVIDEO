@@ -244,8 +244,14 @@ export const VideoRoom = ({ identity, roomName, role, historiaId, documento, onL
       {/* Video Grid - Full screen with better mobile layout */}
       <div className="flex-1 relative overflow-hidden bg-[#0b141a]">
         {/* Remote participant (large) - ocupa TODO el espacio disponible */}
+        {/* Cuando el modal de análisis postural está abierto, el video se muestra flotante */}
         {remoteParticipantArray.length > 0 ? (
-          <div className="absolute inset-0 w-full h-full">
+          <div className={`
+            ${isPosturalAnalysisOpen
+              ? 'fixed bottom-20 right-6 w-80 h-60 z-[55] rounded-xl overflow-hidden shadow-2xl border-2 border-green-500'
+              : 'absolute inset-0 w-full h-full'
+            }
+          `}>
             <Participant participant={remoteParticipantArray[0]} />
           </div>
         ) : (
