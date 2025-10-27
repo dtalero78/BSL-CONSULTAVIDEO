@@ -159,6 +159,9 @@ export function MedicalPanelPage() {
 
     newSocket.on('connect', () => {
       console.log('[MedicalPanel] Socket.io connected');
+
+      // 🔥 SINCRONIZAR ESTADO: Obtener lista de pacientes ya conectados
+      syncConnectedPatients();
     });
 
     newSocket.on('disconnect', () => {
@@ -195,6 +198,21 @@ export function MedicalPanelPage() {
       newSocket.disconnect();
     };
   }, [isLoggedIn]);
+
+  // Función para sincronizar estado de pacientes conectados desde el backend
+  const syncConnectedPatients = async () => {
+    try {
+      console.log('[MedicalPanel] Syncing connected patients from backend...');
+      const connectedList = await apiService.getConnectedPatients();
+
+      console.log('[MedicalPanel] Connected patients received:', connectedList);
+
+      // Actualizar estado con los pacientes conectados
+      setConnectedPatients(new Set(connectedList.map(p => p.documento)));
+    } catch (err) {
+      console.error('[MedicalPanel] Error syncing connected patients:', err);
+    }
+  };
 
   const handleNoAnswer = async (patientId: string) => {
     try {

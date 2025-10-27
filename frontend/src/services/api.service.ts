@@ -92,6 +92,14 @@ class ApiService {
   }
 
   /**
+   * Obtener lista de pacientes actualmente conectados
+   */
+  async getConnectedPatients(): Promise<Array<{ documento: string; roomName: string; identity: string; connectedAt: string }>> {
+    const response = await this.client.get('/api/video/events/connected-patients');
+    return response.data.data;
+  }
+
+  /**
    * Enviar mensaje de WhatsApp
    */
   async sendWhatsApp(phone: string, message: string): Promise<void> {

@@ -374,6 +374,27 @@ class VideoController {
       });
     }
   }
+
+  /**
+   * Obtener lista de pacientes actualmente conectados
+   * GET /api/video/events/connected-patients
+   */
+  async getConnectedPatients(_req: Request, res: Response): Promise<void> {
+    try {
+      const connectedPatients = sessionTracker.getConnectedPatients();
+
+      res.status(200).json({
+        success: true,
+        data: connectedPatients,
+      });
+    } catch (error) {
+      console.error('Error fetching connected patients:', error);
+      res.status(500).json({
+        error: 'Failed to fetch connected patients',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
 }
 
 export default new VideoController();

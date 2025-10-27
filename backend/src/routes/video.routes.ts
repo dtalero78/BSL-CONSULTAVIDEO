@@ -21,6 +21,7 @@ router.post(
 // Tracking de sesiones para reportes
 router.post('/events/participant-connected', videoController.trackParticipantConnected);
 router.post('/events/participant-disconnected', videoController.trackParticipantDisconnected);
+router.get('/events/connected-patients', videoController.getConnectedPatients);
 
 // WhatsApp
 router.post('/whatsapp/send', videoController.sendWhatsApp);

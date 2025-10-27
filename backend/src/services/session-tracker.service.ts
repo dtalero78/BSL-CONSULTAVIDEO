@@ -233,6 +233,31 @@ class SessionTrackerService {
   }
 
   /**
+   * Obtiene el estado actual de todos los pacientes conectados
+   * Retorna un array de objetos con documento, roomName, identity, connectedAt
+   */
+  getConnectedPatients(): Array<{ documento: string; roomName: string; identity: string; connectedAt: string }> {
+    const connectedPatients: Array<{ documento: string; roomName: string; identity: string; connectedAt: string }> = [];
+
+    for (const [roomName, session] of this.sessions.entries()) {
+      for (const participant of session.participants.values()) {
+        // Solo incluir pacientes que NO se han desconectado
+        if (participant.role === 'patient' && !participant.disconnectedAt && session.patientDocumento) {
+          connectedPatients.push({
+            documento: session.patientDocumento,
+            roomName,
+            identity: participant.identity,
+            connectedAt: participant.connectedAt.toISOString(),
+          });
+        }
+      }
+    }
+
+    console.log(`[SessionTracker] getConnectedPatients: Found ${connectedPatients.length} connected patients`);
+    return connectedPatients;
+  }
+
+  /**
    * Limpia sesiones antiguas (mayores a 24 horas)
    */
   cleanOldSessions(): void {
