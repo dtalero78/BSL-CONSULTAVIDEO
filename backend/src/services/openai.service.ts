@@ -60,7 +60,8 @@ Instrucciones:
 5. Ten en cuenta los antecedentes médicos si están disponibles
 6. Formato: cada recomendación debe empezar con un número (1., 2., 3.)
 7. Sé conciso pero específico (máximo 2-3 líneas por recomendación)
-8. IMPORTANTE: Escribe en texto plano sin formato markdown. NO uses asteriscos (**), negritas, cursivas ni ningún formato especial. Solo texto normal.
+8. NO SUGIERAS PAUSAS ACTIVAS
+9. IMPORTANTE: Escribe en texto plano sin formato markdown. NO uses asteriscos (**), negritas, cursivas ni ningún formato especial. Solo texto normal.
 
 Genera las 3 recomendaciones:
     `.trim();
