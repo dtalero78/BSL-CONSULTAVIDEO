@@ -23,6 +23,7 @@ interface UsePosturalAnalysisReturn {
   sessionActive: boolean;
   patientConnected: boolean;
   latestPoseData: PoseData | null;
+  hasReceivedFirstFrame: boolean;
   error: string | null;
   startSession: () => void;
   endSession: () => void;
@@ -39,6 +40,7 @@ export const usePosturalAnalysis = ({
   const [sessionActive, setSessionActive] = useState(false);
   const [patientConnected, setPatientConnected] = useState(false);
   const [latestPoseData, setLatestPoseData] = useState<PoseData | null>(null);
+  const [hasReceivedFirstFrame, setHasReceivedFirstFrame] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const socketRef = useRef<Socket | null>(null);
@@ -118,7 +120,16 @@ export const usePosturalAnalysis = ({
     // Pose data events (for doctor)
     if (role === 'doctor') {
       socket.on('pose-data-update', (poseData: PoseData) => {
+        console.log('[Doctor] 📊 Received pose data:', {
+          landmarksCount: poseData.landmarks?.length || 0,
+          timestamp: poseData.timestamp,
+          hasMetrics: !!poseData.metrics,
+          hasPosture: !!poseData.metrics?.posture,
+          hasJoints: !!poseData.metrics?.joints,
+          hasSymmetry: !!poseData.metrics?.symmetry,
+        });
         setLatestPoseData(poseData);
+        setHasReceivedFirstFrame(true);
       });
     }
 
@@ -143,11 +154,13 @@ export const usePosturalAnalysis = ({
   // Start session (doctor creates session)
   const startSession = useCallback(() => {
     if (!socketRef.current || !isConnected) {
-      console.warn('[Postural Analysis] Cannot start session: not connected');
+      console.warn('[Postural Analysis] ⚠️ Cannot start session: not connected');
       return;
     }
 
-    console.log('[Postural Analysis] Starting session:', roomName);
+    console.log('[Postural Analysis] ✅ Starting session:', roomName);
+    // Reset first frame flag when starting new session
+    setHasReceivedFirstFrame(false);
     socketRef.current.emit('create-analysis-session', {
       roomName,
       doctorIdentity,
@@ -166,6 +179,7 @@ export const usePosturalAnalysis = ({
     setSessionActive(false);
     setPatientConnected(false);
     setLatestPoseData(null);
+    setHasReceivedFirstFrame(false);
   }, [isConnected, roomName]);
 
   // Send pose data (patient sends data)
@@ -200,6 +214,7 @@ export const usePosturalAnalysis = ({
     sessionActive,
     patientConnected,
     latestPoseData,
+    hasReceivedFirstFrame,
     error,
     startSession,
     endSession,

@@ -19,6 +19,7 @@ interface PosturalAnalysisModalProps {
   sessionActive: boolean;
   patientConnected: boolean;
   latestPoseData?: PoseData | null;
+  hasReceivedFirstFrame?: boolean;
   onStartSession: () => void;
   onEndSession: () => void;
 }
@@ -30,6 +31,7 @@ export const PosturalAnalysisModal: React.FC<PosturalAnalysisModalProps> = ({
   sessionActive,
   patientConnected,
   latestPoseData,
+  hasReceivedFirstFrame = false,
   onStartSession,
   onEndSession,
 }) => {
@@ -271,6 +273,22 @@ export const PosturalAnalysisModal: React.FC<PosturalAnalysisModalProps> = ({
                   <h3 className="text-xl text-gray-400 mb-2">Esperando Paciente...</h3>
                   <p className="text-sm text-gray-500">
                     El paciente debe estar en la videollamada para continuar
+                  </p>
+                </div>
+              </div>
+            ) : !hasReceivedFirstFrame ? (
+              // Waiting for first frame from patient
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="mb-6">
+                    <div className="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                  </div>
+                  <h3 className="text-xl text-gray-400 mb-2">Cargando Análisis...</h3>
+                  <p className="text-sm text-gray-500 mb-2">
+                    Esperando datos del paciente
+                  </p>
+                  <p className="text-xs text-gray-600">
+                    El paciente está activando su cámara y cargando el modelo de IA
                   </p>
                 </div>
               </div>

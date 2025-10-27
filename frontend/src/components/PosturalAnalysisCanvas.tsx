@@ -18,14 +18,29 @@ export const PosturalAnalysisCanvas: React.FC<PosturalAnalysisCanvasProps> = ({ 
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
+    console.log('[Canvas] 🎨 Attempting to draw:', {
+      hasCanvas: !!canvasRef.current,
+      hasPoseData: !!poseData,
+      landmarksCount: poseData?.landmarks?.length || 0,
+      timestamp: poseData?.timestamp
+    });
+
     if (!canvasRef.current || !poseData || !poseData.landmarks) {
+      console.warn('[Canvas] ⚠️ Missing data for drawing:', {
+        canvas: !!canvasRef.current,
+        poseData: !!poseData,
+        landmarks: !!poseData?.landmarks
+      });
       return;
     }
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
 
-    if (!ctx) return;
+    if (!ctx) {
+      console.error('[Canvas] ❌ Failed to get 2D context');
+      return;
+    }
 
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -36,6 +51,8 @@ export const PosturalAnalysisCanvas: React.FC<PosturalAnalysisCanvasProps> = ({ 
 
     // Draw landmarks and skeleton
     drawSkeleton(ctx, poseData.landmarks, canvas.width, canvas.height);
+
+    console.log('[Canvas] ✅ Successfully drew skeleton with', poseData.landmarks.length, 'landmarks');
   }, [poseData]);
 
   const drawSkeleton = (

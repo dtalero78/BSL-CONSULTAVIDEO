@@ -54,9 +54,11 @@ export const VideoRoom = ({ identity, roomName, role, historiaId, documento, onL
   });
 
   const {
+    isConnected: isPosturalAnalysisConnected,
     sessionActive,
     patientConnected,
     latestPoseData,
+    hasReceivedFirstFrame,
     startSession,
     endSession,
     sendPoseData,
@@ -86,6 +88,12 @@ export const VideoRoom = ({ identity, roomName, role, historiaId, documento, onL
   };
 
   const handleOpenPosturalAnalysis = () => {
+    // Validar que Socket.io esté conectado antes de abrir el modal
+    if (!isPosturalAnalysisConnected) {
+      alert('⚠️ El sistema de análisis postural aún no está conectado. Por favor espere un momento e intente de nuevo.');
+      console.warn('[VideoRoom] Cannot open postural analysis: Socket.io not connected');
+      return;
+    }
     setIsPosturalAnalysisOpen(true);
   };
 
@@ -296,6 +304,7 @@ export const VideoRoom = ({ identity, roomName, role, historiaId, documento, onL
           sessionActive={sessionActive}
           patientConnected={patientConnected}
           latestPoseData={latestPoseData}
+          hasReceivedFirstFrame={hasReceivedFirstFrame}
           onStartSession={startSession}
           onEndSession={endSession}
         />
