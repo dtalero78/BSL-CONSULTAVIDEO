@@ -169,11 +169,11 @@ class VideoController {
   /**
    * Registrar que un participante se conectó
    * POST /api/video/events/participant-connected
-   * Body: { roomName: string, identity: string, role: 'doctor' | 'patient', documento?: string }
+   * Body: { roomName: string, identity: string, role: 'doctor' | 'patient', documento?: string, medicoCode?: string }
    */
   async trackParticipantConnected(req: Request, res: Response): Promise<void> {
     try {
-      const { roomName, identity, role, documento } = req.body;
+      const { roomName, identity, role, documento, medicoCode } = req.body;
 
       if (!roomName || !identity || !role) {
         res.status(400).json({
@@ -189,7 +189,7 @@ class VideoController {
         return;
       }
 
-      sessionTracker.trackParticipantConnected(roomName, identity, role, documento);
+      sessionTracker.trackParticipantConnected(roomName, identity, role, documento, medicoCode);
 
       res.status(200).json({
         success: true,
@@ -377,11 +377,12 @@ class VideoController {
 
   /**
    * Obtener lista de pacientes actualmente conectados
-   * GET /api/video/events/connected-patients
+   * GET /api/video/events/connected-patients?medicoCode=XXX
    */
-  async getConnectedPatients(_req: Request, res: Response): Promise<void> {
+  async getConnectedPatients(req: Request, res: Response): Promise<void> {
     try {
-      const connectedPatients = sessionTracker.getConnectedPatients();
+      const { medicoCode } = req.query;
+      const connectedPatients = sessionTracker.getConnectedPatients(medicoCode as string | undefined);
 
       res.status(200).json({
         success: true,

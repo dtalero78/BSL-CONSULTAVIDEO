@@ -40,6 +40,7 @@ export const PatientPage = () => {
         roomName={roomName}
         role="patient"
         documento={documentoParam || undefined}
+        medicoCode={doctorParam || undefined}
         onLeave={handleLeaveCall}
       />
     );

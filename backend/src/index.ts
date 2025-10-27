@@ -33,6 +33,20 @@ console.log('[Socket.io] Telemedicine service initialized');
 sessionTracker.initialize(io);
 console.log('[Socket.io] Session tracker initialized');
 
+// Socket.io: Handle join-room event for doctors
+io.on('connection', (socket) => {
+  console.log(`[Socket.io] Client connected: ${socket.id}`);
+
+  socket.on('join-room', (roomName: string) => {
+    socket.join(roomName);
+    console.log(`[Socket.io] Socket ${socket.id} joined room: ${roomName}`);
+  });
+
+  socket.on('disconnect', () => {
+    console.log(`[Socket.io] Client disconnected: ${socket.id}`);
+  });
+});
+
 // Middleware de seguridad - Configurado para servir archivos estaticos
 app.use(
   helmet({

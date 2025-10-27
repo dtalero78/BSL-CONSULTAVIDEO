@@ -13,6 +13,7 @@ interface UseVideoRoomOptions {
   roomName: string;
   role?: 'doctor' | 'patient';
   documento?: string;
+  medicoCode?: string;
 }
 
 interface UseVideoRoomReturn {
@@ -97,6 +98,7 @@ export const useVideoRoom = ({
   roomName,
   role,
   documento,
+  medicoCode,
 }: UseVideoRoomOptions): UseVideoRoomReturn => {
   const [room, setRoom] = useState<Room | null>(null);
   const [localParticipant, setLocalParticipant] = useState<LocalParticipant | null>(null);
@@ -142,7 +144,7 @@ export const useVideoRoom = ({
       // Registrar conexión para reportes (si se proporcionó rol)
       if (role) {
         try {
-          await apiService.trackParticipantConnected(roomName, identity, role, documento);
+          await apiService.trackParticipantConnected(roomName, identity, role, documento, medicoCode);
         } catch (err) {
           console.error('Error tracking participant connection:', err);
         }

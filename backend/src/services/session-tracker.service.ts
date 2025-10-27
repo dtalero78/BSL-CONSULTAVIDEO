@@ -14,6 +14,7 @@ interface VideoSession {
   createdAt: Date;
   completedAt?: Date;
   patientDocumento?: string; // ID del documento del paciente
+  medicoCode?: string; // Código del médico asignado
 }
 
 class SessionTrackerService {
@@ -34,8 +35,8 @@ class SessionTrackerService {
   /**
    * Registra que un participante se conectó a la sala
    */
-  trackParticipantConnected(roomName: string, identity: string, role: 'doctor' | 'patient', documento?: string): void {
-    console.log(`[SessionTracker] Participant connected: ${identity} (${role}) to room ${roomName}`);
+  trackParticipantConnected(roomName: string, identity: string, role: 'doctor' | 'patient', documento?: string, medicoCode?: string): void {
+    console.log(`[SessionTracker] Participant connected: ${identity} (${role}) to room ${roomName}, medicoCode: ${medicoCode}`);
 
     if (!this.sessions.has(roomName)) {
       this.sessions.set(roomName, {
@@ -43,6 +44,7 @@ class SessionTrackerService {
         participants: new Map(),
         createdAt: new Date(),
         patientDocumento: documento,
+        medicoCode: medicoCode,
       });
     }
 
@@ -53,6 +55,11 @@ class SessionTrackerService {
       session.patientDocumento = documento;
     }
 
+    // Si tenemos medicoCode, guardarlo en la sesión
+    if (medicoCode) {
+      session.medicoCode = medicoCode;
+    }
+
     session.participants.set(identity, {
       identity,
       role,
@@ -61,10 +68,11 @@ class SessionTrackerService {
 
     console.log(`[SessionTracker] Current participants in ${roomName}: ${session.participants.size}`);
 
-    // Emitir evento Socket.io cuando un paciente se conecta
-    if (role === 'patient' && this.io && documento) {
-      console.log(`[SessionTracker] Emitting patient-connected event for documento: ${documento}`);
-      this.io.emit('patient-connected', {
+    // Emitir evento Socket.io cuando un paciente se conecta - SOLO a la Room del médico específico
+    if (role === 'patient' && this.io && documento && session.medicoCode) {
+      const roomToEmit = `doctor-${session.medicoCode}`;
+      console.log(`[SessionTracker] Emitting patient-connected event to room: ${roomToEmit} for documento: ${documento}`);
+      this.io.to(roomToEmit).emit('patient-connected', {
         documento,
         roomName,
         identity,
@@ -89,10 +97,11 @@ class SessionTrackerService {
     if (participant) {
       participant.disconnectedAt = new Date();
 
-      // Emitir evento Socket.io cuando un paciente se desconecta
-      if (participant.role === 'patient' && this.io && session.patientDocumento) {
-        console.log(`[SessionTracker] Emitting patient-disconnected event for documento: ${session.patientDocumento}`);
-        this.io.emit('patient-disconnected', {
+      // Emitir evento Socket.io cuando un paciente se desconecta - SOLO a la Room del médico específico
+      if (participant.role === 'patient' && this.io && session.patientDocumento && session.medicoCode) {
+        const roomToEmit = `doctor-${session.medicoCode}`;
+        console.log(`[SessionTracker] Emitting patient-disconnected event to room: ${roomToEmit} for documento: ${session.patientDocumento}`);
+        this.io.to(roomToEmit).emit('patient-disconnected', {
           documento: session.patientDocumento,
           roomName,
           identity,
@@ -235,11 +244,17 @@ class SessionTrackerService {
   /**
    * Obtiene el estado actual de todos los pacientes conectados
    * Retorna un array de objetos con documento, roomName, identity, connectedAt
+   * @param medicoCode - Opcional: filtrar solo pacientes de este médico
    */
-  getConnectedPatients(): Array<{ documento: string; roomName: string; identity: string; connectedAt: string }> {
+  getConnectedPatients(medicoCode?: string): Array<{ documento: string; roomName: string; identity: string; connectedAt: string }> {
     const connectedPatients: Array<{ documento: string; roomName: string; identity: string; connectedAt: string }> = [];
 
     for (const [roomName, session] of this.sessions.entries()) {
+      // Si se proporciona medicoCode, filtrar solo las sesiones de ese médico
+      if (medicoCode && session.medicoCode !== medicoCode) {
+        continue;
+      }
+
       for (const participant of session.participants.values()) {
         // Solo incluir pacientes que NO se han desconectado
         if (participant.role === 'patient' && !participant.disconnectedAt && session.patientDocumento) {
@@ -253,7 +268,7 @@ class SessionTrackerService {
       }
     }
 
-    console.log(`[SessionTracker] getConnectedPatients: Found ${connectedPatients.length} connected patients`);
+    console.log(`[SessionTracker] getConnectedPatients (medicoCode: ${medicoCode}): Found ${connectedPatients.length} connected patients`);
     return connectedPatients;
   }
 

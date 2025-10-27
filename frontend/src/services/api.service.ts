@@ -71,13 +71,15 @@ class ApiService {
     roomName: string,
     identity: string,
     role: 'doctor' | 'patient',
-    documento?: string
+    documento?: string,
+    medicoCode?: string
   ): Promise<void> {
     await this.client.post('/api/video/events/participant-connected', {
       roomName,
       identity,
       role,
       documento,
+      medicoCode,
     });
   }
 
@@ -93,9 +95,13 @@ class ApiService {
 
   /**
    * Obtener lista de pacientes actualmente conectados
+   * @param medicoCode - Opcional: filtrar solo pacientes de este médico
    */
-  async getConnectedPatients(): Promise<Array<{ documento: string; roomName: string; identity: string; connectedAt: string }>> {
-    const response = await this.client.get('/api/video/events/connected-patients');
+  async getConnectedPatients(medicoCode?: string): Promise<Array<{ documento: string; roomName: string; identity: string; connectedAt: string }>> {
+    const url = medicoCode
+      ? `/api/video/events/connected-patients?medicoCode=${encodeURIComponent(medicoCode)}`
+      : '/api/video/events/connected-patients';
+    const response = await this.client.get(url);
     return response.data.data;
   }
 
