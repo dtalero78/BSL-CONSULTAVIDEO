@@ -165,14 +165,15 @@ function populateFormularioFields(item) {
 /**
  * Formatea un número de teléfono para WhatsApp (con prefijo +)
  * Soporta formatos internacionales: +52, +1, +57, etc.
+ * Si no tiene código de país, agrega +57 (Colombia) por defecto
  * Ejemplos:
  *   "(+52) 2441564651" -> "+522441564651"
  *   "+13053392098" -> "+13053392098"
- *   "13053455190" -> "+13053455190"
+ *   "573001234567" -> "+573001234567"
  *   "3001234567" -> "+573001234567" (Colombia por defecto)
  */
 function formatTelefono(telefono) {
-    // Remover todos los espacios, paréntesis y guiones
+    // Remover todos los espacios, paréntesis, guiones y caracteres no numéricos (excepto +)
     telefono = telefono.replace(/[\s\(\)\-]/g, '');
 
     // Si ya tiene el +, retornar tal cual
@@ -180,17 +181,39 @@ function formatTelefono(telefono) {
         return telefono;
     }
 
-    // Si empieza con un código de país conocido (sin +), agregar el +
-    // Códigos de país comunes: 1 (USA/Canada), 52 (México), 57 (Colombia), etc.
-    const countryCodes = ['1', '52', '57', '54', '55', '34', '44', '49', '33'];
+    // Lista de códigos de país con sus longitudes mínimas esperadas
+    // Formato: [código, longitud mínima del número completo sin +]
+    const countryCodes = [
+        { code: '1', minLength: 11 },      // USA/Canada: 1 + 10 dígitos
+        { code: '52', minLength: 12 },     // México: 52 + 10 dígitos
+        { code: '57', minLength: 12 },     // Colombia: 57 + 10 dígitos
+        { code: '54', minLength: 12 },     // Argentina: 54 + 10 dígitos
+        { code: '55', minLength: 12 },     // Brasil: 55 + 10 dígitos
+        { code: '34', minLength: 11 },     // España: 34 + 9 dígitos
+        { code: '44', minLength: 12 },     // UK: 44 + 10 dígitos
+        { code: '49', minLength: 12 },     // Alemania: 49 + 10 dígitos
+        { code: '33', minLength: 11 }      // Francia: 33 + 9 dígitos
+    ];
 
-    for (let code of countryCodes) {
-        if (telefono.startsWith(code)) {
+    // Verificar si empieza con un código de país conocido
+    for (let { code, minLength } of countryCodes) {
+        if (telefono.startsWith(code) && telefono.length >= minLength) {
             return `+${telefono}`;
         }
     }
 
-    // Si no tiene código de país, asumir Colombia (+57) por defecto
+    // Si no tiene código de país reconocido, asumir Colombia (+57) por defecto
+    // Solo si el número tiene 10 dígitos (formato local colombiano)
+    if (telefono.length === 10) {
+        return `+57${telefono}`;
+    }
+
+    // Si tiene 12 dígitos y empieza con 57, probablemente le falta el +
+    if (telefono.length === 12 && telefono.startsWith('57')) {
+        return `+${telefono}`;
+    }
+
+    // Caso por defecto: agregar +57 (puede ser un número incompleto o con formato inesperado)
     return `+57${telefono}`;
 }
 
