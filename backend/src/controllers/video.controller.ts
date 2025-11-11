@@ -22,6 +22,21 @@ class VideoController {
         return;
       }
 
+      // Intentar crear la sala como peer-to-peer si no existe
+      // Esto optimiza costos (~62% más barato que 'group')
+      try {
+        await twilioService.createRoom(roomName, 'peer-to-peer');
+        console.log(`Room created as peer-to-peer: ${roomName}`);
+      } catch (error: any) {
+        // Si la sala ya existe, continuar (error code 53113)
+        if (error.code === 53113) {
+          console.log(`Room already exists: ${roomName}`);
+        } else {
+          // Otro error, pero no bloqueamos la generación del token
+          console.warn(`Could not create room, will use existing: ${error.message}`);
+        }
+      }
+
       const tokenData = twilioService.generateVideoToken({
         identity,
         roomName,
