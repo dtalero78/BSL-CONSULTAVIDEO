@@ -126,25 +126,23 @@ export async function actualizarHistoriaClinica(historiaId, datos) {
         if (datos.mdDx2 !== undefined) item.mdDx2 = datos.mdDx2;
         if (datos.cargo !== undefined) item.cargo = datos.cargo;
 
-        // Marcar como atendido y guardar fecha de consulta
-        // Wix espera un objeto Date de JavaScript, NO un string
-        // Si viene fechaConsulta desde el backend (como ISO string), convertir a Date
-        // Si no viene, usar fecha actual
-        if (datos.fechaConsulta) {
-            item.fechaConsulta = new Date(datos.fechaConsulta);
-        } else {
-            item.fechaConsulta = new Date();
-        }
+        // Marcar como atendido (sin modificar fechaConsulta aún)
         item.atendido = "ATENDIDO";
 
+        // Primer update: guardar todos los campos médicos y marcar como atendido
         const updatedItem = await wixData.update("HistoriaClinica", item);
+
+        // Segundo update: copiar _updatedDate a fechaConsulta
+        // Esto asegura que usamos la fecha exacta que Wix generó en el primer update
+        updatedItem.fechaConsulta = updatedItem._updatedDate;
+        const finalItem = await wixData.update("HistoriaClinica", updatedItem);
 
         return {
             success: true,
             data: {
-                _id: updatedItem._id,
-                numeroId: updatedItem.numeroId,
-                fechaConsulta: updatedItem.fechaConsulta
+                _id: finalItem._id,
+                numeroId: finalItem.numeroId,
+                fechaConsulta: finalItem.fechaConsulta
             }
         };
     } catch (error) {

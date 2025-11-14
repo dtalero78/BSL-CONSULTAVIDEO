@@ -107,7 +107,7 @@ class MedicalHistoryService {
         talla: payload.talla,
         peso: payload.peso,
         cargo: payload.cargo,
-        fechaConsulta: new Date().toISOString(), // Se convertirá a Date en Wix
+        // NO enviamos fechaConsulta - Wix copiará _updatedDate después del update
         atendido: 'ATENDIDO',
       });
 
