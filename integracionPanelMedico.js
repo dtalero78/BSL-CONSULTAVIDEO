@@ -127,7 +127,10 @@ export async function actualizarHistoriaClinica(historiaId, datos) {
         if (datos.cargo !== undefined) item.cargo = datos.cargo;
 
         // Marcar como atendido y guardar fecha de consulta
-        item.fechaConsulta = new Date();
+        // Crear fecha sin milisegundos para compatibilidad con Wix
+        const now = new Date();
+        now.setMilliseconds(0);
+        item.fechaConsulta = now;
         item.atendido = "ATENDIDO";
 
         const updatedItem = await wixData.update("HistoriaClinica", item);
@@ -156,20 +159,19 @@ export async function obtenerEstadisticasMedico(medicoCode) {
         throw new Error("medicoCode es requerido");
     }
 
-    // Usar zona horaria de Colombia (UTC-5)
-    // Colombia está 5 horas detrás de UTC
-    // Entonces 00:00 Colombia = 05:00 UTC del mismo día
-    // Y 23:59 Colombia = 04:59 UTC del día siguiente
+    // Calcular el día actual en Colombia (UTC-5)
+    // Para obtener la fecha correcta en Colombia, restamos 5 horas a la hora UTC actual
     const now = new Date();
-    const year = now.getUTCFullYear();
-    const month = now.getUTCMonth();
-    const day = now.getUTCDate();
+    const colombiaTime = new Date(now.getTime() - (5 * 60 * 60 * 1000)); // UTC-5
 
-    // Si son menos de las 05:00 UTC, aún es el día anterior en Colombia
-    const colombiaDay = now.getUTCHours() < 5 ? day - 1 : day;
+    // Obtener inicio y fin del día en Colombia
+    const year = colombiaTime.getUTCFullYear();
+    const month = colombiaTime.getUTCMonth();
+    const day = colombiaTime.getUTCDate();
 
-    const startOfDay = new Date(Date.UTC(year, month, colombiaDay, 5, 0, 0, 0));
-    const endOfDay = new Date(Date.UTC(year, month, colombiaDay + 1, 4, 59, 59, 999));
+    // Crear rango: desde las 00:00 hasta las 23:59:59.999 del día en Colombia (en UTC+5)
+    const startOfDay = new Date(Date.UTC(year, month, day, 5, 0, 0, 0)); // 00:00 Colombia = 05:00 UTC
+    const endOfDay = new Date(Date.UTC(year, month, day + 1, 4, 59, 59, 999)); // 23:59:59 Colombia = 04:59:59 UTC del día siguiente
 
     try {
         // Ejecutar queries en paralelo para mejor rendimiento
@@ -224,20 +226,19 @@ export async function obtenerPacientesPendientes(medicoCode, page = 0, pageSize 
     const pageNum = parseInt(page);
     const pageSizeNum = parseInt(pageSize);
 
-    // Usar zona horaria de Colombia (UTC-5)
-    // Colombia está 5 horas detrás de UTC
-    // Entonces 00:00 Colombia = 05:00 UTC del mismo día
-    // Y 23:59 Colombia = 04:59 UTC del día siguiente
+    // Calcular el día actual en Colombia (UTC-5)
+    // Para obtener la fecha correcta en Colombia, restamos 5 horas a la hora UTC actual
     const now = new Date();
-    const year = now.getUTCFullYear();
-    const month = now.getUTCMonth();
-    const day = now.getUTCDate();
+    const colombiaTime = new Date(now.getTime() - (5 * 60 * 60 * 1000)); // UTC-5
 
-    // Si son menos de las 05:00 UTC, aún es el día anterior en Colombia
-    const colombiaDay = now.getUTCHours() < 5 ? day - 1 : day;
+    // Obtener inicio y fin del día en Colombia
+    const year = colombiaTime.getUTCFullYear();
+    const month = colombiaTime.getUTCMonth();
+    const day = colombiaTime.getUTCDate();
 
-    const startOfDay = new Date(Date.UTC(year, month, colombiaDay, 5, 0, 0, 0));
-    const endOfDay = new Date(Date.UTC(year, month, colombiaDay + 1, 4, 59, 59, 999));
+    // Crear rango: desde las 00:00 hasta las 23:59:59.999 del día en Colombia (en UTC+5)
+    const startOfDay = new Date(Date.UTC(year, month, day, 5, 0, 0, 0)); // 00:00 Colombia = 05:00 UTC
+    const endOfDay = new Date(Date.UTC(year, month, day + 1, 4, 59, 59, 999)); // 23:59:59 Colombia = 04:59:59 UTC del día siguiente
 
     try {
         // Query para obtener pacientes pendientes del día
