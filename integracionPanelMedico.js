@@ -129,17 +129,60 @@ export async function actualizarHistoriaClinica(historiaId, datos) {
         // Marcar como atendido
         item.atendido = "ATENDIDO";
 
+        console.log("🔵 PASO 1: Item ANTES del primer update:", {
+            _id: item._id,
+            numeroId: item.numeroId,
+            atendido: item.atendido,
+            fechaConsulta: item.fechaConsulta,
+            _updatedDate: item._updatedDate
+        });
+
         // Actualizar registro (esto generará _updatedDate automáticamente)
-        await wixData.update("HistoriaClinica", item);
+        const resultadoUpdate1 = await wixData.update("HistoriaClinica", item);
+
+        console.log("🟢 PASO 2: Resultado del PRIMER update:", {
+            _id: resultadoUpdate1._id,
+            numeroId: resultadoUpdate1.numeroId,
+            atendido: resultadoUpdate1.atendido,
+            fechaConsulta: resultadoUpdate1.fechaConsulta,
+            _updatedDate: resultadoUpdate1._updatedDate
+        });
 
         // Obtener el item actualizado para leer el _updatedDate que Wix acabó de generar
         const itemActualizado = await wixData.get("HistoriaClinica", historiaId);
 
+        console.log("🟡 PASO 3: Item después de GET:", {
+            _id: itemActualizado._id,
+            numeroId: itemActualizado.numeroId,
+            atendido: itemActualizado.atendido,
+            fechaConsulta: itemActualizado.fechaConsulta,
+            _updatedDate: itemActualizado._updatedDate,
+            _updatedDate_type: typeof itemActualizado._updatedDate
+        });
+
         // Copiar _updatedDate a fechaConsulta
         itemActualizado.fechaConsulta = itemActualizado._updatedDate;
 
+        console.log("🟣 PASO 4: Item ANTES del segundo update (con fechaConsulta copiada):", {
+            _id: itemActualizado._id,
+            numeroId: itemActualizado.numeroId,
+            atendido: itemActualizado.atendido,
+            fechaConsulta: itemActualizado.fechaConsulta,
+            fechaConsulta_type: typeof itemActualizado.fechaConsulta,
+            _updatedDate: itemActualizado._updatedDate
+        });
+
         // Guardar nuevamente con fechaConsulta
         const finalItem = await wixData.update("HistoriaClinica", itemActualizado);
+
+        console.log("🔴 PASO 5: Item FINAL después del segundo update:", {
+            _id: finalItem._id,
+            numeroId: finalItem.numeroId,
+            atendido: finalItem.atendido,
+            fechaConsulta: finalItem.fechaConsulta,
+            fechaConsulta_type: typeof finalItem.fechaConsulta,
+            _updatedDate: finalItem._updatedDate
+        });
 
         return {
             success: true,
