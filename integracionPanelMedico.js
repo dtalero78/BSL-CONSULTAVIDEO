@@ -126,16 +126,20 @@ export async function actualizarHistoriaClinica(historiaId, datos) {
         if (datos.mdDx2 !== undefined) item.mdDx2 = datos.mdDx2;
         if (datos.cargo !== undefined) item.cargo = datos.cargo;
 
-        // Marcar como atendido (sin modificar fechaConsulta aún)
+        // Marcar como atendido
         item.atendido = "ATENDIDO";
 
-        // Primer update: guardar todos los campos médicos y marcar como atendido
-        const updatedItem = await wixData.update("HistoriaClinica", item);
+        // Actualizar registro (esto generará _updatedDate automáticamente)
+        await wixData.update("HistoriaClinica", item);
 
-        // Segundo update: copiar _updatedDate a fechaConsulta
-        // Esto asegura que usamos la fecha exacta que Wix generó en el primer update
-        updatedItem.fechaConsulta = updatedItem._updatedDate;
-        const finalItem = await wixData.update("HistoriaClinica", updatedItem);
+        // Obtener el item actualizado para leer el _updatedDate que Wix acabó de generar
+        const itemActualizado = await wixData.get("HistoriaClinica", historiaId);
+
+        // Copiar _updatedDate a fechaConsulta
+        itemActualizado.fechaConsulta = itemActualizado._updatedDate;
+
+        // Guardar nuevamente con fechaConsulta
+        const finalItem = await wixData.update("HistoriaClinica", itemActualizado);
 
         return {
             success: true,
