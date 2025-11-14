@@ -107,11 +107,7 @@ class MedicalHistoryService {
         talla: payload.talla,
         peso: payload.peso,
         cargo: payload.cargo,
-        fechaConsulta: (() => {
-          const now = new Date();
-          now.setMilliseconds(0);
-          return now.toISOString();
-        })(),
+        fechaConsulta: new Date().toISOString(),
         atendido: 'ATENDIDO',
       });
 
