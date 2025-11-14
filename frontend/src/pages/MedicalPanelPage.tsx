@@ -268,7 +268,7 @@ export function MedicalPanelPage() {
       setPatientRooms(prev => ({ ...prev, [patient._id]: roomName }));
 
       // Construir URL del paciente con URLSearchParams para codificación correcta
-      const baseUrl = `${window.location.origin}/patient/${roomName}`;
+      const baseUrl = `https://bsl-consultavideo-58jne.ondigitalocean.app/patient/${roomName}`;
       const params = new URLSearchParams({
         nombre: patient.primerNombre,
         apellido: patient.primerApellido,
@@ -411,7 +411,7 @@ export function MedicalPanelPage() {
     }
 
     const roomName = medicalPanelService.generateRoomName();
-    const patientLink = `${window.location.origin}/patient/${roomName}?nombre=${patient.primerNombre}&apellido=${patient.primerApellido}`;
+    const patientLink = `https://bsl-consultavideo-58jne.ondigitalocean.app/patient/${roomName}?nombre=${patient.primerNombre}&apellido=${patient.primerApellido}`;
 
     return `Hola ${patient.primerNombre}. Te escribimos de BSL. Tienes una cita médica programada conmigo\n\nConéctate al link:\n\n${patientLink}`;
   };
