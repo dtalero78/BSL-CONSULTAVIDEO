@@ -127,11 +127,12 @@ export async function actualizarHistoriaClinica(historiaId, datos) {
         if (datos.cargo !== undefined) item.cargo = datos.cargo;
 
         // Marcar como atendido y guardar fecha de consulta
-        // Wix requiere Date nativo, no string ISO
+        // Wix requiere formato especial: {"$date": "ISO8601"} o Date object
         const now = new Date();
-        // Truncar a segundos (sin milisegundos) para evitar problemas de precisión
+        // Truncar a segundos para formato ISO limpio
         now.setMilliseconds(0);
-        item.fechaConsulta = now;
+        // Usar formato especial de Wix para Date and Time fields
+        item.fechaConsulta = { "$date": now.toISOString() };
         item.atendido = "ATENDIDO";
 
         const updatedItem = await wixData.update("HistoriaClinica", item);
