@@ -1,4 +1,5 @@
 import axios from 'axios';
+import historiaClinicaPostgresService from './historia-clinica-postgres.service';
 
 interface MedicalHistoryData {
   // Datos del paciente
@@ -89,12 +90,13 @@ class MedicalHistoryService {
   }
 
   /**
-   * Actualiza la historia clínica de un paciente en Wix por _id
+   * Actualiza la historia clínica de un paciente en Wix Y PostgreSQL por _id
    */
   async updateMedicalHistory(payload: UpdateMedicalHistoryPayload): Promise<{ success: boolean; error?: string }> {
     try {
       console.log(`💾 Actualizando historia clínica para ID: ${payload.historiaId}`);
 
+      // PASO 1: Actualizar en Wix (fuente principal)
       const response = await axios.post(`${this.wixBaseUrl}/updateHistoriaClinica`, {
         historiaId: payload.historiaId,
         mdAntecedentes: payload.mdAntecedentes,
@@ -111,13 +113,58 @@ class MedicalHistoryService {
         atendido: 'ATENDIDO',
       });
 
-      if (response.data && response.data.success) {
-        console.log(`✅ Historia clínica actualizada exitosamente para ${payload.historiaId}`);
-        return { success: true };
+      if (!response.data || !response.data.success) {
+        console.warn(`⚠️  Respuesta inesperada al actualizar historia clínica: ${JSON.stringify(response.data)}`);
+        return { success: false, error: 'Respuesta inesperada del servidor' };
       }
 
-      console.warn(`⚠️  Respuesta inesperada al actualizar historia clínica: ${JSON.stringify(response.data)}`);
-      return { success: false, error: 'Respuesta inesperada del servidor' };
+      console.log(`✅ [Wix] Historia clínica actualizada exitosamente para ${payload.historiaId}`);
+
+      // PASO 2: Obtener datos completos de Wix para sincronizar a PostgreSQL
+      const historiaCompleta = await this.getMedicalHistory(payload.historiaId);
+
+      if (historiaCompleta) {
+        // PASO 3: Guardar en PostgreSQL (en paralelo, no bloqueante)
+        historiaClinicaPostgresService.upsert({
+          _id: payload.historiaId,
+          numeroId: historiaCompleta.numeroId,
+          primerNombre: historiaCompleta.primerNombre,
+          segundoNombre: historiaCompleta.segundoNombre,
+          primerApellido: historiaCompleta.primerApellido,
+          segundoApellido: historiaCompleta.segundoApellido,
+          celular: historiaCompleta.celular,
+          email: historiaCompleta.email,
+          fechaNacimiento: historiaCompleta.fechaNacimiento,
+          edad: historiaCompleta.edad,
+          genero: historiaCompleta.genero,
+          estadoCivil: historiaCompleta.estadoCivil,
+          hijos: historiaCompleta.hijos,
+          ejercicio: historiaCompleta.ejercicio,
+          codEmpresa: historiaCompleta.codEmpresa,
+          cargo: historiaCompleta.cargo,
+          tipoExamen: historiaCompleta.tipoExamen,
+          encuestaSalud: historiaCompleta.encuestaSalud,
+          antecedentesFamiliares: historiaCompleta.antecedentesFamiliares,
+          empresa1: historiaCompleta.empresa1,
+          mdAntecedentes: historiaCompleta.mdAntecedentes,
+          mdObsParaMiDocYa: historiaCompleta.mdObsParaMiDocYa,
+          mdObservacionesCertificado: historiaCompleta.mdObservacionesCertificado,
+          mdRecomendacionesMedicasAdicionales: historiaCompleta.mdRecomendacionesMedicasAdicionales,
+          mdConceptoFinal: historiaCompleta.mdConceptoFinal,
+          mdDx1: historiaCompleta.mdDx1,
+          mdDx2: historiaCompleta.mdDx2,
+          talla: historiaCompleta.talla,
+          peso: historiaCompleta.peso,
+          fechaAtencion: historiaCompleta.fechaAtencion,
+          fechaConsulta: historiaCompleta.fechaConsulta,
+          atendido: historiaCompleta.atendido,
+        }).catch((error) => {
+          // No fallar si PostgreSQL falla (Wix es la fuente principal)
+          console.error(`⚠️  [PostgreSQL] Error guardando historia clínica ${payload.historiaId}:`, error);
+        });
+      }
+
+      return { success: true };
     } catch (error: any) {
       console.error('❌ Error actualizando historia clínica:', error.message);
       return {
