@@ -106,6 +106,8 @@ export async function actualizarHistoriaClinica(historiaId, datos) {
         return { success: false, error: "historiaId es requerido" };
     }
 
+    let itemGuardado = null;
+
     try {
         // Obtener el registro por _id
         const item = await wixData.get("HistoriaClinica", historiaId);
@@ -129,71 +131,54 @@ export async function actualizarHistoriaClinica(historiaId, datos) {
         // Marcar como atendido
         item.atendido = "ATENDIDO";
 
-        console.log("🔵 PASO 1: Item ANTES del primer update:", {
-            _id: item._id,
-            numeroId: item.numeroId,
-            atendido: item.atendido,
-            fechaConsulta: item.fechaConsulta,
-            _updatedDate: item._updatedDate
-        });
+        console.log("🔵 PASO 1: Guardando datos médicos principales");
 
-        // Actualizar registro (esto generará _updatedDate automáticamente)
-        const resultadoUpdate1 = await wixData.update("HistoriaClinica", item);
+        // PASO PRINCIPAL: Guardar datos médicos (ESTE DEBE SIEMPRE FUNCIONAR)
+        itemGuardado = await wixData.update("HistoriaClinica", item);
 
-        console.log("🟢 PASO 2: Resultado del PRIMER update:", {
-            _id: resultadoUpdate1._id,
-            numeroId: resultadoUpdate1.numeroId,
-            atendido: resultadoUpdate1.atendido,
-            fechaConsulta: resultadoUpdate1.fechaConsulta,
-            _updatedDate: resultadoUpdate1._updatedDate
-        });
+        console.log("✅ PASO 2: Datos médicos guardados exitosamente");
 
-        // Obtener el item actualizado para leer el _updatedDate que Wix acabó de generar
-        const itemActualizado = await wixData.get("HistoriaClinica", historiaId);
+        // PASO OPCIONAL: Intentar actualizar fechaConsulta (SI FALLA, NO INTERRUMPIR)
+        try {
+            console.log("🟡 PASO 3: Intentando actualizar fechaConsulta...");
 
-        console.log("🟡 PASO 3: Item después de GET:", {
-            _id: itemActualizado._id,
-            numeroId: itemActualizado.numeroId,
-            atendido: itemActualizado.atendido,
-            fechaConsulta: itemActualizado.fechaConsulta,
-            _updatedDate: itemActualizado._updatedDate,
-            _updatedDate_type: typeof itemActualizado._updatedDate
-        });
+            // Obtener el item actualizado para leer el _updatedDate que Wix acabó de generar
+            const itemActualizado = await wixData.get("HistoriaClinica", historiaId);
 
-        // Copiar _updatedDate a fechaConsulta
-        itemActualizado.fechaConsulta = itemActualizado._updatedDate;
+            // Copiar _updatedDate a fechaConsulta
+            itemActualizado.fechaConsulta = itemActualizado._updatedDate;
 
-        console.log("🟣 PASO 4: Item ANTES del segundo update (con fechaConsulta copiada):", {
-            _id: itemActualizado._id,
-            numeroId: itemActualizado.numeroId,
-            atendido: itemActualizado.atendido,
-            fechaConsulta: itemActualizado.fechaConsulta,
-            fechaConsulta_type: typeof itemActualizado.fechaConsulta,
-            _updatedDate: itemActualizado._updatedDate
-        });
+            console.log("🟣 PASO 4: Guardando fechaConsulta:", {
+                fechaConsulta: itemActualizado.fechaConsulta,
+                type: typeof itemActualizado.fechaConsulta
+            });
 
-        // Guardar nuevamente con fechaConsulta
-        const finalItem = await wixData.update("HistoriaClinica", itemActualizado);
+            // Guardar nuevamente con fechaConsulta
+            const finalItem = await wixData.update("HistoriaClinica", itemActualizado);
 
-        console.log("🔴 PASO 5: Item FINAL después del segundo update:", {
-            _id: finalItem._id,
-            numeroId: finalItem.numeroId,
-            atendido: finalItem.atendido,
-            fechaConsulta: finalItem.fechaConsulta,
-            fechaConsulta_type: typeof finalItem.fechaConsulta,
-            _updatedDate: finalItem._updatedDate
-        });
+            console.log("✅ PASO 5: fechaConsulta actualizada exitosamente:", finalItem.fechaConsulta);
 
+            itemGuardado = finalItem; // Actualizar con la versión final
+
+        } catch (fechaError) {
+            // Si falla fechaConsulta, solo logear pero NO fallar la operación completa
+            console.warn("⚠️  Error actualizando fechaConsulta (NO crítico):", fechaError.message);
+            console.warn("⚠️  Los datos médicos SÍ se guardaron correctamente");
+        }
+
+        // SIEMPRE retornar success si el guardado principal funcionó
         return {
             success: true,
             data: {
-                _id: finalItem._id,
-                numeroId: finalItem.numeroId,
-                fechaConsulta: finalItem.fechaConsulta
+                _id: itemGuardado._id,
+                numeroId: itemGuardado.numeroId,
+                fechaConsulta: itemGuardado.fechaConsulta
             }
         };
+
     } catch (error) {
-        console.error("Error actualizando historia clínica:", error);
+        // Solo fallar si el guardado PRINCIPAL falla
+        console.error("❌ Error CRÍTICO actualizando datos médicos:", error);
         return { success: false, error: error.message };
     }
 }

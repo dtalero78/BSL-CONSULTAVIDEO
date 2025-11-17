@@ -96,6 +96,13 @@ class MedicalHistoryService {
     try {
       console.log(`💾 Actualizando historia clínica para ID: ${payload.historiaId}`);
 
+      // PASO 0: Obtener datos base del paciente ANTES de actualizar (para PostgreSQL)
+      const historiaBase = await this.getMedicalHistory(payload.historiaId);
+
+      if (!historiaBase) {
+        return { success: false, error: 'No se encontró historia clínica' };
+      }
+
       // PASO 1: Actualizar en Wix (fuente principal)
       const response = await axios.post(`${this.wixBaseUrl}/updateHistoriaClinica`, {
         historiaId: payload.historiaId,
@@ -120,49 +127,50 @@ class MedicalHistoryService {
 
       console.log(`✅ [Wix] Historia clínica actualizada exitosamente para ${payload.historiaId}`);
 
-      // PASO 2: Obtener datos completos de Wix para sincronizar a PostgreSQL
-      const historiaCompleta = await this.getMedicalHistory(payload.historiaId);
+      // PASO 2: Guardar en PostgreSQL INDEPENDIENTEMENTE de Wix
+      // PostgreSQL guarda los datos que el médico ingresó + fechaConsulta = NOW()
+      historiaClinicaPostgresService.upsert({
+        _id: payload.historiaId,
+        // Datos base del paciente (no cambian)
+        numeroId: historiaBase.numeroId,
+        primerNombre: historiaBase.primerNombre,
+        segundoNombre: historiaBase.segundoNombre,
+        primerApellido: historiaBase.primerApellido,
+        segundoApellido: historiaBase.segundoApellido,
+        celular: historiaBase.celular,
+        email: historiaBase.email,
+        fechaNacimiento: historiaBase.fechaNacimiento,
+        edad: historiaBase.edad,
+        genero: historiaBase.genero,
+        estadoCivil: historiaBase.estadoCivil,
+        hijos: historiaBase.hijos,
+        ejercicio: historiaBase.ejercicio,
+        codEmpresa: historiaBase.codEmpresa,
+        tipoExamen: historiaBase.tipoExamen,
+        encuestaSalud: historiaBase.encuestaSalud,
+        antecedentesFamiliares: historiaBase.antecedentesFamiliares,
+        empresa1: historiaBase.empresa1,
+        fechaAtencion: historiaBase.fechaAtencion,
 
-      if (historiaCompleta) {
-        // PASO 3: Guardar en PostgreSQL (en paralelo, no bloqueante)
-        historiaClinicaPostgresService.upsert({
-          _id: payload.historiaId,
-          numeroId: historiaCompleta.numeroId,
-          primerNombre: historiaCompleta.primerNombre,
-          segundoNombre: historiaCompleta.segundoNombre,
-          primerApellido: historiaCompleta.primerApellido,
-          segundoApellido: historiaCompleta.segundoApellido,
-          celular: historiaCompleta.celular,
-          email: historiaCompleta.email,
-          fechaNacimiento: historiaCompleta.fechaNacimiento,
-          edad: historiaCompleta.edad,
-          genero: historiaCompleta.genero,
-          estadoCivil: historiaCompleta.estadoCivil,
-          hijos: historiaCompleta.hijos,
-          ejercicio: historiaCompleta.ejercicio,
-          codEmpresa: historiaCompleta.codEmpresa,
-          cargo: historiaCompleta.cargo,
-          tipoExamen: historiaCompleta.tipoExamen,
-          encuestaSalud: historiaCompleta.encuestaSalud,
-          antecedentesFamiliares: historiaCompleta.antecedentesFamiliares,
-          empresa1: historiaCompleta.empresa1,
-          mdAntecedentes: historiaCompleta.mdAntecedentes,
-          mdObsParaMiDocYa: historiaCompleta.mdObsParaMiDocYa,
-          mdObservacionesCertificado: historiaCompleta.mdObservacionesCertificado,
-          mdRecomendacionesMedicasAdicionales: historiaCompleta.mdRecomendacionesMedicasAdicionales,
-          mdConceptoFinal: historiaCompleta.mdConceptoFinal,
-          mdDx1: historiaCompleta.mdDx1,
-          mdDx2: historiaCompleta.mdDx2,
-          talla: historiaCompleta.talla,
-          peso: historiaCompleta.peso,
-          fechaAtencion: historiaCompleta.fechaAtencion,
-          fechaConsulta: historiaCompleta.fechaConsulta,
-          atendido: historiaCompleta.atendido,
-        }).catch((error) => {
-          // No fallar si PostgreSQL falla (Wix es la fuente principal)
-          console.error(`⚠️  [PostgreSQL] Error guardando historia clínica ${payload.historiaId}:`, error);
-        });
-      }
+        // Datos médicos ingresados por el doctor (del payload)
+        mdAntecedentes: payload.mdAntecedentes,
+        mdObsParaMiDocYa: payload.mdObsParaMiDocYa,
+        mdObservacionesCertificado: payload.mdObservacionesCertificado,
+        mdRecomendacionesMedicasAdicionales: payload.mdRecomendacionesMedicasAdicionales,
+        mdConceptoFinal: payload.mdConceptoFinal,
+        mdDx1: payload.mdDx1,
+        mdDx2: payload.mdDx2,
+        talla: payload.talla,
+        peso: payload.peso,
+        cargo: payload.cargo,
+
+        // Campos de estado
+        fechaConsulta: new Date(), // IMPORTANTE: PostgreSQL genera su propia fechaConsulta
+        atendido: 'ATENDIDO',
+      }).catch((error) => {
+        // No fallar si PostgreSQL falla (Wix es la fuente principal)
+        console.error(`⚠️  [PostgreSQL] Error guardando historia clínica ${payload.historiaId}:`, error);
+      });
 
       return { success: true };
     } catch (error: any) {

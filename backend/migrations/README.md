@@ -54,6 +54,38 @@ Este directorio contiene las migraciones SQL para la base de datos PostgreSQL de
 
 ## Verificar que la Tabla se Creó Correctamente
 
+### Opción 1: Script de prueba completo (TypeScript)
+
+```bash
+# Desde el directorio backend/
+cd backend
+
+# Asegúrate de tener las variables de entorno configuradas en .env
+# Luego ejecuta:
+npx ts-node migrations/test-postgres-api.ts
+```
+
+Este script ejecuta 7 pruebas:
+1. ✅ Verificar conexión básica
+2. ✅ Verificar si existe la tabla HistoriaClinica
+3. ✅ Verificar estructura de la tabla
+4. ✅ Contar registros existentes
+5. ✅ Insertar registro de prueba
+6. ✅ Leer registro insertado
+7. ✅ Eliminar registro de prueba
+
+### Opción 2: Script bash (requiere psql instalado)
+
+```bash
+# Desde el directorio backend/
+cd backend/migrations
+./test-postgres-connection.sh
+
+# El script te pedirá las credenciales y ejecutará las mismas pruebas
+```
+
+### Opción 3: Consultas SQL manuales
+
 ```sql
 -- Verificar que la tabla existe
 SELECT table_name
