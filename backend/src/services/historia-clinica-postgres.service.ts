@@ -9,19 +9,10 @@ interface HistoriaClinicaData {
   segundoApellido?: string;
   celular: string;
   email?: string;
-  fechaNacimiento?: Date;
-  edad?: number;
-  genero?: string;
-  estadoCivil?: string;
-  hijos?: string;
-  ejercicio?: string;
   codEmpresa?: string;
   empresa?: string;
   cargo?: string;
   tipoExamen?: string;
-  encuestaSalud?: string;
-  antecedentesFamiliares?: string;
-  empresa1?: string;
   mdAntecedentes?: string;
   mdObsParaMiDocYa?: string;
   mdObservacionesCertificado?: string;
@@ -39,6 +30,9 @@ interface HistoriaClinicaData {
   atendido?: string;
   pvEstado?: string;
   medico?: string;
+  ciudad?: string;
+  examenes?: string;
+  horaAtencion?: string;
 }
 
 /**
@@ -54,16 +48,18 @@ class HistoriaClinicaPostgresService {
       const query = `
         INSERT INTO "HistoriaClinica" (
           "_id", "numeroId", "primerNombre", "segundoNombre", "primerApellido", "segundoApellido",
-          "celular", "email", "fechaNacimiento", "edad", "genero", "estadoCivil", "hijos", "ejercicio",
-          "codEmpresa", "empresa", "cargo", "tipoExamen",
-          "encuestaSalud", "antecedentesFamiliares", "empresa1",
+          "celular", "email", "codEmpresa", "empresa", "cargo", "tipoExamen",
           "mdAntecedentes", "mdObsParaMiDocYa", "mdObservacionesCertificado",
           "mdRecomendacionesMedicasAdicionales", "mdConceptoFinal", "mdDx1", "mdDx2",
           "talla", "peso", "motivoConsulta", "diagnostico", "tratamiento",
-          "fechaAtencion", "fechaConsulta", "atendido", "pvEstado", "medico"
+          "fechaAtencion", "fechaConsulta", "atendido", "pvEstado", "medico",
+          "ciudad", "examenes", "horaAtencion"
         ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18,
-          $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+          $13, $14, $15, $16, $17, $18, $19,
+          $20, $21, $22, $23, $24,
+          $25, $26, $27, $28, $29,
+          $30, $31, $32
         )
         ON CONFLICT ("_id") DO UPDATE SET
           "numeroId" = EXCLUDED."numeroId",
@@ -73,19 +69,10 @@ class HistoriaClinicaPostgresService {
           "segundoApellido" = EXCLUDED."segundoApellido",
           "celular" = EXCLUDED."celular",
           "email" = EXCLUDED."email",
-          "fechaNacimiento" = EXCLUDED."fechaNacimiento",
-          "edad" = EXCLUDED."edad",
-          "genero" = EXCLUDED."genero",
-          "estadoCivil" = EXCLUDED."estadoCivil",
-          "hijos" = EXCLUDED."hijos",
-          "ejercicio" = EXCLUDED."ejercicio",
           "codEmpresa" = EXCLUDED."codEmpresa",
           "empresa" = EXCLUDED."empresa",
           "cargo" = EXCLUDED."cargo",
           "tipoExamen" = EXCLUDED."tipoExamen",
-          "encuestaSalud" = EXCLUDED."encuestaSalud",
-          "antecedentesFamiliares" = EXCLUDED."antecedentesFamiliares",
-          "empresa1" = EXCLUDED."empresa1",
           "mdAntecedentes" = EXCLUDED."mdAntecedentes",
           "mdObsParaMiDocYa" = EXCLUDED."mdObsParaMiDocYa",
           "mdObservacionesCertificado" = EXCLUDED."mdObservacionesCertificado",
@@ -103,6 +90,9 @@ class HistoriaClinicaPostgresService {
           "atendido" = EXCLUDED."atendido",
           "pvEstado" = EXCLUDED."pvEstado",
           "medico" = EXCLUDED."medico",
+          "ciudad" = EXCLUDED."ciudad",
+          "examenes" = EXCLUDED."examenes",
+          "horaAtencion" = EXCLUDED."horaAtencion",
           "_updatedDate" = NOW()
         RETURNING "_id";
       `;
@@ -116,19 +106,10 @@ class HistoriaClinicaPostgresService {
         data.segundoApellido || null,
         data.celular,
         data.email || null,
-        data.fechaNacimiento || null,
-        data.edad || null,
-        data.genero || null,
-        data.estadoCivil || null,
-        data.hijos || null,
-        data.ejercicio || null,
         data.codEmpresa || null,
         data.empresa || null,
         data.cargo || null,
         data.tipoExamen || null,
-        data.encuestaSalud || null,
-        data.antecedentesFamiliares || null,
-        data.empresa1 || null,
         data.mdAntecedentes || null,
         data.mdObsParaMiDocYa || null,
         data.mdObservacionesCertificado || null,
@@ -146,6 +127,9 @@ class HistoriaClinicaPostgresService {
         data.atendido || null,
         data.pvEstado || null,
         data.medico || null,
+        data.ciudad || null,
+        data.examenes || null,
+        data.horaAtencion || null,
       ];
 
       const result = await postgresService.query(query, params);
