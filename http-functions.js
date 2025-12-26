@@ -19,6 +19,7 @@ import { obtenerFormularios, actualizarFormulario, obtenerFormularioPorIdGeneral
 import { obtenerAudiometrias, actualizarAudiometria, crearAudiometria } from 'backend/exposeDataBase';
 import { obtenerVisuales, actualizarVisual, crearVisual } from 'backend/exposeDataBase';
 import { obtenerAdcTests, actualizarAdcTest, crearAdcTest } from 'backend/exposeDataBase';
+import { obtenerEstadisticasConsultas, buscarPacientesMediData, obtenerDatosCompletosPaciente } from 'backend/exposeDataBase';
 import {
   obtenerEstadisticasMedico,
   obtenerPacientesPendientes,
@@ -26,11 +27,13 @@ import {
   marcarPacienteNoContesta,
   obtenerDetallesPaciente,
   obtenerTodosProgramadosHoy,
-  actualizarHistoriaClinica,
   obtenerDatosFormularioPorHistoriaId,
   obtenerDatosCompletosParaFormulario,
-  obtenerHistoriaClinica
+  obtenerHistoriaClinica,
+  actualizarHistoriaClinica
 } from 'backend/integracionPanelMedico';
+import { handleWhatsAppButtonClick, generateSuccessPage, generateErrorPage } from 'backend/twilioWhatsApp';
+import { enviarPreguntasTrasRespuesta } from 'backend/automaticWhp';
 
 import { callOpenAI } from 'backend/open-ai';
 import { consultarCita } from 'backend/consultaHistoriaClinicaBot';
@@ -458,7 +461,7 @@ export async function post_guardarConversacion(request) {
     }
 
     try {
-        const { userId, nombre, mensajes = [], threadId, ultimoMensajeBot } = body;
+        const { userId, nombre, mensajes = [], threadId, ultimoMensajeBot, stopBot } = body;
 
         if (!Array.isArray(mensajes) || !userId) {
             return {
@@ -500,36 +503,19 @@ export async function post_guardarConversacion(request) {
             item.ultimoMensajeBot = ultimoMensajeBot;
         }
 
-        if (previo._id) {
-            await wixData.update("WHP", item);
-        } else {
-            await wixData.insert("WHP", item);
+        // ✅ NUEVO: Manejar el campo stopBot
+        if (stopBot !== undefined) {
+            item.stopBot = stopBot;
+            console.log(`📌 Campo stopBot actualizado a: ${stopBot} para userId: ${userId}`);
         }
 
-        // --- REENVIAR A OPENAI DESDE WIX DESPUÉS DE GUARDAR ---
-        // Si tienes threadId y hay mensajes nuevos:
-        if (threadId && nuevosFiltrados.length > 0) {
-            // Por cada mensaje nuevo, llama a tu backend Flask
-            for (const msg of nuevosFiltrados) {
-                try {
-                    await fetch("https://agentes-bot-bsl-vf9hm.ondigitalocean.app//reenviar_a_openai", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                                role: msg.from, // Puede ser "usuario", "sistema", "admin", "wix"
-                                mensaje: msg.mensaje,
-                                thread_id: threadId
-                            })
-                        })
-                        .then(response => response.json())
-                        .then(res => console.log("Mensaje reenviado a OpenAI:", res))
-                        .catch(err => console.error("❌ Error reenviando a OpenAI:", err));
-                } catch (e) {
-                    console.error("❌ Error en fetch a Flask para OpenAI:", e);
-                }
-            }
+        if (previo._id) {
+            await wixData.update("WHP", item);
+            console.log(`✅ Conversación actualizada en WHP para userId: ${userId}`);
+        } else {
+            await wixData.insert("WHP", item);
+            console.log(`✅ Nueva conversación creada en WHP para userId: ${userId}`);
         }
-        // ------------------------------------------------------
 
         return {
             status: 200,
@@ -612,6 +598,12 @@ export async function post_actualizarObservaciones(request) {
         const item = result.items[0];
         item.observaciones = observaciones;
 
+        // ✅ NUEVO: Si observaciones contiene "stop", marcar stopBot = true
+        if (observaciones.toLowerCase().includes("stop")) {
+            item.stopBot = true;
+            console.log(`🛑 stopBot marcado como true para userId: ${userId}`);
+        }
+
         const actualizado = await wixData.update("WHP", item);
 
         console.log(`✅ Observación actualizada | userId: ${userId} | observaciones: ${observaciones}`);
@@ -641,8 +633,11 @@ export async function post_marcarPagado(request) {
         item.pvEstado = observaciones;
 
         const actualizado = await wixData.update("HistoriaClinica", item);
+//ESTA LÍNEA VA A CAMBIAR DESDE EL BOT.V3 POR SI LLEGA A FALLAR EL MEDIDATA PANEL
+        //return ok({ body: { success: true } });
+                return ok({ body: { success: true, _id: item._id } });
 
-        return ok({ body: { success: true } });
+        
 
     } catch (e) {
         console.error("❌ Error en guardarObservacion:", e);
@@ -760,7 +755,7 @@ export async function post_eliminarConversacion(request) {
 
 const BOT_NUMBER = "573008021701";
 
-export function post_handleInput(request) {
+export function post_handleInput1(request) {
     return request.body.json()
         .then(async (body) => {
             if (body && body.statuses && Array.isArray(body.statuses)) {
@@ -1658,6 +1653,44 @@ export function get_historiaClinicaPorId(request) {
     });
 }
 
+// ENDPOINT PARA BUSCAR HISTORIA CLÍNICA POR NUMERO DE IDENTIFICACION
+export function get_historiaClinicaPorNumeroId(request) {
+    console.log("Buscando información de HistoriaClinica por numeroId");
+
+    const { numeroId } = request.query;
+
+    if (!numeroId) {
+        return badRequest({ body: { message: "Falta el parámetro 'numeroId'" } });
+    }
+
+    return wixData.query("HistoriaClinica")
+        .eq("numeroId", numeroId)
+        .descending("fechaConsulta")  // Obtener el más reciente primero
+        .find()
+        .then(result => {
+            if (!result.items || result.items.length === 0) {
+                return notFound({
+                    body: { message: "No se encontró información para el paciente con ese número de identificación" }
+                });
+            }
+
+            // Retornar el más reciente (primero en la lista)
+            const item = result.items[0];
+
+            return ok({
+                headers: { "Content-Type": "application/json" },
+                body: {
+                    _id: item._id,
+                    data: item
+                }
+            });
+        })
+        .catch(error => {
+            console.error("Error al obtener información por numeroId:", error);
+            return serverError({ body: { message: "Error al obtener la información" } });
+        });
+}
+
 // ENDPOINT PARA ACTUALIZAR HISTORIA CLÍNICA
 export async function post_actualizarHistoriaClinica(request) {
     try {
@@ -2213,6 +2246,12 @@ export async function post_updateHistoriaClinica(request) {
     const body = await request.body.json();
     const { historiaId, ...datos } = body;
 
+    console.log("🌐 [HTTP ENDPOINT] Recibiendo request updateHistoriaClinica:", {
+      historiaId,
+      datosCampos: Object.keys(datos),
+      atendido: datos.atendido
+    });
+
     if (!historiaId) {
       return badRequest({
         headers: {
@@ -2222,6 +2261,11 @@ export async function post_updateHistoriaClinica(request) {
         body: { success: false, error: "El parámetro 'historiaId' es requerido" }
       });
     }
+
+    console.log("🌐 [HTTP ENDPOINT] Llamando a actualizarHistoriaClinica con:", {
+      historiaId,
+      datosTipo: typeof datos
+    });
 
     const resultado = await actualizarHistoriaClinica(historiaId, datos);
 
@@ -2252,5 +2296,382 @@ export async function post_updateHistoriaClinica(request) {
       body: { success: false, error: error.message }
     });
   }
+}
+
+
+
+/**
+ * GET: Obtener estadísticas de consultas por rango de fechas
+ * URL: /_functions/estadisticasConsultas?fechaInicio=2025-01-01&fechaFin=2025-12-31
+ */
+export async function get_estadisticasConsultas(request) {
+  const { fechaInicio, fechaFin } = request.query;
+
+  if (!fechaInicio || !fechaFin) {
+    return badRequest({
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*"
+      },
+      body: { error: "Los parámetros 'fechaInicio' y 'fechaFin' son requeridos (formato: YYYY-MM-DD)" }
+    });
+  }
+
+  try {
+    const resultado = await obtenerEstadisticasConsultas(fechaInicio, fechaFin);
+
+    if (resultado.success) {
+      return ok({
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*"
+        },
+        body: {
+          success: true,
+          total: resultado.total,
+          conteosPorFecha: resultado.conteosPorFecha
+        }
+      });
+    } else {
+      return serverError({
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*"
+        },
+        body: { success: false, error: resultado.error }
+      });
+    }
+  } catch (error) {
+    console.error("Error en get_estadisticasConsultas:", error);
+    return serverError({
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*"
+      },
+      body: { success: false, error: error.message }
+    });
+  }
+}
+
+/**
+ * OPTIONS: CORS preflight para estadisticasConsultas
+ */
+export function options_estadisticasConsultas(request) {
+  return {
+    status: 200,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization"
+    },
+    body: {}
+  };
+}
+
+// ============================================
+// MEDIDATA - BÚSQUEDA Y EDICIÓN DE PACIENTES
+// ============================================
+
+/**
+ * GET: Buscar pacientes en HistoriaClinica por numeroId, celular o apellido
+ * URL: /medidata-buscar?termino=12345
+ */
+export async function get_medidataBuscar(request) {
+    const { termino } = request.query;
+
+    if (!termino) {
+        return badRequest({
+            headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+            body: { error: "El parámetro 'termino' es requerido" }
+        });
+    }
+
+    try {
+        const resultado = await buscarPacientesMediData(termino);
+
+        if (resultado.success) {
+            return ok({
+                headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+                body: resultado
+            });
+        } else {
+            return serverError({
+                headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+                body: { error: resultado.error }
+            });
+        }
+    } catch (error) {
+        console.error("Error en medidata-buscar:", error);
+        return serverError({
+            headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+            body: { error: error.message }
+        });
+    }
+}
+
+/**
+ * GET: Obtener datos completos de un paciente (HistoriaClinica + Formulario)
+ * URL: /medidata-paciente?historiaId=xxx
+ */
+export async function get_medidataPaciente(request) {
+    const { historiaId } = request.query;
+
+    if (!historiaId) {
+        return badRequest({
+            headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+            body: { error: "El parámetro 'historiaId' es requerido" }
+        });
+    }
+
+    try {
+        const resultado = await obtenerDatosCompletosPaciente(historiaId);
+
+        if (resultado.success) {
+            return ok({
+                headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+                body: resultado
+            });
+        } else {
+            return serverError({
+                headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+                body: { error: resultado.error }
+            });
+        }
+    } catch (error) {
+        console.error("Error en medidata-paciente:", error);
+        return serverError({
+            headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+            body: { error: error.message }
+        });
+    }
+}
+
+/**
+ * POST: Actualizar datos de HistoriaClinica
+ * URL: /medidata-actualizar-historia
+ */
+export async function post_medidataActualizarHistoria(request) {
+    try {
+        const body = await request.body.json();
+        const { _id, ...datos } = body;
+
+        if (!_id) {
+            return badRequest({
+                headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+                body: { error: "El parámetro '_id' es requerido" }
+            });
+        }
+
+        const resultado = await actualizarHistoriaClinica(_id, datos);
+
+        if (resultado.success) {
+            return ok({
+                headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+                body: resultado
+            });
+        } else {
+            return serverError({
+                headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+                body: { error: resultado.error }
+            });
+        }
+    } catch (error) {
+        console.error("Error en medidata-actualizar-historia:", error);
+        return serverError({
+            headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+            body: { error: error.message }
+        });
+    }
+}
+
+/**
+ * POST: Actualizar datos de Formulario
+ * URL: /medidata-actualizar-formulario
+ */
+export async function post_medidataActualizarFormulario(request) {
+    try {
+        const body = await request.body.json();
+        const { _id, ...datos } = body;
+
+        if (!_id) {
+            return badRequest({
+                headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+                body: { error: "El parámetro '_id' es requerido" }
+            });
+        }
+
+        const resultado = await actualizarFormulario(_id, datos);
+
+        if (resultado.success) {
+            return ok({
+                headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+                body: resultado
+            });
+        } else {
+            return serverError({
+                headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+                body: { error: resultado.error }
+            });
+        }
+    } catch (error) {
+        console.error("Error en medidata-actualizar-formulario:", error);
+        return serverError({
+            headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+            body: { error: error.message }
+        });
+    }
+}
+
+// NOTA: Wix maneja automáticamente las peticiones OPTIONS y los headers CORS
+// No es necesario definir funciones options_ manualmente
+// Los endpoints GET y POST ya incluyen access-control-allow-origin: *
+/**
+ * API endpoint para procesar clics en botones de WhatsApp
+ * Retorna JSON para ser consumido desde una página frontend
+ * URL: https://www.bsl.com.co/_functions/handleWhatsAppButton?phone=3008021701
+ */
+export async function get_handleWhatsAppButton(request) {
+    console.log("[API handleWhatsAppButton] Iniciando endpoint...");
+
+    try {
+        const query = request.query || {};
+        let phoneNumber = query.phone || query.celular || query.number;
+
+        console.log(`[API handleWhatsAppButton] Query params:`, JSON.stringify(query));
+        console.log(`[API handleWhatsAppButton] Número extraído: ${phoneNumber}`);
+
+        if (!phoneNumber) {
+            console.log(`[API handleWhatsAppButton] ❌ No se proporcionó número`);
+            return ok({
+                headers: {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*"
+                },
+                body: {
+                    success: false,
+                    message: "Parámetro 'phone' faltante"
+                }
+            });
+        }
+
+        phoneNumber = phoneNumber.replace(/\D/g, '').replace(/^57/, '');
+        console.log(`[API handleWhatsAppButton] Número limpio: ${phoneNumber}`);
+
+        console.log(`[API handleWhatsAppButton] Llamando handleWhatsAppButtonClick...`);
+        const result = await handleWhatsAppButtonClick(phoneNumber);
+
+        console.log(`[API handleWhatsAppButton] Resultado:`, JSON.stringify(result));
+
+        return ok({
+            headers: {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*"
+            },
+            body: result
+        });
+
+    } catch (err) {
+        console.error(`❌ Error en handleWhatsAppButton:`, err);
+        console.error(`Stack trace:`, err.stack);
+        console.error(`Error message:`, err.message);
+
+        return ok({
+            headers: {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*"
+            },
+            body: {
+                success: false,
+                message: `Error: ${err.message || 'Error desconocido'}`
+            }
+        });
+    }
+}
+
+/**
+ * Webhook de Twilio para recibir respuestas de WhatsApp
+ * Cuando un paciente responde al template inicial, este endpoint se dispara
+ * y envía las preguntas médicas personalizadas que fueron generadas previamente
+ * URL: https://www.bsl.com.co/_functions/twilioWhatsAppWebhook
+ */
+export async function post_twilioWhatsAppWebhook(request) {
+    console.log("[Twilio Webhook] Recibiendo respuesta de WhatsApp...");
+
+    try {
+        // Obtener el cuerpo de la petición
+        const body = await request.body.text();
+        const params = new URLSearchParams(body);
+
+        // Extraer el número del remitente (formato: whatsapp:+573008021701)
+        const fromNumber = params.get('From');
+        const messageBody = params.get('Body');
+        const messageSid = params.get('MessageSid');
+        const smsStatus = params.get('SmsStatus');
+
+        console.log(`[Twilio Webhook] Mensaje recibido de: ${fromNumber}`);
+        console.log(`[Twilio Webhook] Contenido: ${messageBody}`);
+        console.log(`[Twilio Webhook] SID: ${messageSid}`);
+        console.log(`[Twilio Webhook] Estado: ${smsStatus}`);
+
+        // Ignorar mensajes que no son entrantes del usuario
+        // SmsStatus puede ser: queued, sending, sent, delivered, undelivered, failed
+        // Solo procesar cuando SmsStatus está vacío o es "received" (mensaje entrante)
+        if (smsStatus && smsStatus !== 'received') {
+            console.log(`[Twilio Webhook] Ignorando evento de estado: ${smsStatus}`);
+            return ok({
+                headers: {
+                    "Content-Type": "text/xml"
+                },
+                body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response></Response>"
+            });
+        }
+
+        // Limpiar el número para buscar en la base de datos
+        const cleanNumber = fromNumber.replace(/\D/g, '').replace(/^57/, '').replace(/^whatsapp:\+/, '');
+        console.log(`[Twilio Webhook] Número limpio: ${cleanNumber}`);
+
+        // Verificar si el paciente tiene preguntas pendientes de enviar
+        const chatbotResults = await wixData.query('CHATBOT')
+            .eq('celular', cleanNumber)
+            .eq('estadoPreguntas', 'pendiente_respuesta')
+            .find();
+
+        if (chatbotResults.items.length === 0) {
+            console.log(`[Twilio Webhook] No hay preguntas pendientes para ${cleanNumber}. Ignorando mensaje.`);
+            return ok({
+                headers: {
+                    "Content-Type": "text/xml"
+                },
+                body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response></Response>"
+            });
+        }
+
+        console.log(`[Twilio Webhook] Paciente con preguntas pendientes encontrado. Enviando preguntas...`);
+
+        // Llamar a la función que envía las preguntas médicas SOLO si están pendientes
+        const result = await enviarPreguntasTrasRespuesta(fromNumber);
+
+        console.log(`[Twilio Webhook] Resultado:`, JSON.stringify(result));
+
+        // Responder con TwiML vacío (Twilio requiere respuesta XML)
+        return ok({
+            headers: {
+                "Content-Type": "text/xml"
+            },
+            body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response></Response>"
+        });
+
+    } catch (err) {
+        console.error(`[Twilio Webhook] Error:`, err);
+        console.error(`[Twilio Webhook] Stack trace:`, err.stack);
+
+        // Incluso en caso de error, devolver respuesta XML válida para Twilio
+        return ok({
+            headers: {
+                "Content-Type": "text/xml"
+            },
+            body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response></Response>"
+        });
+    }
 }
 

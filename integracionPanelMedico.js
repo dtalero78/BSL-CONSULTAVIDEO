@@ -116,7 +116,14 @@ export async function actualizarHistoriaClinica(historiaId, datos) {
             return { success: false, error: "No se encontró historia clínica con ese ID" };
         }
 
-        // Actualizar campos del formulario médico
+        console.log("🔵 PASO 1: Item ANTES de actualizar:", {
+            _id: item._id,
+            numeroId: item.numeroId,
+            fechaAtencion: item.fechaAtencion,
+            fechaConsulta: item.fechaConsulta
+        });
+
+        // Actualizar SOLO campos del formulario médico (NO tocar fechaAtencion)
         if (datos.talla !== undefined) item.talla = datos.talla;
         if (datos.peso !== undefined) item.peso = datos.peso;
         if (datos.mdAntecedentes !== undefined) item.mdAntecedentes = datos.mdAntecedentes;
@@ -131,9 +138,10 @@ export async function actualizarHistoriaClinica(historiaId, datos) {
         // Marcar como atendido
         item.atendido = "ATENDIDO";
 
-        console.log("🔵 PASO 1: Guardando datos médicos principales");
+        console.log("🟢 PASO 2: Guardando datos médicos (preservando fechaAtencion)");
 
         // PASO PRINCIPAL: Guardar datos médicos (ESTE DEBE SIEMPRE FUNCIONAR)
+        // IMPORTANTE: wixData.update() preserva automáticamente los campos que no se modifican
         itemGuardado = await wixData.update("HistoriaClinica", item);
 
         console.log("✅ PASO 2: Datos médicos guardados exitosamente");

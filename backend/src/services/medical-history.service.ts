@@ -5,6 +5,7 @@ import postgresService from './postgres.service';
 interface MedicalHistoryData {
   // Datos del paciente
   _id?: string;
+  historiaId?: string; // Alias de _id para compatibilidad con frontend
   numeroId: string;
   primerNombre: string;
   segundoNombre?: string;
@@ -87,6 +88,7 @@ class MedicalHistoryService {
         console.log(`✅ [PostgreSQL] Historia clínica encontrada para ${historiaId}`);
         return {
           _id: row._id,
+          historiaId: row._id, // Alias para compatibilidad con frontend
           numeroId: row.numeroId,
           primerNombre: row.primerNombre,
           segundoNombre: row.segundoNombre,
