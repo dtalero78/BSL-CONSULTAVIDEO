@@ -2,6 +2,47 @@ import axios from 'axios';
 import historiaClinicaPostgresService from './historia-clinica-postgres.service';
 import postgresService from './postgres.service';
 
+interface AntecedentesPersonales {
+  cirugiaOcular?: boolean;
+  cirugiaProgramada?: boolean;
+  condicionMedica?: boolean;
+  dolorCabeza?: boolean;
+  dolorEspalda?: boolean;
+  embarazo?: boolean;
+  enfermedadHigado?: boolean;
+  enfermedadPulmonar?: boolean;
+  fuma?: boolean;
+  consumoLicor?: boolean;
+  hernias?: boolean;
+  hormigueos?: boolean;
+  presionAlta?: boolean;
+  problemasAzucar?: boolean;
+  problemasCardiacos?: boolean;
+  problemasSueno?: boolean;
+  usaAnteojos?: boolean;
+  usaLentesContacto?: boolean;
+  varices?: boolean;
+  hepatitis?: boolean;
+  trastornoPsicologico?: boolean;
+  sintomasPsicologicos?: boolean;
+  diagnosticoCancer?: boolean;
+  enfermedadesLaborales?: boolean;
+  enfermedadOsteomuscular?: boolean;
+  enfermedadAutoinmune?: boolean;
+  ruidoJaqueca?: boolean;
+}
+
+interface AntecedentesFamiliares {
+  hereditarias?: boolean;
+  geneticas?: boolean;
+  diabetes?: boolean;
+  hipertension?: boolean;
+  infartos?: boolean;
+  cancer?: boolean;
+  trastornos?: boolean;
+  infecciosas?: boolean;
+}
+
 interface MedicalHistoryData {
   // Datos del paciente
   _id?: string;
@@ -30,6 +71,10 @@ interface MedicalHistoryData {
   encuestaSalud?: string;
   antecedentesFamiliares?: string;
   empresa1?: string;
+
+  // Antecedentes médicos del formulario
+  antecedentesPersonales?: AntecedentesPersonales;
+  antecedentesFamiliaresDetalle?: AntecedentesFamiliares;
 
   // Campos médicos editables
   mdAntecedentes?: string;
@@ -78,7 +123,7 @@ class MedicalHistoryService {
     try {
       console.log(`📋 Obteniendo historia clínica para ID: ${historiaId}`);
 
-      // PASO 1: Intentar obtener de PostgreSQL con JOIN a formularios para datos demográficos
+      // PASO 1: Intentar obtener de PostgreSQL con JOIN a formularios para datos demográficos y antecedentes
       const pgResult = await postgresService.query(
         `SELECT
           h.*,
@@ -88,7 +133,44 @@ class MedicalHistoryService {
           f.estado_civil as f_estado_civil,
           f.hijos as f_hijos,
           f.ejercicio as f_ejercicio,
-          f.foto_url as f_foto
+          f.foto_url as f_foto,
+          -- Antecedentes personales
+          f.cirugia_ocular,
+          f.cirugia_programada,
+          f.condicion_medica,
+          f.dolor_cabeza,
+          f.dolor_espalda,
+          f.embarazo,
+          f.enfermedad_higado,
+          f.enfermedad_pulmonar,
+          f.fuma,
+          f.consumo_licor,
+          f.hernias,
+          f.hormigueos,
+          f.presion_alta,
+          f.problemas_azucar,
+          f.problemas_cardiacos,
+          f.problemas_sueno,
+          f.usa_anteojos,
+          f.usa_lentes_contacto,
+          f.varices,
+          f.hepatitis,
+          f.trastorno_psicologico,
+          f.sintomas_psicologicos,
+          f.diagnostico_cancer,
+          f.enfermedades_laborales,
+          f.enfermedad_osteomuscular,
+          f.enfermedad_autoinmune,
+          f.ruido_jaqueca,
+          -- Antecedentes familiares
+          f.familia_hereditarias,
+          f.familia_geneticas,
+          f.familia_diabetes,
+          f.familia_hipertension,
+          f.familia_infartos,
+          f.familia_cancer,
+          f.familia_trastornos,
+          f.familia_infecciosas
         FROM "HistoriaClinica" h
         LEFT JOIN formularios f ON h."numeroId" = f.numero_id
         WHERE h."_id" = $1
@@ -121,6 +203,47 @@ class MedicalHistoryService {
           codEmpresa: row.codEmpresa,
           cargo: row.cargo,
           tipoExamen: row.tipoExamen,
+          // Antecedentes personales (de formularios)
+          antecedentesPersonales: {
+            cirugiaOcular: row.cirugia_ocular === true || row.cirugia_ocular === 'true' || row.cirugia_ocular === 'Sí',
+            cirugiaProgramada: row.cirugia_programada === true || row.cirugia_programada === 'true' || row.cirugia_programada === 'Sí',
+            condicionMedica: row.condicion_medica === true || row.condicion_medica === 'true' || row.condicion_medica === 'Sí',
+            dolorCabeza: row.dolor_cabeza === true || row.dolor_cabeza === 'true' || row.dolor_cabeza === 'Sí',
+            dolorEspalda: row.dolor_espalda === true || row.dolor_espalda === 'true' || row.dolor_espalda === 'Sí',
+            embarazo: row.embarazo === true || row.embarazo === 'true' || row.embarazo === 'Sí',
+            enfermedadHigado: row.enfermedad_higado === true || row.enfermedad_higado === 'true' || row.enfermedad_higado === 'Sí',
+            enfermedadPulmonar: row.enfermedad_pulmonar === true || row.enfermedad_pulmonar === 'true' || row.enfermedad_pulmonar === 'Sí',
+            fuma: row.fuma === true || row.fuma === 'true' || row.fuma === 'Sí',
+            consumoLicor: row.consumo_licor === true || row.consumo_licor === 'true' || row.consumo_licor === 'Sí',
+            hernias: row.hernias === true || row.hernias === 'true' || row.hernias === 'Sí',
+            hormigueos: row.hormigueos === true || row.hormigueos === 'true' || row.hormigueos === 'Sí',
+            presionAlta: row.presion_alta === true || row.presion_alta === 'true' || row.presion_alta === 'Sí',
+            problemasAzucar: row.problemas_azucar === true || row.problemas_azucar === 'true' || row.problemas_azucar === 'Sí',
+            problemasCardiacos: row.problemas_cardiacos === true || row.problemas_cardiacos === 'true' || row.problemas_cardiacos === 'Sí',
+            problemasSueno: row.problemas_sueno === true || row.problemas_sueno === 'true' || row.problemas_sueno === 'Sí',
+            usaAnteojos: row.usa_anteojos === true || row.usa_anteojos === 'true' || row.usa_anteojos === 'Sí',
+            usaLentesContacto: row.usa_lentes_contacto === true || row.usa_lentes_contacto === 'true' || row.usa_lentes_contacto === 'Sí',
+            varices: row.varices === true || row.varices === 'true' || row.varices === 'Sí',
+            hepatitis: row.hepatitis === true || row.hepatitis === 'true' || row.hepatitis === 'Sí',
+            trastornoPsicologico: row.trastorno_psicologico === true || row.trastorno_psicologico === 'true' || row.trastorno_psicologico === 'Sí',
+            sintomasPsicologicos: row.sintomas_psicologicos === true || row.sintomas_psicologicos === 'true' || row.sintomas_psicologicos === 'Sí',
+            diagnosticoCancer: row.diagnostico_cancer === true || row.diagnostico_cancer === 'true' || row.diagnostico_cancer === 'Sí',
+            enfermedadesLaborales: row.enfermedades_laborales === true || row.enfermedades_laborales === 'true' || row.enfermedades_laborales === 'Sí',
+            enfermedadOsteomuscular: row.enfermedad_osteomuscular === true || row.enfermedad_osteomuscular === 'true' || row.enfermedad_osteomuscular === 'Sí',
+            enfermedadAutoinmune: row.enfermedad_autoinmune === true || row.enfermedad_autoinmune === 'true' || row.enfermedad_autoinmune === 'Sí',
+            ruidoJaqueca: row.ruido_jaqueca === true || row.ruido_jaqueca === 'true' || row.ruido_jaqueca === 'Sí',
+          },
+          // Antecedentes familiares (de formularios)
+          antecedentesFamiliaresDetalle: {
+            hereditarias: row.familia_hereditarias === true || row.familia_hereditarias === 'true' || row.familia_hereditarias === 'Sí',
+            geneticas: row.familia_geneticas === true || row.familia_geneticas === 'true' || row.familia_geneticas === 'Sí',
+            diabetes: row.familia_diabetes === true || row.familia_diabetes === 'true' || row.familia_diabetes === 'Sí',
+            hipertension: row.familia_hipertension === true || row.familia_hipertension === 'true' || row.familia_hipertension === 'Sí',
+            infartos: row.familia_infartos === true || row.familia_infartos === 'true' || row.familia_infartos === 'Sí',
+            cancer: row.familia_cancer === true || row.familia_cancer === 'true' || row.familia_cancer === 'Sí',
+            trastornos: row.familia_trastornos === true || row.familia_trastornos === 'true' || row.familia_trastornos === 'Sí',
+            infecciosas: row.familia_infecciosas === true || row.familia_infecciosas === 'true' || row.familia_infecciosas === 'Sí',
+          },
           // Campos médicos
           mdAntecedentes: row.mdAntecedentes,
           mdObsParaMiDocYa: row.mdObsParaMiDocYa,
