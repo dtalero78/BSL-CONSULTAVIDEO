@@ -80,12 +80,13 @@ class MedicalPanelService {
         [medicoCode, startOfDay, endOfDay]
       );
 
-      // Query para atendidos hoy
+      // Query para atendidos hoy (programados hoy que ya tienen fechaConsulta)
       const atendidosResult = await postgresService.query(
         `SELECT COUNT(*) as count FROM "HistoriaClinica"
          WHERE "medico" = $1
-         AND "fechaConsulta" >= $2
-         AND "fechaConsulta" <= $3`,
+         AND "fechaAtencion" >= $2
+         AND "fechaAtencion" <= $3
+         AND "fechaConsulta" IS NOT NULL`,
         [medicoCode, startOfDay, endOfDay]
       );
 
