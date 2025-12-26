@@ -19,6 +19,7 @@ interface MedicalHistoryData {
   estadoCivil?: string;
   hijos?: string;
   ejercicio?: string;
+  foto?: string;
 
   // Datos de la empresa
   codEmpresa?: string;
@@ -77,9 +78,22 @@ class MedicalHistoryService {
     try {
       console.log(`📋 Obteniendo historia clínica para ID: ${historiaId}`);
 
-      // PASO 1: Intentar obtener de PostgreSQL (fuente principal)
+      // PASO 1: Intentar obtener de PostgreSQL con JOIN a formularios para datos demográficos
       const pgResult = await postgresService.query(
-        `SELECT * FROM "HistoriaClinica" WHERE "_id" = $1`,
+        `SELECT
+          h.*,
+          f.edad as f_edad,
+          f.genero as f_genero,
+          f.email as f_email,
+          f.estado_civil as f_estado_civil,
+          f.hijos as f_hijos,
+          f.ejercicio as f_ejercicio,
+          f.foto_url as f_foto
+        FROM "HistoriaClinica" h
+        LEFT JOIN formularios f ON h."numeroId" = f.numero_id
+        WHERE h."_id" = $1
+        ORDER BY f.fecha_registro DESC
+        LIMIT 1`,
         [historiaId]
       );
 
@@ -95,10 +109,19 @@ class MedicalHistoryService {
           primerApellido: row.primerApellido,
           segundoApellido: row.segundoApellido,
           celular: row.celular,
-          email: row.email,
+          // Datos demográficos desde formularios (con fallback a HistoriaClinica)
+          email: row.f_email || row.email,
+          edad: row.f_edad,
+          genero: row.f_genero,
+          estadoCivil: row.f_estado_civil,
+          hijos: row.f_hijos?.toString(),
+          ejercicio: row.f_ejercicio,
+          foto: row.f_foto,
+          // Datos de empresa
           codEmpresa: row.codEmpresa,
           cargo: row.cargo,
           tipoExamen: row.tipoExamen,
+          // Campos médicos
           mdAntecedentes: row.mdAntecedentes,
           mdObsParaMiDocYa: row.mdObsParaMiDocYa,
           mdObservacionesCertificado: row.mdObservacionesCertificado,
