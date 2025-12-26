@@ -331,8 +331,10 @@ class VideoController {
   async updateMedicalHistory(req: Request, res: Response): Promise<void> {
     try {
       const payload = req.body;
+      console.log('📥 [updateMedicalHistory] Payload recibido:', JSON.stringify(payload, null, 2));
 
       if (!payload.historiaId) {
+        console.error('❌ [updateMedicalHistory] historiaId no encontrado en payload');
         res.status(400).json({ error: 'historiaId is required' });
         return;
       }
