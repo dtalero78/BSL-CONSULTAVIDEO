@@ -1,8 +1,10 @@
 import axios from 'axios';
 import historiaClinicaPostgresService from './historia-clinica-postgres.service';
+import postgresService from './postgres.service';
 
 interface MedicalHistoryData {
   // Datos del paciente
+  _id?: string;
   numeroId: string;
   primerNombre: string;
   segundoNombre?: string;
@@ -42,6 +44,7 @@ interface MedicalHistoryData {
   fechaAtencion?: Date;
   fechaConsulta?: Date;
   atendido?: string;
+  medico?: string;
 }
 
 interface UpdateMedicalHistoryPayload {
@@ -66,18 +69,58 @@ class MedicalHistoryService {
   }
 
   /**
-   * Obtiene la historia clínica de un paciente desde Wix por _id
+   * Obtiene la historia clínica de un paciente desde PostgreSQL (principal)
+   * Si no existe en PostgreSQL, intenta obtener de Wix como fallback
    */
   async getMedicalHistory(historiaId: string): Promise<MedicalHistoryData | null> {
     try {
       console.log(`📋 Obteniendo historia clínica para ID: ${historiaId}`);
 
+      // PASO 1: Intentar obtener de PostgreSQL (fuente principal)
+      const pgResult = await postgresService.query(
+        `SELECT * FROM "HistoriaClinica" WHERE "_id" = $1`,
+        [historiaId]
+      );
+
+      if (pgResult && pgResult.length > 0) {
+        const row = pgResult[0];
+        console.log(`✅ [PostgreSQL] Historia clínica encontrada para ${historiaId}`);
+        return {
+          _id: row._id,
+          numeroId: row.numeroId,
+          primerNombre: row.primerNombre,
+          segundoNombre: row.segundoNombre,
+          primerApellido: row.primerApellido,
+          segundoApellido: row.segundoApellido,
+          celular: row.celular,
+          email: row.email,
+          codEmpresa: row.codEmpresa,
+          cargo: row.cargo,
+          tipoExamen: row.tipoExamen,
+          mdAntecedentes: row.mdAntecedentes,
+          mdObsParaMiDocYa: row.mdObsParaMiDocYa,
+          mdObservacionesCertificado: row.mdObservacionesCertificado,
+          mdRecomendacionesMedicasAdicionales: row.mdRecomendacionesMedicasAdicionales,
+          mdConceptoFinal: row.mdConceptoFinal,
+          mdDx1: row.mdDx1,
+          mdDx2: row.mdDx2,
+          talla: row.talla,
+          peso: row.peso,
+          fechaAtencion: row.fechaAtencion,
+          fechaConsulta: row.fechaConsulta,
+          atendido: row.atendido,
+          medico: row.medico,
+        } as MedicalHistoryData;
+      }
+
+      // PASO 2: Fallback a Wix si no está en PostgreSQL
+      console.log(`⚠️  [PostgreSQL] No encontrado, intentando Wix para ${historiaId}`);
       const response = await axios.get(`${this.wixBaseUrl}/getHistoriaClinica`, {
         params: { historiaId: historiaId },
       });
 
       if (response.data && response.data.success && response.data.data) {
-        console.log(`✅ Historia clínica encontrada para ${historiaId}`);
+        console.log(`✅ [Wix] Historia clínica encontrada para ${historiaId}`);
         return response.data.data as MedicalHistoryData;
       }
 
@@ -90,46 +133,23 @@ class MedicalHistoryService {
   }
 
   /**
-   * Actualiza la historia clínica de un paciente en Wix Y PostgreSQL por _id
+   * Actualiza la historia clínica: PostgreSQL primero (principal), luego Wix (backup)
    */
   async updateMedicalHistory(payload: UpdateMedicalHistoryPayload): Promise<{ success: boolean; error?: string }> {
     try {
       console.log(`💾 Actualizando historia clínica para ID: ${payload.historiaId}`);
 
-      // PASO 0: Obtener datos base del paciente ANTES de actualizar (para PostgreSQL)
+      // PASO 0: Obtener datos base del paciente
       const historiaBase = await this.getMedicalHistory(payload.historiaId);
 
       if (!historiaBase) {
         return { success: false, error: 'No se encontró historia clínica' };
       }
 
-      // PASO 1: Actualizar en Wix (fuente principal)
-      const response = await axios.post(`${this.wixBaseUrl}/updateHistoriaClinica`, {
-        historiaId: payload.historiaId,
-        mdAntecedentes: payload.mdAntecedentes,
-        mdObsParaMiDocYa: payload.mdObsParaMiDocYa,
-        mdObservacionesCertificado: payload.mdObservacionesCertificado,
-        mdRecomendacionesMedicasAdicionales: payload.mdRecomendacionesMedicasAdicionales,
-        mdConceptoFinal: payload.mdConceptoFinal,
-        mdDx1: payload.mdDx1,
-        mdDx2: payload.mdDx2,
-        talla: payload.talla,
-        peso: payload.peso,
-        cargo: payload.cargo,
-        // NO enviamos fechaConsulta - Wix copiará _updatedDate después del update
-        atendido: 'ATENDIDO',
-      });
+      // PASO 1: Guardar en PostgreSQL PRIMERO (fuente principal - OBLIGATORIO)
+      console.log(`💾 [PostgreSQL] Guardando historia clínica ${payload.historiaId}...`);
 
-      if (!response.data || !response.data.success) {
-        console.warn(`⚠️  Respuesta inesperada al actualizar historia clínica: ${JSON.stringify(response.data)}`);
-        return { success: false, error: 'Respuesta inesperada del servidor' };
-      }
-
-      console.log(`✅ [Wix] Historia clínica actualizada exitosamente para ${payload.historiaId}`);
-
-      // PASO 2: Guardar en PostgreSQL INDEPENDIENTEMENTE de Wix
-      // PostgreSQL guarda los datos que el médico ingresó + fechaConsulta = NOW()
-      historiaClinicaPostgresService.upsert({
+      const pgSuccess = await historiaClinicaPostgresService.upsert({
         _id: payload.historiaId,
         // Datos base del paciente (no cambian)
         numeroId: historiaBase.numeroId,
@@ -142,6 +162,7 @@ class MedicalHistoryService {
         codEmpresa: historiaBase.codEmpresa,
         tipoExamen: historiaBase.tipoExamen,
         fechaAtencion: historiaBase.fechaAtencion,
+        medico: historiaBase.medico,
 
         // Datos médicos ingresados por el doctor (del payload)
         mdAntecedentes: payload.mdAntecedentes,
@@ -156,19 +177,52 @@ class MedicalHistoryService {
         cargo: payload.cargo,
 
         // Campos de estado
-        fechaConsulta: new Date(), // IMPORTANTE: PostgreSQL genera su propia fechaConsulta
+        fechaConsulta: new Date(),
         atendido: 'ATENDIDO',
-      }).catch((error) => {
-        // No fallar si PostgreSQL falla (Wix es la fuente principal)
-        console.error(`⚠️  [PostgreSQL] Error guardando historia clínica ${payload.historiaId}:`, error);
       });
+
+      if (!pgSuccess) {
+        console.error(`❌ [PostgreSQL] Error guardando historia clínica ${payload.historiaId}`);
+        return { success: false, error: 'Error guardando en PostgreSQL' };
+      }
+
+      console.log(`✅ [PostgreSQL] Historia clínica guardada exitosamente para ${payload.historiaId}`);
+
+      // PASO 2: Guardar en Wix como BACKUP (obligatorio pero no bloquea si falla)
+      console.log(`💾 [Wix] Guardando backup de historia clínica ${payload.historiaId}...`);
+
+      try {
+        const response = await axios.post(`${this.wixBaseUrl}/updateHistoriaClinica`, {
+          historiaId: payload.historiaId,
+          mdAntecedentes: payload.mdAntecedentes,
+          mdObsParaMiDocYa: payload.mdObsParaMiDocYa,
+          mdObservacionesCertificado: payload.mdObservacionesCertificado,
+          mdRecomendacionesMedicasAdicionales: payload.mdRecomendacionesMedicasAdicionales,
+          mdConceptoFinal: payload.mdConceptoFinal,
+          mdDx1: payload.mdDx1,
+          mdDx2: payload.mdDx2,
+          talla: payload.talla,
+          peso: payload.peso,
+          cargo: payload.cargo,
+          atendido: 'ATENDIDO',
+        });
+
+        if (response.data && response.data.success) {
+          console.log(`✅ [Wix] Backup guardado exitosamente para ${payload.historiaId}`);
+        } else {
+          console.warn(`⚠️  [Wix] Respuesta inesperada al guardar backup: ${JSON.stringify(response.data)}`);
+        }
+      } catch (wixError: any) {
+        // Log error pero no fallar - PostgreSQL ya tiene los datos
+        console.error(`⚠️  [Wix] Error guardando backup (no crítico): ${wixError.message}`);
+      }
 
       return { success: true };
     } catch (error: any) {
       console.error('❌ Error actualizando historia clínica:', error.message);
       return {
         success: false,
-        error: error.response?.data?.message || error.message || 'Error al actualizar historia clínica'
+        error: error.message || 'Error al actualizar historia clínica'
       };
     }
   }
