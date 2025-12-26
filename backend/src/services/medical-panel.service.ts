@@ -96,7 +96,7 @@ class MedicalPanelService {
          WHERE "medico" = $1
          AND "fechaAtencion" >= $2
          AND "fechaAtencion" <= $3
-         AND ("fechaConsulta" IS NULL OR "fechaConsulta" = '')`,
+         AND "fechaConsulta" IS NULL`,
         [medicoCode, startOfDay, endOfDay]
       );
 
