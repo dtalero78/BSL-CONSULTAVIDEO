@@ -1,6 +1,47 @@
 import { useState, useEffect } from 'react';
 import apiService from '../services/api.service';
 
+interface AntecedentesPersonales {
+  cirugiaOcular?: boolean;
+  cirugiaProgramada?: boolean;
+  condicionMedica?: boolean;
+  dolorCabeza?: boolean;
+  dolorEspalda?: boolean;
+  embarazo?: boolean;
+  enfermedadHigado?: boolean;
+  enfermedadPulmonar?: boolean;
+  fuma?: boolean;
+  consumoLicor?: boolean;
+  hernias?: boolean;
+  hormigueos?: boolean;
+  presionAlta?: boolean;
+  problemasAzucar?: boolean;
+  problemasCardiacos?: boolean;
+  problemasSueno?: boolean;
+  usaAnteojos?: boolean;
+  usaLentesContacto?: boolean;
+  varices?: boolean;
+  hepatitis?: boolean;
+  trastornoPsicologico?: boolean;
+  sintomasPsicologicos?: boolean;
+  diagnosticoCancer?: boolean;
+  enfermedadesLaborales?: boolean;
+  enfermedadOsteomuscular?: boolean;
+  enfermedadAutoinmune?: boolean;
+  ruidoJaqueca?: boolean;
+}
+
+interface AntecedentesFamiliares {
+  hereditarias?: boolean;
+  geneticas?: boolean;
+  diabetes?: boolean;
+  hipertension?: boolean;
+  infartos?: boolean;
+  cancer?: boolean;
+  trastornos?: boolean;
+  infecciosas?: boolean;
+}
+
 interface MedicalHistoryData {
   historiaId: string;
   numeroId: string;
@@ -22,6 +63,8 @@ interface MedicalHistoryData {
   encuestaSalud?: string;
   antecedentesFamiliares?: string;
   empresa1?: string;
+  antecedentesPersonales?: AntecedentesPersonales;
+  antecedentesFamiliaresDetalle?: AntecedentesFamiliares;
   mdAntecedentes?: string;
   mdObsParaMiDocYa?: string;
   mdObservacionesCertificado?: string;
@@ -116,6 +159,77 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones }: Med
     if (imcNum < 25) return 'Normal';
     if (imcNum < 30) return 'Sobrepeso';
     return 'Obesidad';
+  };
+
+  // Función para convertir camelCase a texto legible
+  const formatFieldName = (fieldName: string): string => {
+    const translations: { [key: string]: string } = {
+      // Antecedentes personales
+      cirugiaOcular: 'Cirugía Ocular',
+      cirugiaProgramada: 'Cirugía Programada',
+      condicionMedica: 'Condición Médica',
+      dolorCabeza: 'Dolor de Cabeza',
+      dolorEspalda: 'Dolor de Espalda',
+      embarazo: 'Embarazo',
+      enfermedadHigado: 'Enfermedad del Hígado',
+      enfermedadPulmonar: 'Enfermedad Pulmonar',
+      fuma: 'Fuma',
+      consumoLicor: 'Consumo de Licor',
+      hernias: 'Hernias',
+      hormigueos: 'Hormigueos',
+      presionAlta: 'Presión Alta',
+      problemasAzucar: 'Problemas de Azúcar',
+      problemasCardiacos: 'Problemas Cardíacos',
+      problemasSueno: 'Problemas de Sueño',
+      usaAnteojos: 'Usa Anteojos',
+      usaLentesContacto: 'Usa Lentes de Contacto',
+      varices: 'Várices',
+      hepatitis: 'Hepatitis',
+      trastornoPsicologico: 'Trastorno Psicológico',
+      sintomasPsicologicos: 'Síntomas Psicológicos',
+      diagnosticoCancer: 'Diagnóstico de Cáncer',
+      enfermedadesLaborales: 'Enfermedades Laborales',
+      enfermedadOsteomuscular: 'Enfermedad Osteomuscular',
+      enfermedadAutoinmune: 'Enfermedad Autoinmune',
+      ruidoJaqueca: 'Ruido/Jaqueca',
+      // Antecedentes familiares
+      hereditarias: 'Enfermedades Hereditarias',
+      geneticas: 'Enfermedades Genéticas',
+      diabetes: 'Diabetes',
+      hipertension: 'Hipertensión',
+      infartos: 'Infartos',
+      cancer: 'Cáncer',
+      trastornos: 'Trastornos',
+      infecciosas: 'Enfermedades Infecciosas',
+    };
+    return translations[fieldName] || fieldName;
+  };
+
+  // Función para obtener antecedentes positivos como array de strings
+  const getPositiveConditions = (): string[] => {
+    if (!data) return [];
+
+    const conditions: string[] = [];
+
+    // Agregar antecedentes personales positivos
+    if (data.antecedentesPersonales) {
+      Object.entries(data.antecedentesPersonales).forEach(([key, value]) => {
+        if (value === true) {
+          conditions.push(formatFieldName(key));
+        }
+      });
+    }
+
+    // Agregar antecedentes familiares positivos (con prefijo)
+    if (data.antecedentesFamiliaresDetalle) {
+      Object.entries(data.antecedentesFamiliaresDetalle).forEach(([key, value]) => {
+        if (value === true) {
+          conditions.push(`Fam: ${formatFieldName(key)}`);
+        }
+      });
+    }
+
+    return conditions;
   };
 
   const loadMedicalHistory = async () => {
@@ -334,6 +448,27 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones }: Med
           </div>
         </div>
       </div>
+
+      {/* Condiciones Especiales (antecedentes positivos del formulario) */}
+      {getPositiveConditions().length > 0 && (
+        <div className="bg-[#2a3942] rounded-lg p-3">
+          <h3 className="text-sm font-semibold mb-2 text-[#00a884]">Condiciones Especiales</h3>
+          <div className="flex flex-wrap gap-2">
+            {getPositiveConditions().map((condition, index) => (
+              <span
+                key={index}
+                className={`px-3 py-1 rounded-full text-xs font-medium ${
+                  condition.startsWith('Fam:')
+                    ? 'bg-purple-900/30 text-purple-300 border border-purple-500/30'
+                    : 'bg-amber-900/30 text-amber-300 border border-amber-500/30'
+                }`}
+              >
+                {condition}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Antecedentes (Solo lectura) */}
       {(data.antecedentesFamiliares || data.encuestaSalud || data.empresa1) && (
