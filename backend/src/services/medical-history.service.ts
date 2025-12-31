@@ -337,16 +337,21 @@ class MedicalHistoryService {
       console.log(`✅ [PostgreSQL] Historia clínica guardada exitosamente para ${payload.historiaId}`);
 
       // PASO 1.5: Solicitar certificado para empresas específicas (PARTICULAR o SANITHELP-JJ)
+      // Se ejecuta en background sin bloquear el guardado (fire-and-forget)
       if (historiaBase.codEmpresa === 'PARTICULAR' || historiaBase.codEmpresa === 'SANITHELP-JJ') {
         console.log(`📜 [Certificado] Solicitando certificado para ${payload.historiaId} (${historiaBase.codEmpresa})...`);
-        try {
-          const certificadoUrl = `https://bsl-utilidades-yp78a.ondigitalocean.app/static/solicitar-certificado.html?id=${payload.historiaId}`;
-          await axios.get(certificadoUrl, { timeout: 5000 });
-          console.log(`✅ [Certificado] Solicitud enviada exitosamente para ${payload.historiaId}`);
-        } catch (certError: any) {
-          // Log error pero no fallar - la historia ya está guardada
-          console.error(`⚠️  [Certificado] Error solicitando certificado (no crítico): ${certError.message}`);
-        }
+        const certificadoUrl = `https://bsl-utilidades-yp78a.ondigitalocean.app/static/solicitar-certificado.html?id=${payload.historiaId}`;
+
+        // Fire-and-forget: Ejecutar en background sin esperar respuesta
+        axios.get(certificadoUrl, { timeout: 60000 }) // 60 segundos para generar el PDF
+          .then(() => {
+            console.log(`✅ [Certificado] Solicitud completada para ${payload.historiaId}`);
+          })
+          .catch((certError: any) => {
+            console.error(`⚠️  [Certificado] Error solicitando certificado: ${certError.message}`);
+          });
+
+        console.log(`📤 [Certificado] Solicitud iniciada en background para ${payload.historiaId}`);
       } else {
         console.log(`ℹ️  [Certificado] No se solicita certificado para ${historiaBase.codEmpresa || 'N/A'}`);
       }
