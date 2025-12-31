@@ -336,6 +336,21 @@ class MedicalHistoryService {
 
       console.log(`✅ [PostgreSQL] Historia clínica guardada exitosamente para ${payload.historiaId}`);
 
+      // PASO 1.5: Solicitar certificado para empresas específicas (PARTICULAR o SANITHELP-JJ)
+      if (historiaBase.codEmpresa === 'PARTICULAR' || historiaBase.codEmpresa === 'SANITHELP-JJ') {
+        console.log(`📜 [Certificado] Solicitando certificado para ${payload.historiaId} (${historiaBase.codEmpresa})...`);
+        try {
+          const certificadoUrl = `https://bsl-utilidades-yp78a.ondigitalocean.app/static/solicitar-certificado.html?id=${payload.historiaId}`;
+          await axios.get(certificadoUrl, { timeout: 5000 });
+          console.log(`✅ [Certificado] Solicitud enviada exitosamente para ${payload.historiaId}`);
+        } catch (certError: any) {
+          // Log error pero no fallar - la historia ya está guardada
+          console.error(`⚠️  [Certificado] Error solicitando certificado (no crítico): ${certError.message}`);
+        }
+      } else {
+        console.log(`ℹ️  [Certificado] No se solicita certificado para ${historiaBase.codEmpresa || 'N/A'}`);
+      }
+
       // PASO 2: Guardar en Wix como BACKUP (obligatorio pero no bloquea si falla)
       console.log(`💾 [Wix] Guardando backup de historia clínica ${payload.historiaId}...`);
 
