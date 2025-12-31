@@ -1,6 +1,7 @@
 import axios from 'axios';
 import historiaClinicaPostgresService from './historia-clinica-postgres.service';
 import postgresService from './postgres.service';
+import whatsappService from './whatsapp.service';
 
 interface AntecedentesPersonales {
   cirugiaOcular?: boolean;
@@ -336,24 +337,36 @@ class MedicalHistoryService {
 
       console.log(`✅ [PostgreSQL] Historia clínica guardada exitosamente para ${payload.historiaId}`);
 
-      // PASO 1.5: Solicitar certificado para empresas específicas (PARTICULAR o SANITHELP-JJ)
-      // Se ejecuta en background sin bloquear el guardado (fire-and-forget)
+      // PASO 1.5: Enviar link de certificado por WhatsApp para empresas específicas (PARTICULAR o SANITHELP-JJ)
       if (historiaBase.codEmpresa === 'PARTICULAR' || historiaBase.codEmpresa === 'SANITHELP-JJ') {
-        console.log(`📜 [Certificado] Solicitando certificado para ${payload.historiaId} (${historiaBase.codEmpresa})...`);
-        const certificadoUrl = `https://bsl-utilidades-yp78a.ondigitalocean.app/static/solicitar-certificado.html?id=${payload.historiaId}`;
+        console.log(`📜 [Certificado] Enviando link de certificado para ${payload.historiaId} (${historiaBase.codEmpresa})...`);
 
-        // Fire-and-forget: Ejecutar en background sin esperar respuesta
-        axios.get(certificadoUrl, { timeout: 60000 }) // 60 segundos para generar el PDF
-          .then(() => {
-            console.log(`✅ [Certificado] Solicitud completada para ${payload.historiaId}`);
+        // Construir URL del certificado
+        const certificadoUrl = `https://bsl-utilidades-yp78a.ondigitalocean.app/generar-certificado-desde-wix/${payload.historiaId}`;
+
+        // Construir mensaje de WhatsApp
+        const nombreCompleto = `${historiaBase.primerNombre} ${historiaBase.primerApellido}`;
+        const mensaje = `Hola ${nombreCompleto}! 👋\n\n` +
+          `Tu certificado médico ya está listo. Puedes descargarlo en el siguiente enlace:\n\n` +
+          `${certificadoUrl}\n\n` +
+          `_Este enlace estará disponible por 30 días._`;
+
+        // Enviar WhatsApp en background (fire-and-forget)
+        whatsappService.sendTextMessage(historiaBase.celular, mensaje)
+          .then((result) => {
+            if (result.success) {
+              console.log(`✅ [Certificado] Link enviado por WhatsApp a ${historiaBase.celular}`);
+            } else {
+              console.error(`⚠️  [Certificado] Error enviando WhatsApp: ${result.error}`);
+            }
           })
-          .catch((certError: any) => {
-            console.error(`⚠️  [Certificado] Error solicitando certificado: ${certError.message}`);
+          .catch((error: any) => {
+            console.error(`⚠️  [Certificado] Error inesperado al enviar WhatsApp: ${error.message}`);
           });
 
-        console.log(`📤 [Certificado] Solicitud iniciada en background para ${payload.historiaId}`);
+        console.log(`📤 [Certificado] Enviando link por WhatsApp a ${historiaBase.celular}...`);
       } else {
-        console.log(`ℹ️  [Certificado] No se solicita certificado para ${historiaBase.codEmpresa || 'N/A'}`);
+        console.log(`ℹ️  [Certificado] No se envía certificado para ${historiaBase.codEmpresa || 'N/A'}`);
       }
 
       // PASO 2: Guardar en Wix como BACKUP (obligatorio pero no bloquea si falla)
