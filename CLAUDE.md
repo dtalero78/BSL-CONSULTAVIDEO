@@ -203,6 +203,7 @@ TWILIO_API_KEY_SECRET=xxxxxx
 
 # Twilio WhatsApp Configuration - Required for session reports and Wix integration
 TWILIO_WHATSAPP_FROM=whatsapp:+3153369631
+TWILIO_WHATSAPP_TEMPLATE_SID=HXc8473cfd60cd378314355e17e736d24d
 
 # Server config
 PORT=3000

@@ -6,12 +6,14 @@ import twilio from 'twilio';
 class WhatsAppService {
   private readonly client: twilio.Twilio;
   private readonly fromNumber: string;
+  private readonly templateSid: string;
   private readonly maxRetries = 3;
 
   constructor() {
     const accountSid = process.env.TWILIO_ACCOUNT_SID || '';
     const authToken = process.env.TWILIO_AUTH_TOKEN || '';
     this.fromNumber = process.env.TWILIO_WHATSAPP_FROM || 'whatsapp:+3153369631';
+    this.templateSid = process.env.TWILIO_WHATSAPP_TEMPLATE_SID || 'HXc8473cfd60cd378314355e17e736d24d';
 
     if (!accountSid || !authToken) {
       console.warn('⚠️  Credenciales de Twilio no configuradas - servicio de WhatsApp no disponible');
@@ -19,6 +21,7 @@ class WhatsAppService {
     } else {
       this.client = twilio(accountSid, authToken);
       console.log('✅ Twilio WhatsApp Service inicializado');
+      console.log(`   Template SID: ${this.templateSid}`);
     }
   }
 
@@ -48,7 +51,77 @@ class WhatsAppService {
   }
 
   /**
-   * Envía un mensaje de texto por WhatsApp con reintentos automáticos
+   * Envía un mensaje usando el template aprobado de Twilio
+   * Template: "Hola soy el Dr. Juan de BSL. Tienes cita médica programada conmigo. Por favor responde "SÍ" para iniciar el proceso."
+   * @param phone Número de teléfono (ejemplo: 573001234567 o +573001234567)
+   * @param attempt Número de intento actual (uso interno)
+   * @returns Resultado del envío
+   */
+  async sendTemplateMessage(
+    phone: string,
+    attempt: number = 1
+  ): Promise<{ success: boolean; error?: string; messageSid?: string }> {
+    if (!this.client.messages) {
+      console.error('❌ Cliente de Twilio no está configurado');
+      return {
+        success: false,
+        error: 'Cliente de Twilio no configurado'
+      };
+    }
+
+    const toNumber = this.formatPhoneNumber(phone);
+
+    try {
+      console.log(`📱 Enviando WhatsApp con template a: ${toNumber} (intento ${attempt}/${this.maxRetries})`);
+
+      const twilioMessage = await this.client.messages.create({
+        from: this.fromNumber,
+        to: toNumber,
+        contentSid: this.templateSid,
+      });
+
+      console.log(`✅ WhatsApp con template enviado exitosamente a ${toNumber}`);
+      console.log(`   Message SID: ${twilioMessage.sid}`);
+      console.log(`   Estado: ${twilioMessage.status}`);
+
+      return {
+        success: true,
+        messageSid: twilioMessage.sid
+      };
+    } catch (error: any) {
+      const isRetryableError = this.isRetryableError(error);
+      const shouldRetry = isRetryableError && attempt < this.maxRetries;
+
+      if (shouldRetry) {
+        // Backoff exponencial: 2s, 4s, 8s
+        const backoffMs = Math.pow(2, attempt) * 1000;
+        console.warn(
+          `⚠️  Error en intento ${attempt}/${this.maxRetries}. ` +
+          `Reintentando en ${backoffMs / 1000}s... ` +
+          `(Razón: ${error.message || 'Error desconocido'})`
+        );
+
+        await this.sleep(backoffMs);
+        return this.sendTemplateMessage(phone, attempt + 1);
+      }
+
+      // Error final después de todos los reintentos
+      const errorMessage = this.getErrorMessage(error);
+      console.error(
+        `❌ Error enviando WhatsApp con template después de ${attempt} intentos:`,
+        errorMessage
+      );
+
+      return {
+        success: false,
+        error: errorMessage
+      };
+    }
+  }
+
+  /**
+   * Envía un mensaje de texto libre por WhatsApp con reintentos automáticos
+   * NOTA: Solo usar para mensajes al admin o casos especiales. Para pacientes usar sendTemplateMessage()
    * @param phone Número de teléfono (ejemplo: 573001234567 o +573001234567)
    * @param message Mensaje a enviar
    * @param attempt Número de intento actual (uso interno)
@@ -70,7 +143,7 @@ class WhatsAppService {
     const toNumber = this.formatPhoneNumber(phone);
 
     try {
-      console.log(`📱 Enviando WhatsApp a: ${toNumber} (intento ${attempt}/${this.maxRetries})`);
+      console.log(`📱 Enviando WhatsApp (texto libre) a: ${toNumber} (intento ${attempt}/${this.maxRetries})`);
 
       const twilioMessage = await this.client.messages.create({
         from: this.fromNumber,
