@@ -253,25 +253,30 @@ class VideoController {
   /**
    * Enviar mensaje de WhatsApp usando template aprobado
    * POST /api/video/whatsapp/send
-   * Body: { phone: string }
+   * Body: { phone: string, roomNameWithParams: string, patientName: string, doctorCode: string }
    *
-   * Usa el template aprobado de Twilio (sin variables):
-   * "Hola soy el Dr. Juan de BSL. Tienes cita médica programada conmigo.
-   * Por favor responde "SÍ" para iniciar el proceso."
+   * Usa el template aprobado de Twilio con variables:
+   * Template: "Hola {{2}}. Te escribimos de BSL. Tienes una consulta médica programada con el Dr. {{3}}..."
+   * Button URL: https://medico-bsl.com/patient/{{1}}
    */
   async sendWhatsApp(req: Request, res: Response): Promise<void> {
     try {
-      const { phone } = req.body;
+      const { phone, roomNameWithParams, patientName, doctorCode } = req.body;
 
-      if (!phone) {
+      if (!phone || !roomNameWithParams || !patientName || !doctorCode) {
         res.status(400).json({
-          error: 'phone is required',
+          error: 'phone, roomNameWithParams, patientName, and doctorCode are required',
         });
         return;
       }
 
-      // Usar template aprobado para pacientes
-      const result = await whatsappService.sendTemplateMessage(phone);
+      // Usar template aprobado con variables para pacientes
+      const result = await whatsappService.sendTemplateMessage(
+        phone,
+        roomNameWithParams,
+        patientName,
+        doctorCode
+      );
 
       if (result.success) {
         res.status(200).json({

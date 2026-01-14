@@ -273,10 +273,25 @@ export function MedicalPanelPage() {
       // Formatear teléfono (sin + para WhatsApp API)
       const phoneWithoutPlus = phoneWithPlus.substring(1);
 
+      // Construir roomNameWithParams para el template (path completo con query params)
+      // Ejemplo: "consulta-abc123?nombre=Juan&apellido=Perez&documento=123&doctor=JUAN"
+      const params = new URLSearchParams({
+        nombre: patient.primerNombre,
+        apellido: patient.primerApellido,
+        documento: patient._id,
+        doctor: medicoCode
+      });
+      const roomNameWithParams = `${roomName}?${params.toString()}`;
+
       // 1. Enviar mensaje de WhatsApp con template aprobado
-      // Template: "Hola soy el Dr. Juan de BSL. Tienes cita médica programada conmigo.
-      // Por favor responde "SÍ" para iniciar el proceso."
-      await apiService.sendWhatsApp(phoneWithoutPlus);
+      // Template: "Hola {{2}}. Te escribimos de BSL. Tienes una consulta médica programada con el Dr. {{3}}..."
+      // Button URL: https://medico-bsl.com/patient/{{1}}
+      await apiService.sendWhatsApp(
+        phoneWithoutPlus,
+        roomNameWithParams,
+        patient.primerNombre,
+        medicoCode
+      );
       console.log('WhatsApp con template enviado exitosamente');
 
       // 2. Realizar llamada telefónica con Twilio Voice

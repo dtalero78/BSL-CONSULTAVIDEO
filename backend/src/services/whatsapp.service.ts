@@ -61,14 +61,20 @@ class WhatsAppService {
   }
 
   /**
-   * Envía un mensaje usando el template aprobado de Twilio
-   * Template: "Hola soy el Dr. Juan de BSL. Tienes cita médica programada conmigo. Por favor responde "SÍ" para iniciar el proceso."
+   * Envía un mensaje usando el template aprobado de Twilio con variables
+   * Template: "Hola {{1}}. Te escribimos de BSL. Tienes una consulta médica programada con el Dr. {{2}}..."
    * @param phone Número de teléfono (ejemplo: 573001234567 o +573001234567)
+   * @param roomNameWithParams Path completo: "consulta-abc123?nombre=Juan&apellido=Perez&documento=123&doctor=JUAN"
+   * @param patientName Primer nombre del paciente
+   * @param doctorCode Código del doctor
    * @param attempt Número de intento actual (uso interno)
    * @returns Resultado del envío
    */
   async sendTemplateMessage(
     phone: string,
+    roomNameWithParams: string,
+    patientName: string,
+    doctorCode: string,
     attempt: number = 1
   ): Promise<{ success: boolean; error?: string; messageSid?: string }> {
     if (!this.client.messages) {
@@ -83,11 +89,17 @@ class WhatsAppService {
 
     try {
       console.log(`📱 Enviando WhatsApp con template a: ${toNumber} (intento ${attempt}/${this.maxRetries})`);
+      console.log(`   Variables: roomPath=${roomNameWithParams}, name=${patientName}, doctor=${doctorCode}`);
 
       const twilioMessage = await this.client.messages.create({
         from: this.fromNumber,
         to: toNumber,
         contentSid: this.templateSid,
+        contentVariables: JSON.stringify({
+          '1': roomNameWithParams,
+          '2': patientName,
+          '3': doctorCode
+        })
       });
 
       console.log(`✅ WhatsApp con template enviado exitosamente a ${toNumber}`);
@@ -112,7 +124,7 @@ class WhatsAppService {
         );
 
         await this.sleep(backoffMs);
-        return this.sendTemplateMessage(phone, attempt + 1);
+        return this.sendTemplateMessage(phone, roomNameWithParams, patientName, doctorCode, attempt + 1);
       }
 
       // Error final después de todos los reintentos

@@ -107,12 +107,25 @@ class ApiService {
 
   /**
    * Enviar mensaje de WhatsApp con template aprobado de Twilio
-   * Template: "Hola soy el Dr. Juan de BSL. Tienes cita médica programada conmigo.
-   * Por favor responde "SÍ" para iniciar el proceso."
+   * Template: "Hola {{2}}. Te escribimos de BSL. Tienes una consulta médica programada con el Dr. {{3}}..."
+   * Button URL: https://medico-bsl.com/patient/{{1}}
+   *
+   * @param phone - Número de teléfono sin el prefijo + (ejemplo: 573001234567)
+   * @param roomNameWithParams - Path completo con query params (ejemplo: "consulta-abc123?nombre=Juan&apellido=Perez&documento=123&doctor=JUAN")
+   * @param patientName - Primer nombre del paciente (para {{2}} en el mensaje)
+   * @param doctorCode - Código del doctor (para {{3}} en el mensaje)
    */
-  async sendWhatsApp(phone: string): Promise<void> {
+  async sendWhatsApp(
+    phone: string,
+    roomNameWithParams: string,
+    patientName: string,
+    doctorCode: string
+  ): Promise<void> {
     await this.client.post('/api/video/whatsapp/send', {
       phone,
+      roomNameWithParams,
+      patientName,
+      doctorCode,
     });
   }
 
