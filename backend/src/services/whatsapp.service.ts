@@ -41,13 +41,23 @@ class WhatsAppService {
     // Limpiar el número de teléfono (quitar espacios, paréntesis, guiones)
     let cleanPhone = phone.replace(/[\s\(\)\-]/g, '');
 
-    // Asegurarse de que tenga el prefijo +
-    if (!cleanPhone.startsWith('+')) {
-      cleanPhone = `+${cleanPhone}`;
+    // Si ya tiene el prefijo +, usarlo directamente
+    if (cleanPhone.startsWith('+')) {
+      return `whatsapp:${cleanPhone}`;
     }
 
-    // Agregar el prefijo de WhatsApp de Twilio
-    return `whatsapp:${cleanPhone}`;
+    // Si tiene exactamente 10 dígitos, es un número colombiano local
+    if (cleanPhone.length === 10 && /^\d{10}$/.test(cleanPhone)) {
+      return `whatsapp:+57${cleanPhone}`;
+    }
+
+    // Si empieza con 57 y tiene 12 dígitos, agregar solo el +
+    if (cleanPhone.startsWith('57') && cleanPhone.length === 12) {
+      return `whatsapp:+${cleanPhone}`;
+    }
+
+    // Para otros formatos, intentar agregar + y esperar que sea válido
+    return `whatsapp:+${cleanPhone}`;
   }
 
   /**
