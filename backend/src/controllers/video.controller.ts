@@ -251,32 +251,38 @@ class VideoController {
   }
 
   /**
-   * Enviar mensaje de WhatsApp
+   * Enviar mensaje de WhatsApp usando template aprobado
    * POST /api/video/whatsapp/send
-   * Body: { phone: string, message: string }
+   * Body: { phone: string }
+   *
+   * Usa el template aprobado de Twilio (sin variables):
+   * "Hola soy el Dr. Juan de BSL. Tienes cita médica programada conmigo.
+   * Por favor responde "SÍ" para iniciar el proceso."
    */
   async sendWhatsApp(req: Request, res: Response): Promise<void> {
     try {
-      const { phone, message } = req.body;
+      const { phone } = req.body;
 
-      if (!phone || !message) {
+      if (!phone) {
         res.status(400).json({
-          error: 'phone and message are required',
+          error: 'phone is required',
         });
         return;
       }
 
-      const result = await whatsappService.sendTextMessage(phone, message);
+      // Usar template aprobado para pacientes
+      const result = await whatsappService.sendTemplateMessage(phone);
 
       if (result.success) {
         res.status(200).json({
           success: true,
-          message: 'WhatsApp message sent successfully',
+          message: 'WhatsApp template sent successfully',
+          messageSid: result.messageSid,
         });
       } else {
         res.status(500).json({
           success: false,
-          error: result.error || 'Failed to send WhatsApp message',
+          error: result.error || 'Failed to send WhatsApp template',
         });
       }
     } catch (error) {
