@@ -277,18 +277,17 @@ export function MedicalPanelPage() {
       });
       const patientLink = `${baseUrl}?${params.toString()}`;
 
-      // Generar mensaje de WhatsApp con el link
-      const whatsappMessage = `Hola ${patient.primerNombre}. Te escribimos de BSL. Tienes una cita médica programada conmigo\n\nConéctate al link:\n\n${patientLink}`;
-
       // Formatear teléfono con código de país internacional
       const phoneWithPlus = formatPhoneNumber(patient.celular);
 
       // Formatear teléfono (sin + para WhatsApp API)
       const phoneWithoutPlus = phoneWithPlus.substring(1);
 
-      // 1. Enviar mensaje de WhatsApp por API
-      await apiService.sendWhatsApp(phoneWithoutPlus, whatsappMessage);
-      console.log('WhatsApp enviado exitosamente');
+      // 1. Enviar mensaje de WhatsApp con template aprobado
+      // Template: "Hola soy el Dr. Juan de BSL. Tienes cita médica programada conmigo.
+      // Por favor responde "SÍ" para iniciar el proceso."
+      await apiService.sendWhatsApp(phoneWithoutPlus);
+      console.log('WhatsApp con template enviado exitosamente');
 
       // 2. Realizar llamada telefónica con Twilio Voice
       try {

@@ -106,12 +106,13 @@ class ApiService {
   }
 
   /**
-   * Enviar mensaje de WhatsApp
+   * Enviar mensaje de WhatsApp con template aprobado de Twilio
+   * Template: "Hola soy el Dr. Juan de BSL. Tienes cita médica programada conmigo.
+   * Por favor responde "SÍ" para iniciar el proceso."
    */
-  async sendWhatsApp(phone: string, message: string): Promise<void> {
+  async sendWhatsApp(phone: string): Promise<void> {
     await this.client.post('/api/video/whatsapp/send', {
       phone,
-      message,
     });
   }
 
