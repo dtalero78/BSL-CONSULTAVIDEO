@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-BSL Consulta Video is a Twilio-based video calling application integrated with Wix for medical consultations. It features a React frontend, Node.js/Express backend, and WhatsApp reporting via WHAPI.
+BSL Consulta Video is a Twilio-based video calling application integrated with Wix for medical consultations. It features a React frontend, Node.js/Express backend, and WhatsApp messaging via Twilio WhatsApp API.
 
 ## Development Commands
 
@@ -195,15 +195,14 @@ Twilio tracks must be attached to DOM elements in specific useEffect patterns. S
 
 ### Backend (.env)
 ```bash
-# Twilio credentials (required for video calls)
+# Twilio credentials (required for video calls and WhatsApp)
 TWILIO_ACCOUNT_SID=ACxxxxxx
 TWILIO_AUTH_TOKEN=xxxxxx
 TWILIO_API_KEY_SID=SKxxxxxx
 TWILIO_API_KEY_SECRET=xxxxxx
 
-# WhatsApp API (WHAPI) - Required for session reports and Wix integration
-# Get your token from https://whapi.cloud/
-WHAPI_TOKEN=xxxxxx
+# Twilio WhatsApp Configuration - Required for session reports and Wix integration
+TWILIO_WHATSAPP_FROM=whatsapp:+3153369631
 
 # Server config
 PORT=3000
@@ -300,4 +299,4 @@ Main repeater in `wix.json` displays:
 ### Phone Number Format
 - **Issue**: International numbers not recognized
 - **Solution**: Use `formatTelefono()` which supports multiple country codes
-- **Remember**: Remove `+` prefix when using `sendTextMessage()` API
+- **Note**: Twilio WhatsApp API accepts numbers with or without `+` prefix (service handles both formats automatically)

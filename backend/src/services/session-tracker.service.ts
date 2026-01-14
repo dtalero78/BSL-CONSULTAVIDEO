@@ -1,4 +1,4 @@
-import axios from 'axios';
+import twilio from 'twilio';
 import { Server as SocketIOServer } from 'socket.io';
 
 interface SessionParticipant {
@@ -19,10 +19,24 @@ interface VideoSession {
 
 class SessionTrackerService {
   private sessions: Map<string, VideoSession> = new Map();
-  private readonly ADMIN_PHONE = '573008021701';
-  private readonly WHAPI_TOKEN = process.env.WHAPI_TOKEN || 'due3eWCwuBM2Xqd6cPujuTRqSbMb68lt';
-  private readonly WHAPI_URL = 'https://gate.whapi.cloud/messages/text';
+  private readonly ADMIN_PHONE = 'whatsapp:+573008021701';
+  private readonly twilioClient: twilio.Twilio;
+  private readonly twilioWhatsAppFrom: string;
   private io: SocketIOServer | null = null;
+
+  constructor() {
+    const accountSid = process.env.TWILIO_ACCOUNT_SID || '';
+    const authToken = process.env.TWILIO_AUTH_TOKEN || '';
+    this.twilioWhatsAppFrom = process.env.TWILIO_WHATSAPP_FROM || 'whatsapp:+3153369631';
+
+    if (!accountSid || !authToken) {
+      console.warn('⚠️  Credenciales de Twilio no configuradas - reportes de sesión no disponibles');
+      this.twilioClient = {} as twilio.Twilio;
+    } else {
+      this.twilioClient = twilio(accountSid, authToken);
+      console.log('✅ SessionTrackerService inicializado con Twilio WhatsApp');
+    }
+  }
 
   /**
    * Inicializa el servicio con la instancia de Socket.io
@@ -209,32 +223,24 @@ class SessionTrackerService {
   }
 
   /**
-   * Envía mensaje por WhatsApp usando WHAPI
+   * Envía mensaje por WhatsApp usando Twilio
    */
   private async sendWhatsAppMessage(message: string): Promise<void> {
-    if (!this.WHAPI_TOKEN) {
-      console.error('[SessionTracker] WHAPI_TOKEN not configured');
+    if (!this.twilioClient.messages) {
+      console.error('[SessionTracker] Twilio client not configured');
       return;
     }
 
     try {
-      const response = await axios.post(
-        this.WHAPI_URL,
-        {
-          typing_time: 0,
-          to: this.ADMIN_PHONE,
-          body: message,
-        },
-        {
-          headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.WHAPI_TOKEN}`,
-          },
-        }
-      );
+      const twilioMessage = await this.twilioClient.messages.create({
+        from: this.twilioWhatsAppFrom,
+        to: this.ADMIN_PHONE,
+        body: message,
+      });
 
-      console.log('[SessionTracker] WhatsApp message sent:', response.data);
+      console.log('[SessionTracker] WhatsApp message sent via Twilio');
+      console.log(`   Message SID: ${twilioMessage.sid}`);
+      console.log(`   Estado: ${twilioMessage.status}`);
     } catch (error) {
       console.error('[SessionTracker] Error sending WhatsApp message:', error);
       throw error;
