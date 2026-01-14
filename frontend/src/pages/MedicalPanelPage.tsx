@@ -267,16 +267,6 @@ export function MedicalPanelPage() {
       const roomName = medicalPanelService.generateRoomName();
       setPatientRooms(prev => ({ ...prev, [patient._id]: roomName }));
 
-      // Construir URL del paciente con URLSearchParams para codificación correcta
-      const baseUrl = `https://bsl-consultavideo-58jne.ondigitalocean.app/patient/${roomName}`;
-      const params = new URLSearchParams({
-        nombre: patient.primerNombre,
-        apellido: patient.primerApellido,
-        documento: patient._id,
-        doctor: medicoCode
-      });
-      const patientLink = `${baseUrl}?${params.toString()}`;
-
       // Formatear teléfono con código de país internacional
       const phoneWithPlus = formatPhoneNumber(patient.celular);
 
