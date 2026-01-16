@@ -1,13 +1,10 @@
 import { Request, Response } from 'express';
-import axios from 'axios';
 import twilioService from '../services/twilio.service';
 import { sessionTracker } from '../services/session-tracker.service';
 import whatsappService from '../services/whatsapp.service';
 import medicalHistoryService from '../services/medical-history.service';
 import openaiService from '../services/openai.service';
-
-// URL de BSL-PLATAFORMA para registrar mensajes en el chat
-const BSL_PLATAFORMA_REGISTER_URL = process.env.BSL_PLATAFORMA_REGISTER_URL || 'https://bsl-plataforma.com/api/whatsapp/register-outgoing';
+import postgresService from '../services/postgres.service';
 
 class VideoController {
   /**
@@ -283,7 +280,7 @@ class VideoController {
       );
 
       if (result.success) {
-        // Registrar el mensaje en BSL-PLATAFORMA para que aparezca en el chat
+        // Registrar el mensaje directamente en PostgreSQL para que aparezca en el chat
         try {
           const videoCallUrl = `https://medico-bsl.com/patient/${roomNameWithParams}`;
           const messageBody = `Hola ${patientName}. Te escribimos de BSL. Tienes una consulta médica programada con el Dr. ${doctorCode}.\n\nLink de videollamada: ${videoCallUrl}`;
@@ -291,19 +288,17 @@ class VideoController {
           // Formatear número de teléfono con prefijo +
           const phoneWithPlus = phone.startsWith('+') ? phone : `+${phone}`;
 
-          await axios.post(BSL_PLATAFORMA_REGISTER_URL, {
-            to: phoneWithPlus,
-            body: messageBody,
-            messageSid: result.messageSid,
-            source: 'BSL-CONSULTAVIDEO'
-          }, {
-            timeout: 5000 // 5 segundos timeout
-          });
+          await postgresService.registrarMensajeSaliente(
+            phoneWithPlus,
+            messageBody,
+            result.messageSid || '',
+            patientName
+          );
 
-          console.log(`✅ Mensaje registrado en BSL-PLATAFORMA para ${phoneWithPlus}`);
+          console.log(`✅ Mensaje registrado en PostgreSQL para ${phoneWithPlus}`);
         } catch (registerError) {
-          // No fallar si el registro en BSL-PLATAFORMA falla
-          console.error('⚠️ Error registrando mensaje en BSL-PLATAFORMA:', registerError);
+          // No fallar si el registro en PostgreSQL falla
+          console.error('⚠️ Error registrando mensaje en PostgreSQL:', registerError);
         }
 
         res.status(200).json({
