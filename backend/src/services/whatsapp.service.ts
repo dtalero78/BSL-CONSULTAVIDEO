@@ -7,6 +7,7 @@ class WhatsAppService {
   private readonly client: twilio.Twilio;
   private readonly fromNumber: string;
   private readonly templateSid: string;
+  private readonly statusCallbackUrl: string;
   private readonly maxRetries = 3;
 
   constructor() {
@@ -14,6 +15,8 @@ class WhatsAppService {
     const authToken = process.env.TWILIO_AUTH_TOKEN || '';
     this.fromNumber = process.env.TWILIO_WHATSAPP_FROM || 'whatsapp:+3153369631';
     this.templateSid = process.env.TWILIO_WHATSAPP_TEMPLATE_SID || 'HXc8473cfd60cd378314355e17e736d24d';
+    // URL de callback para registrar mensajes en BSL-PLATAFORMA
+    this.statusCallbackUrl = process.env.WHATSAPP_STATUS_CALLBACK_URL || 'https://bsl-plataforma.com/api/whatsapp/status';
 
     if (!accountSid || !authToken) {
       console.warn('⚠️  Credenciales de Twilio no configuradas - servicio de WhatsApp no disponible');
@@ -22,6 +25,7 @@ class WhatsAppService {
       this.client = twilio(accountSid, authToken);
       console.log('✅ Twilio WhatsApp Service inicializado');
       console.log(`   Template SID: ${this.templateSid}`);
+      console.log(`   Status Callback: ${this.statusCallbackUrl}`);
     }
   }
 
@@ -99,7 +103,8 @@ class WhatsAppService {
           '1': roomNameWithParams,
           '2': patientName,
           '3': doctorCode
-        })
+        }),
+        statusCallback: this.statusCallbackUrl
       });
 
       console.log(`✅ WhatsApp con template enviado exitosamente a ${toNumber}`);
@@ -171,6 +176,7 @@ class WhatsAppService {
         from: this.fromNumber,
         to: toNumber,
         body: message,
+        statusCallback: this.statusCallbackUrl
       });
 
       console.log(`✅ WhatsApp enviado exitosamente a ${toNumber}`);
