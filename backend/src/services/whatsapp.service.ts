@@ -39,29 +39,24 @@ class WhatsAppService {
   /**
    * Formatea un número de teléfono para WhatsApp de Twilio
    * @param phone Número de teléfono (puede tener o no el prefijo +)
-   * @returns Número formateado como whatsapp:+573001234567
+   * @returns Número formateado como whatsapp:573001234567 (SIN +)
    */
   private formatPhoneNumber(phone: string): string {
-    // Limpiar el número de teléfono (quitar espacios, paréntesis, guiones)
-    let cleanPhone = phone.replace(/[\s\(\)\-]/g, '');
-
-    // Si ya tiene el prefijo +, usarlo directamente
-    if (cleanPhone.startsWith('+')) {
-      return `whatsapp:${cleanPhone}`;
-    }
+    // Limpiar el número de teléfono (quitar espacios, paréntesis, guiones, y +)
+    let cleanPhone = phone.replace(/[\s\(\)\-\+]/g, '');
 
     // Si tiene exactamente 10 dígitos, es un número colombiano local
     if (cleanPhone.length === 10 && /^\d{10}$/.test(cleanPhone)) {
-      return `whatsapp:+57${cleanPhone}`;
+      return `whatsapp:57${cleanPhone}`;
     }
 
-    // Si empieza con 57 y tiene 12 dígitos, agregar solo el +
+    // Si empieza con 57 y tiene 12 dígitos, usar directamente
     if (cleanPhone.startsWith('57') && cleanPhone.length === 12) {
-      return `whatsapp:+${cleanPhone}`;
+      return `whatsapp:${cleanPhone}`;
     }
 
-    // Para otros formatos, intentar agregar + y esperar que sea válido
-    return `whatsapp:+${cleanPhone}`;
+    // Para otros formatos, asumir que ya está completo
+    return `whatsapp:${cleanPhone}`;
   }
 
   /**
