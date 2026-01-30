@@ -4,6 +4,25 @@ import axios, { AxiosInstance } from 'axios';
 // entonces usamos URL relativa (vacía). En desarrollo, apuntamos a localhost:3000
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
+// Interfaz para el historial de consultas anteriores
+export interface PatientHistoryRecord {
+  _id: string;
+  numeroId: string;
+  fechaConsulta: string | null;
+  fechaAtencion: string | null;
+  medico: string | null;
+  mdDx1: string | null;
+  mdDx2: string | null;
+  mdConceptoFinal: string | null;
+  mdAntecedentes: string | null;
+  mdObservacionesCertificado: string | null;
+  mdRecomendacionesMedicasAdicionales: string | null;
+  tipoExamen: string | null;
+  talla: string | null;
+  peso: string | null;
+  atendido: string | null;
+}
+
 class ApiService {
   private client: AxiosInstance;
 
@@ -134,6 +153,16 @@ class ApiService {
    */
   async getMedicalHistory(historiaId: string): Promise<any> {
     const response = await this.client.get(`/api/video/medical-history/${historiaId}`);
+    return response.data.data;
+  }
+
+  /**
+   * Obtener historial de consultas anteriores de un paciente por su documento de identidad
+   * @param numeroId - Documento de identidad del paciente
+   * @returns Array de consultas anteriores ordenadas por fecha descendente
+   */
+  async getPatientHistory(numeroId: string): Promise<PatientHistoryRecord[]> {
+    const response = await this.client.get(`/api/video/medical-history/patient/${numeroId}`);
     return response.data.data;
   }
 

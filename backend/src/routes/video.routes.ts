@@ -27,6 +27,8 @@ router.get('/events/connected-patients', videoController.getConnectedPatients);
 router.post('/whatsapp/send', videoController.sendWhatsApp);
 
 // Medical History
+// IMPORTANTE: La ruta específica '/patient/:numeroId' debe ir ANTES de '/:historiaId' para evitar conflictos
+router.get('/medical-history/patient/:numeroId', videoController.getPatientHistory);
 router.get('/medical-history/:historiaId', videoController.getMedicalHistory);
 router.post('/medical-history', videoController.updateMedicalHistory);
 

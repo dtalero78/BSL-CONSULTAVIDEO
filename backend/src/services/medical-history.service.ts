@@ -109,6 +109,24 @@ interface UpdateMedicalHistoryPayload {
   cargo?: string;
 }
 
+interface PatientHistoryRecord {
+  _id: string;
+  numeroId: string;
+  fechaConsulta: Date | null;
+  fechaAtencion: Date | null;
+  medico: string | null;
+  mdDx1: string | null;
+  mdDx2: string | null;
+  mdConceptoFinal: string | null;
+  mdAntecedentes: string | null;
+  mdObservacionesCertificado: string | null;
+  mdRecomendacionesMedicasAdicionales: string | null;
+  tipoExamen: string | null;
+  talla: string | null;
+  peso: string | null;
+  atendido: string | null;
+}
+
 class MedicalHistoryService {
   private wixBaseUrl: string;
 
@@ -284,6 +302,70 @@ class MedicalHistoryService {
   /**
    * Actualiza la historia clínica: PostgreSQL primero (principal), luego Wix (backup)
    */
+  /**
+   * Obtiene el historial de consultas anteriores de un paciente por su numeroId (documento de identidad)
+   * Retorna todas las consultas completadas (atendido = 'ATENDIDO') ordenadas por fecha descendente
+   */
+  async getPatientHistory(numeroId: string): Promise<PatientHistoryRecord[]> {
+    try {
+      console.log(`📋 Obteniendo historial de consultas para paciente: ${numeroId}`);
+
+      const pgResult = await postgresService.query(
+        `SELECT
+          "_id",
+          "numeroId",
+          "fechaConsulta",
+          "fechaAtencion",
+          "medico",
+          "mdDx1",
+          "mdDx2",
+          "mdConceptoFinal",
+          "mdAntecedentes",
+          "mdObservacionesCertificado",
+          "mdRecomendacionesMedicasAdicionales",
+          "tipoExamen",
+          "talla",
+          "peso",
+          "atendido"
+        FROM "HistoriaClinica"
+        WHERE "numeroId" = $1
+          AND "atendido" = 'ATENDIDO'
+          AND "fechaConsulta" IS NOT NULL
+        ORDER BY "fechaConsulta" DESC
+        LIMIT 20`,
+        [numeroId]
+      );
+
+      if (!pgResult || pgResult.length === 0) {
+        console.log(`ℹ️  No se encontraron consultas anteriores para ${numeroId}`);
+        return [];
+      }
+
+      console.log(`✅ Se encontraron ${pgResult.length} consultas anteriores para ${numeroId}`);
+
+      return pgResult.map((row: any) => ({
+        _id: row._id,
+        numeroId: row.numeroId,
+        fechaConsulta: row.fechaConsulta,
+        fechaAtencion: row.fechaAtencion,
+        medico: row.medico,
+        mdDx1: row.mdDx1,
+        mdDx2: row.mdDx2,
+        mdConceptoFinal: row.mdConceptoFinal,
+        mdAntecedentes: row.mdAntecedentes,
+        mdObservacionesCertificado: row.mdObservacionesCertificado,
+        mdRecomendacionesMedicasAdicionales: row.mdRecomendacionesMedicasAdicionales,
+        tipoExamen: row.tipoExamen,
+        talla: row.talla,
+        peso: row.peso,
+        atendido: row.atendido,
+      })) as PatientHistoryRecord[];
+    } catch (error: any) {
+      console.error('❌ Error obteniendo historial del paciente:', error.message);
+      throw new Error('Error al obtener historial de consultas del paciente');
+    }
+  }
+
   async updateMedicalHistory(payload: UpdateMedicalHistoryPayload): Promise<{ success: boolean; error?: string }> {
     try {
       console.log(`💾 Actualizando historia clínica para ID: ${payload.historiaId}`);

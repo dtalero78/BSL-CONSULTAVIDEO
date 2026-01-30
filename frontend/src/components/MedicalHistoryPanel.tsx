@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import apiService from '../services/api.service';
+import { PatientHistoryModal } from './PatientHistoryModal';
 
 interface AntecedentesPersonales {
   cirugiaOcular?: boolean;
@@ -100,6 +101,7 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones }: Med
   const [imc, setImc] = useState('');
   const [aiSuggestions, setAiSuggestions] = useState('');
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
 
   useEffect(() => {
     loadMedicalHistory();
@@ -385,8 +387,20 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones }: Med
   return (
     <div className="h-full flex flex-col bg-[#1f2c34] text-white">
       {/* Header fijo */}
-      <div className="flex items-center p-4 border-b border-gray-700 bg-[#1f2c34] sticky top-0 z-10">
+      <div className="flex items-center justify-between p-4 border-b border-gray-700 bg-[#1f2c34] sticky top-0 z-10">
         <h2 className="text-lg font-bold text-[#00a884]">Historia Clínica</h2>
+        {data?.numeroId && (
+          <button
+            onClick={() => setIsHistoryModalOpen(true)}
+            className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition"
+            title="Ver consultas anteriores de este paciente"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Historial
+          </button>
+        )}
       </div>
 
       {/* Contenido scrollable */}
@@ -778,6 +792,16 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones }: Med
           )}
         </button>
       </div>
+
+      {/* Modal de Historial de Consultas */}
+      {data?.numeroId && (
+        <PatientHistoryModal
+          isOpen={isHistoryModalOpen}
+          onClose={() => setIsHistoryModalOpen(false)}
+          numeroId={data.numeroId}
+          patientName={`${data.primerNombre} ${data.primerApellido}`}
+        />
+      )}
     </div>
   );
 };

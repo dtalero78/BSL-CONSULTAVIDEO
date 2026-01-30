@@ -358,6 +358,34 @@ class VideoController {
   }
 
   /**
+   * Obtener historial de consultas anteriores de un paciente por numeroId (documento de identidad)
+   * GET /api/video/medical-history/patient/:numeroId
+   */
+  async getPatientHistory(req: Request, res: Response): Promise<void> {
+    try {
+      const { numeroId } = req.params;
+
+      if (!numeroId) {
+        res.status(400).json({ error: 'numeroId is required' });
+        return;
+      }
+
+      const history = await medicalHistoryService.getPatientHistory(numeroId);
+
+      res.status(200).json({
+        success: true,
+        data: history,
+      });
+    } catch (error) {
+      console.error('Error fetching patient history:', error);
+      res.status(500).json({
+        error: 'Failed to fetch patient history',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  /**
    * Actualizar historia clínica de un paciente por _id
    * POST /api/video/medical-history
    */
