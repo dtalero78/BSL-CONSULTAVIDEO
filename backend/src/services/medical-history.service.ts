@@ -119,6 +119,7 @@ interface PatientHistoryRecord {
   mdDx2: string | null;
   mdConceptoFinal: string | null;
   mdAntecedentes: string | null;
+  mdObsParaMiDocYa: string | null;
   mdObservacionesCertificado: string | null;
   mdRecomendacionesMedicasAdicionales: string | null;
   tipoExamen: string | null;
@@ -321,6 +322,7 @@ class MedicalHistoryService {
           "mdDx2",
           "mdConceptoFinal",
           "mdAntecedentes",
+          "mdObsParaMiDocYa",
           "mdObservacionesCertificado",
           "mdRecomendacionesMedicasAdicionales",
           "tipoExamen",
@@ -353,6 +355,7 @@ class MedicalHistoryService {
         mdDx2: row.mdDx2,
         mdConceptoFinal: row.mdConceptoFinal,
         mdAntecedentes: row.mdAntecedentes,
+        mdObsParaMiDocYa: row.mdObsParaMiDocYa,
         mdObservacionesCertificado: row.mdObservacionesCertificado,
         mdRecomendacionesMedicasAdicionales: row.mdRecomendacionesMedicasAdicionales,
         tipoExamen: row.tipoExamen,

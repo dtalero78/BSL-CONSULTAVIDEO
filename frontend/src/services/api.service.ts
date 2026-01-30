@@ -15,6 +15,7 @@ export interface PatientHistoryRecord {
   mdDx2: string | null;
   mdConceptoFinal: string | null;
   mdAntecedentes: string | null;
+  mdObsParaMiDocYa: string | null;
   mdObservacionesCertificado: string | null;
   mdRecomendacionesMedicasAdicionales: string | null;
   tipoExamen: string | null;

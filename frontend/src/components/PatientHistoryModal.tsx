@@ -201,6 +201,16 @@ export const PatientHistoryModal = ({
                         </div>
                       )}
 
+                      {/* Observaciones para la Empresa (MiDocYa) */}
+                      {record.mdObsParaMiDocYa && (
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">Observaciones para la Empresa</p>
+                          <p className="text-sm text-white whitespace-pre-wrap bg-[#1f2c34] p-2 rounded border-l-2 border-orange-500">
+                            {record.mdObsParaMiDocYa}
+                          </p>
+                        </div>
+                      )}
+
                       {/* Recomendaciones */}
                       {record.mdRecomendacionesMedicasAdicionales && (
                         <div>
