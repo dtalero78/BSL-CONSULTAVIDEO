@@ -757,12 +757,23 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones }: Med
             className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none"
           >
             <option value="">Seleccione una opción</option>
-            <option value="ELEGIBLE PARA EL CARGO SIN RECOMENDACIONES LABORALES">ELEGIBLE PARA EL CARGO SIN RECOMENDACIONES LABORALES</option>
-            <option value="ELEGIBLE PARA EL CARGO CON RECOMENDACIONES LABORALES">ELEGIBLE PARA EL CARGO CON RECOMENDACIONES LABORALES</option>
-            <option value="NO ELEGIBLE PARA EL CARGO POR FUERA DEL PROFESIOGRAMA">NO ELEGIBLE PARA EL CARGO POR FUERA DEL PROFESIOGRAMA</option>
-            <option value="PENDIENTE">PENDIENTE</option>
-            <option value="NO PRESENTA DETERIORO FÍSICO POR ACTIVIDAD LABORAL">NO PRESENTA DETERIORO FÍSICO POR ACTIVIDAD LABORAL</option>
-            <option value="Puede realizar actividades escolares y grupales">Puede realizar actividades escolares y grupales</option>
+            {data?.codEmpresa === 'SIIGO' ? (
+              <>
+                <option value="APTO">APTO</option>
+                <option value="NO APTO">NO APTO</option>
+                <option value="APLAZADO">APLAZADO</option>
+                <option value="NO PRESENTA DETERIORO FÍSICO POR ACTIVIDAD LABORAL">NO PRESENTA DETERIORO FÍSICO POR ACTIVIDAD LABORAL</option>
+              </>
+            ) : (
+              <>
+                <option value="ELEGIBLE PARA EL CARGO SIN RECOMENDACIONES LABORALES">ELEGIBLE PARA EL CARGO SIN RECOMENDACIONES LABORALES</option>
+                <option value="ELEGIBLE PARA EL CARGO CON RECOMENDACIONES LABORALES">ELEGIBLE PARA EL CARGO CON RECOMENDACIONES LABORALES</option>
+                <option value="NO ELEGIBLE PARA EL CARGO POR FUERA DEL PROFESIOGRAMA">NO ELEGIBLE PARA EL CARGO POR FUERA DEL PROFESIOGRAMA</option>
+                <option value="PENDIENTE">PENDIENTE</option>
+                <option value="NO PRESENTA DETERIORO FÍSICO POR ACTIVIDAD LABORAL">NO PRESENTA DETERIORO FÍSICO POR ACTIVIDAD LABORAL</option>
+                <option value="Puede realizar actividades escolares y grupales">Puede realizar actividades escolares y grupales</option>
+              </>
+            )}
           </select>
         </div>
 
