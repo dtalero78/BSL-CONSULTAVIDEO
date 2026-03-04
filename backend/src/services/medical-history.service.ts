@@ -373,6 +373,10 @@ class MedicalHistoryService {
     try {
       console.log(`💾 Actualizando historia clínica para ID: ${payload.historiaId}`);
 
+      if (!payload.mdConceptoFinal) {
+        return { success: false, error: 'El campo Concepto Final es obligatorio' };
+      }
+
       // PASO 0: Obtener datos base del paciente
       const historiaBase = await this.getMedicalHistory(payload.historiaId);
 

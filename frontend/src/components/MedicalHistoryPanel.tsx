@@ -294,6 +294,11 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones }: Med
   const handleSave = async () => {
     if (!data) return;
 
+    if (!mdConceptoFinal) {
+      alert('Debe seleccionar un Concepto Final antes de guardar.');
+      return;
+    }
+
     try {
       setIsSaving(true);
       setError(null);
@@ -750,7 +755,7 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones }: Med
 
         {/* 7. CONCEPTO FINAL */}
         <div>
-          <label className="block text-xs text-gray-400 mb-1">Concepto Final</label>
+          <label className="block text-xs text-gray-400 mb-1">Concepto Final <span className="text-red-500">*</span></label>
           <select
             value={mdConceptoFinal}
             onChange={(e) => setMdConceptoFinal(e.target.value)}
