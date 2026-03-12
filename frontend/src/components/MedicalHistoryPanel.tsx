@@ -771,10 +771,10 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones }: Med
               </>
             ) : (
               <>
-                <option value="ELEGIBLE PARA EL CARGO SIN RECOMENDACIONES LABORALES">ELEGIBLE PARA EL CARGO SIN RECOMENDACIONES LABORALES</option>
-                <option value="ELEGIBLE PARA EL CARGO CON RECOMENDACIONES LABORALES">ELEGIBLE PARA EL CARGO CON RECOMENDACIONES LABORALES</option>
-                <option value="NO ELEGIBLE PARA EL CARGO POR FUERA DEL PROFESIOGRAMA">NO ELEGIBLE PARA EL CARGO POR FUERA DEL PROFESIOGRAMA</option>
-                <option value="PENDIENTE">PENDIENTE</option>
+                <option value="APTO">APTO</option>
+                <option value="APTO CON RECOMENDACIONES">APTO CON RECOMENDACIONES</option>
+                <option value="APLAZADO">APLAZADO</option>
+                <option value="NO APTO">NO APTO</option>
                 <option value="NO PRESENTA DETERIORO FÍSICO POR ACTIVIDAD LABORAL">NO PRESENTA DETERIORO FÍSICO POR ACTIVIDAD LABORAL</option>
                 <option value="Puede realizar actividades escolares y grupales">Puede realizar actividades escolares y grupales</option>
               </>
