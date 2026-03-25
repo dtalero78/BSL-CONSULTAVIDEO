@@ -180,6 +180,32 @@ class HistoriaClinicaPostgresService {
       return [];
     }
   }
+
+  /**
+   * Actualiza el campo aprobacion de una historia clínica
+   */
+  async updateAprobacion(historiaId: string, aprobacion: string): Promise<boolean> {
+    try {
+      const query = `
+        UPDATE "HistoriaClinica"
+        SET "aprobacion" = $2
+        WHERE "_id" = $1
+        RETURNING "_id"
+      `;
+      const result = await postgresService.query(query, [historiaId, aprobacion]);
+
+      if (result && result.length > 0) {
+        console.log(`✅ [PostgreSQL] Aprobación actualizada para ${historiaId}: ${aprobacion}`);
+        return true;
+      }
+
+      console.warn(`⚠️  [PostgreSQL] No se encontró historia clínica ${historiaId} para actualizar aprobación`);
+      return false;
+    } catch (error) {
+      console.error(`❌ [PostgreSQL] Error actualizando aprobación ${historiaId}:`, error);
+      return false;
+    }
+  }
 }
 
 export default new HistoriaClinicaPostgresService();

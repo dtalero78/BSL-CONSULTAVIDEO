@@ -505,6 +505,9 @@ class MedicalHistoryService {
         console.error(`⚠️  [Wix] Error guardando backup (no crítico): ${wixError.message}`);
       }
 
+      // PASO 3: Enviar alerta WhatsApp para OMEGA con concepto crítico
+      this.sendOmegaAlertIfNeeded(historiaBase, payload);
+
       return { success: true };
     } catch (error: any) {
       console.error('❌ Error actualizando historia clínica:', error.message);
@@ -512,6 +515,75 @@ class MedicalHistoryService {
         success: false,
         error: error.message || 'Error al actualizar historia clínica'
       };
+    }
+  }
+
+  /**
+   * Envía alerta WhatsApp cuando un paciente OMEGA tiene concepto NO APTO, APLAZADO o APTO CON RECOMENDACIONES
+   */
+  private async sendOmegaAlertIfNeeded(
+    historiaBase: MedicalHistoryData,
+    payload: UpdateMedicalHistoryPayload
+  ): Promise<void> {
+    try {
+      const conceptosAlerta = ['NO APTO', 'APLAZADO', 'APTO CON RECOMENDACIONES'];
+
+      if (
+        historiaBase.codEmpresa?.toUpperCase() !== 'OMEGA' ||
+        !payload.mdConceptoFinal ||
+        !conceptosAlerta.includes(payload.mdConceptoFinal.toUpperCase())
+      ) {
+        return;
+      }
+
+      const nombrePaciente = [
+        historiaBase.primerNombre,
+        historiaBase.segundoNombre,
+        historiaBase.primerApellido,
+        historiaBase.segundoApellido,
+      ].filter(Boolean).join(' ');
+
+      let mensaje = `🚨 *ALERTA CONCEPTO MÉDICO - OMEGA*\n\n`;
+      mensaje += `*Paciente:* ${nombrePaciente}\n`;
+      mensaje += `*Documento:* ${historiaBase.numeroId}\n`;
+      mensaje += `*Cargo:* ${payload.cargo || historiaBase.cargo || 'No especificado'}\n`;
+      mensaje += `*Concepto Final:* ${payload.mdConceptoFinal}\n`;
+
+      if (payload.mdRecomendacionesMedicasAdicionales) {
+        mensaje += `\n*Recomendaciones Médicas:*\n${payload.mdRecomendacionesMedicasAdicionales}\n`;
+      }
+
+      if (payload.mdObsParaMiDocYa) {
+        mensaje += `\n*Observaciones para la empresa:*\n${payload.mdObsParaMiDocYa}\n`;
+      }
+
+      const baseUrl = 'https://medico-bsl.com';
+      const approveUrl = `${baseUrl}/api/medical-panel/approve/${payload.historiaId}/APROBADO`;
+      const rejectUrl = `${baseUrl}/api/medical-panel/approve/${payload.historiaId}/NO%20APROBADO`;
+
+      mensaje += `\n---\n`;
+      mensaje += `✅ *Aprobar:* ${approveUrl}\n`;
+      mensaje += `❌ *No Aprobar:* ${rejectUrl}\n`;
+
+      const telefonos = ['573008021701', '573166939639', '573202543077'];
+
+      console.log(`🚨 Enviando alerta OMEGA para ${nombrePaciente} - Concepto: ${payload.mdConceptoFinal}`);
+
+      const resultados = await Promise.allSettled(
+        telefonos.map(telefono => whatsappService.sendTextMessage(telefono, mensaje))
+      );
+
+      resultados.forEach((resultado, i) => {
+        if (resultado.status === 'fulfilled' && resultado.value.success) {
+          console.log(`✅ Alerta OMEGA enviada a ${telefonos[i]}`);
+        } else {
+          const error = resultado.status === 'rejected' ? resultado.reason : resultado.value.error;
+          console.error(`❌ Error enviando alerta OMEGA a ${telefonos[i]}:`, error);
+        }
+      });
+    } catch (error: any) {
+      // No bloquear el guardado si falla el envío de alertas
+      console.error('❌ Error enviando alerta OMEGA por WhatsApp:', error.message);
     }
   }
 }
