@@ -43,7 +43,7 @@ class WhapiService {
     try {
       console.log(`📱 [WHAPI] Enviando WhatsApp a: ${cleanPhone} (intento ${attempt}/${this.maxRetries})`);
 
-      const response = await axios.post(
+      await axios.post(
         this.apiUrl,
         { typing_time: 0, to: cleanPhone, body: message },
         {
