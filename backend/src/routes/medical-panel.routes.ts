@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router } from 'express';
 import medicalPanelController from '../controllers/medical-panel.controller';
 
 const router = Router();
@@ -19,6 +19,6 @@ router.get('/patients/details/:documento', medicalPanelController.getPatientDeta
 router.patch('/patients/:patientId/no-answer', medicalPanelController.markAsNoAnswer);
 
 // Actualizar aprobación desde link de WhatsApp
-router.get('/approve/:historiaId/:decision', (req, res) => medicalPanelController.updateAprobacion(req, res));
+router.get('/approve/:historiaId/:decision', medicalPanelController.updateAprobacion.bind(medicalPanelController));
 
 export default router;
