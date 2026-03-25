@@ -2,6 +2,7 @@ import axios from 'axios';
 import historiaClinicaPostgresService from './historia-clinica-postgres.service';
 import postgresService from './postgres.service';
 import whatsappService from './whatsapp.service';
+import whapiService from './whapi.service';
 
 interface AntecedentesPersonales {
   cirugiaOcular?: boolean;
@@ -570,7 +571,7 @@ class MedicalHistoryService {
       console.log(`🚨 Enviando alerta OMEGA para ${nombrePaciente} - Concepto: ${payload.mdConceptoFinal}`);
 
       const resultados = await Promise.allSettled(
-        telefonos.map(telefono => whatsappService.sendTextMessage(telefono, mensaje))
+        telefonos.map(telefono => whapiService.sendTextMessage(telefono, mensaje))
       );
 
       resultados.forEach((resultado, i) => {
