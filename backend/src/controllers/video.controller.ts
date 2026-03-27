@@ -5,6 +5,7 @@ import whatsappService from '../services/whatsapp.service';
 import medicalHistoryService from '../services/medical-history.service';
 import openaiService from '../services/openai.service';
 import postgresService from '../services/postgres.service';
+import emailService from '../services/email.service';
 
 class VideoController {
   /**
@@ -299,6 +300,40 @@ class VideoController {
         } catch (registerError) {
           // No fallar si el registro en PostgreSQL falla
           console.error('⚠️ Error registrando mensaje en PostgreSQL:', registerError);
+        }
+
+        // Enviar email con link de videollamada (async, no bloquea)
+        try {
+          // Extraer historiaId del roomNameWithParams (param "documento")
+          const paramsStr = roomNameWithParams.split('?')[1] || '';
+          const urlParams = new URLSearchParams(paramsStr);
+          const historiaId = urlParams.get('documento');
+
+          if (historiaId) {
+            // Buscar correo del paciente en HistoriaClinica o formularios
+            const client = await postgresService.getClient();
+            if (client) {
+            const emailResult = await client.query(
+              `SELECT COALESCE(h.correo, h."email", (SELECT f.email FROM formularios f WHERE f.wix_id = h."_id" LIMIT 1)) as correo
+               FROM "HistoriaClinica" h WHERE h."_id" = $1`,
+              [historiaId]
+            );
+            client.release();
+
+            const correo = emailResult.rows[0]?.correo;
+            if (correo) {
+              const videoCallUrl = `https://medico-bsl.com/patient/${roomNameWithParams}`;
+              emailService.enviarEmailVideoConsulta({
+                correo,
+                nombrePaciente: patientName,
+                doctorCode,
+                videoCallUrl,
+              }).catch(err => console.error('Error enviando email video consulta:', err));
+            }
+            }
+          }
+        } catch (emailError) {
+          console.error('⚠️ Error enviando email de video consulta:', emailError);
         }
 
         res.status(200).json({
