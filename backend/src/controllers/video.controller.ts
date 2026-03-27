@@ -24,18 +24,26 @@ class VideoController {
         return;
       }
 
-      // Intentar crear la sala como peer-to-peer si no existe
-      // Esto optimiza costos (~62% más barato que 'group')
+      // Verificar si la sala ya fue completada (cerrada por el doctor)
       try {
-        await twilioService.createRoom(roomName, 'peer-to-peer');
-        console.log(`Room created as peer-to-peer: ${roomName}`);
+        const existingRoom = await twilioService.getRoom(roomName);
+        if (existingRoom.status === 'completed') {
+          res.status(403).json({
+            error: 'Room has been completed',
+            message: 'Esta videollamada ya finalizó y no se puede volver a ingresar.',
+          });
+          return;
+        }
+        console.log(`Room already exists: ${roomName}`);
       } catch (error: any) {
-        // Si la sala ya existe, continuar (error code 53113)
-        if (error.code === 53113) {
-          console.log(`Room already exists: ${roomName}`);
-        } else {
-          // Otro error, pero no bloqueamos la generación del token
-          console.warn(`Could not create room, will use existing: ${error.message}`);
+        // Sala no existe, intentar crearla como peer-to-peer
+        try {
+          await twilioService.createRoom(roomName, 'peer-to-peer');
+          console.log(`Room created as peer-to-peer: ${roomName}`);
+        } catch (createError: any) {
+          if (createError.code !== 53113) {
+            console.warn(`Could not create room, will use existing: ${createError.message}`);
+          }
         }
       }
 

@@ -186,9 +186,14 @@ export const useVideoRoom = ({
       });
 
       console.log(`Successfully connected to room: ${roomName}`);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error connecting to room:', err);
-      setError(err instanceof Error ? err.message : 'Failed to connect to room');
+      // Detectar error 403 (sala completada)
+      if (err?.response?.status === 403) {
+        setError(err.response.data?.message || 'Esta videollamada ya finalizó y no se puede volver a ingresar.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to connect to room');
+      }
     } finally {
       setIsConnecting(false);
     }

@@ -1,5 +1,6 @@
 import twilio from 'twilio';
 import { Server as SocketIOServer } from 'socket.io';
+import twilioService from './twilio.service';
 
 interface SessionParticipant {
   identity: string;
@@ -110,6 +111,13 @@ class SessionTrackerService {
     const participant = session.participants.get(identity);
     if (participant) {
       participant.disconnectedAt = new Date();
+
+      // Si el doctor se desconecta, cerrar la sala en Twilio para que nadie más pueda entrar
+      if (participant.role === 'doctor') {
+        twilioService.endRoom(roomName)
+          .then(() => console.log(`[SessionTracker] Room ${roomName} completed (doctor disconnected)`))
+          .catch((err: any) => console.error(`[SessionTracker] Error ending room ${roomName}:`, err.message));
+      }
 
       // Emitir evento Socket.io cuando un paciente se desconecta - SOLO a la Room del médico específico
       if (participant.role === 'patient' && this.io && session.patientDocumento && session.medicoCode) {
