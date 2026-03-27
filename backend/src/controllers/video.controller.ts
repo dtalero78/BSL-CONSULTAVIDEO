@@ -38,8 +38,8 @@ class VideoController {
       } catch (error: any) {
         // Sala no existe, intentar crearla como peer-to-peer
         try {
-          await twilioService.createRoom(roomName, 'peer-to-peer');
-          console.log(`Room created as peer-to-peer: ${roomName}`);
+          await twilioService.createRoom(roomName);
+          console.log(`Room created as group (max 2): ${roomName}`);
         } catch (createError: any) {
           if (createError.code !== 53113) {
             console.warn(`Could not create room, will use existing: ${createError.message}`);
