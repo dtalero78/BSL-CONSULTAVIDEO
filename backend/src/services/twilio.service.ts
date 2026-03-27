@@ -124,12 +124,46 @@ class TwilioService {
         .rooms(roomSidOrUniqueName)
         .update({ status: 'completed' });
 
+      // Crear composición combinada (audio + video en un solo archivo)
+      this.createComposition(room.sid)
+        .then((comp) => console.log(`[Twilio] Composition created: ${comp.sid} for room ${room.sid}`))
+        .catch((err) => console.error(`[Twilio] Error creating composition for room ${room.sid}:`, err.message));
+
       return {
         sid: room.sid,
         status: room.status,
       };
     } catch (error) {
       console.error('Error ending room:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Crear composición combinada de todos los tracks de una sala
+   * Genera un solo archivo MP4 con audio y video de todos los participantes
+   */
+  async createComposition(roomSid: string) {
+    try {
+      const composition = await this.client.video.v1.compositions.create({
+        roomSid,
+        audioSources: ['*'],
+        videoLayout: {
+          grid: {
+            video_sources: ['*'],
+          },
+        },
+        format: 'mp4',
+        resolution: '640x480',
+      });
+
+      return {
+        sid: composition.sid,
+        status: composition.status,
+        roomSid: composition.roomSid,
+      };
+    } catch (error) {
+      console.error('Error creating composition:', error);
       throw error;
     }
   }
