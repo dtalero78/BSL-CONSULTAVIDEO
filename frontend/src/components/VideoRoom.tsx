@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useVideoRoom } from '../hooks/useVideoRoom';
 import { useBackgroundEffects } from '../hooks/useBackgroundEffects';
 import { usePosturalAnalysis } from '../hooks/usePosturalAnalysis';
@@ -65,6 +65,13 @@ export const VideoRoom = ({ identity, roomName, role, historiaId, documento, med
     endSession,
     sendPoseData,
   } = posturalAnalysis;
+
+  // Aplicar fondo virtual BSL automáticamente al doctor cuando se conecta
+  useEffect(() => {
+    if (role === 'doctor' && localVideoTrack && currentEffect === 'none') {
+      applyVirtualBackground(localVideoTrack, '/fondoVideoSalaDoc.png');
+    }
+  }, [localVideoTrack]);
 
   const handleLeave = () => {
     disconnectFromRoom();
