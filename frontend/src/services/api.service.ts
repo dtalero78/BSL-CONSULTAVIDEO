@@ -92,7 +92,8 @@ class ApiService {
     identity: string,
     role: 'doctor' | 'patient',
     documento?: string,
-    medicoCode?: string
+    medicoCode?: string,
+    historiaId?: string
   ): Promise<void> {
     await this.client.post('/api/video/events/participant-connected', {
       roomName,
@@ -100,6 +101,7 @@ class ApiService {
       role,
       documento,
       medicoCode,
+      historiaId,
     });
   }
 

@@ -35,7 +35,7 @@ export const VideoRoom = ({ identity, roomName, role, historiaId, documento, med
     isAudioEnabled,
     isVideoEnabled,
     localVideoTrack,
-  } = useVideoRoom({ identity, roomName, role, documento, medicoCode });
+  } = useVideoRoom({ identity, roomName, role, documento, medicoCode, historiaId });
 
   const {
     currentEffect,

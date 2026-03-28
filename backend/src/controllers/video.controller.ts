@@ -198,7 +198,7 @@ class VideoController {
    */
   async trackParticipantConnected(req: Request, res: Response): Promise<void> {
     try {
-      const { roomName, identity, role, documento, medicoCode } = req.body;
+      const { roomName, identity, role, documento, medicoCode, historiaId } = req.body;
 
       if (!roomName || !identity || !role) {
         res.status(400).json({
@@ -214,7 +214,7 @@ class VideoController {
         return;
       }
 
-      sessionTracker.trackParticipantConnected(roomName, identity, role, documento, medicoCode);
+      sessionTracker.trackParticipantConnected(roomName, identity, role, documento, medicoCode, historiaId);
 
       res.status(200).json({
         success: true,

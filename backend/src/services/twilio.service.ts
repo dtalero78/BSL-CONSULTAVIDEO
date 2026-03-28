@@ -74,7 +74,6 @@ class TwilioService {
         uniqueName: roomName,
         type: 'group',
         maxParticipants,
-        recordParticipantsOnConnect: true,
       });
 
       return {
@@ -118,23 +117,48 @@ class TwilioService {
    * Finalizar una sala de video
    * @param roomSidOrUniqueName - SID o nombre único de la sala
    */
-  async endRoom(roomSidOrUniqueName: string) {
+  async endRoom(roomSidOrUniqueName: string, createComposition: boolean = false) {
     try {
       const room = await this.client.video.v1
         .rooms(roomSidOrUniqueName)
         .update({ status: 'completed' });
 
-      // Crear composición combinada (audio + video en un solo archivo)
-      this.createComposition(room.sid)
-        .then((comp) => console.log(`[Twilio] Composition created: ${comp.sid} for room ${room.sid}`))
-        .catch((err) => console.error(`[Twilio] Error creating composition for room ${room.sid}:`, err.message));
+      let compositionSid: string | undefined;
+
+      // Solo crear composición si la grabación estaba activada
+      if (createComposition) {
+        try {
+          const comp = await this.createComposition(room.sid);
+          compositionSid = comp.sid;
+          console.log(`[Twilio] Composition created: ${comp.sid} for room ${room.sid}`);
+        } catch (err: any) {
+          console.error(`[Twilio] Error creating composition for room ${room.sid}:`, err.message);
+        }
+      }
 
       return {
         sid: room.sid,
         status: room.status,
+        compositionSid,
       };
     } catch (error) {
       console.error('Error ending room:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Activar grabación en una sala existente usando Recording Rules
+   */
+  async enableRecording(roomSid: string) {
+    try {
+      await this.client.video.v1.rooms(roomSid)
+        .recordingRules.update({
+          rules: [{ type: 'include', all: true }],
+        });
+      console.log(`[Twilio] Recording enabled for room ${roomSid}`);
+    } catch (error) {
+      console.error('Error enabling recording:', error);
       throw error;
     }
   }

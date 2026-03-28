@@ -1,6 +1,7 @@
 import twilio from 'twilio';
 import { Server as SocketIOServer } from 'socket.io';
 import twilioService from './twilio.service';
+import postgresService from './postgres.service';
 
 interface SessionParticipant {
   identity: string;
@@ -14,8 +15,11 @@ interface VideoSession {
   participants: Map<string, SessionParticipant>;
   createdAt: Date;
   completedAt?: Date;
-  patientDocumento?: string; // ID del documento del paciente
-  medicoCode?: string; // Código del médico asignado
+  patientDocumento?: string;
+  medicoCode?: string;
+  historiaId?: string;
+  codEmpresa?: string;
+  recordingEnabled: boolean;
 }
 
 class SessionTrackerService {
@@ -50,8 +54,8 @@ class SessionTrackerService {
   /**
    * Registra que un participante se conectó a la sala
    */
-  trackParticipantConnected(roomName: string, identity: string, role: 'doctor' | 'patient', documento?: string, medicoCode?: string): void {
-    console.log(`[SessionTracker] Participant connected: ${identity} (${role}) to room ${roomName}, medicoCode: ${medicoCode}`);
+  trackParticipantConnected(roomName: string, identity: string, role: 'doctor' | 'patient', documento?: string, medicoCode?: string, historiaId?: string): void {
+    console.log(`[SessionTracker] Participant connected: ${identity} (${role}) to room ${roomName}, medicoCode: ${medicoCode}, historiaId: ${historiaId}`);
 
     if (!this.sessions.has(roomName)) {
       this.sessions.set(roomName, {
@@ -60,6 +64,7 @@ class SessionTrackerService {
         createdAt: new Date(),
         patientDocumento: documento,
         medicoCode: medicoCode,
+        recordingEnabled: false,
       });
     }
 
@@ -73,6 +78,12 @@ class SessionTrackerService {
     // Si tenemos medicoCode, guardarlo en la sesión
     if (medicoCode) {
       session.medicoCode = medicoCode;
+    }
+
+    // Si el doctor se conecta con historiaId, buscar codEmpresa y decidir grabación
+    if (role === 'doctor' && historiaId) {
+      session.historiaId = historiaId;
+      this.setupRecordingIfNeeded(session, historiaId, identity);
     }
 
     session.participants.set(identity, {
@@ -97,6 +108,61 @@ class SessionTrackerService {
   }
 
   /**
+   * Busca codEmpresa del paciente y activa grabación si es SIIGO.
+   * También guarda el registro en video_sessions.
+   */
+  private async setupRecordingIfNeeded(session: VideoSession, historiaId: string, doctorIdentity: string): Promise<void> {
+    try {
+      // Buscar datos del paciente en PostgreSQL
+      const rows = await postgresService.query(
+        `SELECT "numeroId", "primerNombre", "primerApellido", "codEmpresa" FROM "HistoriaClinica" WHERE "_id" = $1 LIMIT 1`,
+        [historiaId]
+      );
+
+      if (!rows || rows.length === 0) {
+        console.warn(`[SessionTracker] Historia clínica no encontrada: ${historiaId}`);
+        return;
+      }
+
+      const patient = rows[0];
+      session.codEmpresa = patient.codEmpresa;
+      session.patientDocumento = patient.numeroId;
+
+      // Si es SIIGO, activar grabación
+      if (patient.codEmpresa === 'SIIGO') {
+        try {
+          const room = await twilioService.getRoom(session.roomName);
+          await twilioService.enableRecording(room.sid);
+          session.recordingEnabled = true;
+          console.log(`[SessionTracker] Recording enabled for SIIGO patient in room ${session.roomName}`);
+        } catch (err: any) {
+          console.error(`[SessionTracker] Error enabling recording: ${err.message}`);
+        }
+      }
+
+      // Guardar en video_sessions
+      const roomInfo = await twilioService.getRoom(session.roomName).catch(() => null);
+      await postgresService.query(
+        `INSERT INTO video_sessions (room_name, room_sid, historia_id, patient_documento, patient_name, doctor_name, cod_empresa, recording_enabled)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          session.roomName,
+          roomInfo?.sid || null,
+          historiaId,
+          patient.numeroId,
+          `${patient.primerNombre} ${patient.primerApellido}`.trim(),
+          doctorIdentity,
+          patient.codEmpresa,
+          session.recordingEnabled,
+        ]
+      );
+      console.log(`[SessionTracker] Video session saved for patient ${patient.numeroId} in room ${session.roomName}`);
+    } catch (error: any) {
+      console.error(`[SessionTracker] Error in setupRecordingIfNeeded: ${error.message}`);
+    }
+  }
+
+  /**
    * Registra que un participante se desconectó de la sala
    */
   trackParticipantDisconnected(roomName: string, identity: string): void {
@@ -114,8 +180,23 @@ class SessionTrackerService {
 
       // Si el doctor se desconecta, cerrar la sala en Twilio para que nadie más pueda entrar
       if (participant.role === 'doctor') {
-        twilioService.endRoom(roomName)
-          .then(() => console.log(`[SessionTracker] Room ${roomName} completed (doctor disconnected)`))
+        const shouldCreateComposition = session.recordingEnabled;
+        twilioService.endRoom(roomName, shouldCreateComposition)
+          .then(async (result) => {
+            console.log(`[SessionTracker] Room ${roomName} completed (doctor disconnected)`);
+            // Guardar composition_sid en video_sessions
+            if (result.compositionSid) {
+              try {
+                await postgresService.query(
+                  `UPDATE video_sessions SET composition_sid = $1 WHERE room_name = $2`,
+                  [result.compositionSid, roomName]
+                );
+                console.log(`[SessionTracker] Composition ${result.compositionSid} saved for room ${roomName}`);
+              } catch (err: any) {
+                console.error(`[SessionTracker] Error saving composition_sid: ${err.message}`);
+              }
+            }
+          })
           .catch((err: any) => console.error(`[SessionTracker] Error ending room ${roomName}:`, err.message));
       }
 
