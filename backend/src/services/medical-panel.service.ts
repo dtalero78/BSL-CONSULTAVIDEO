@@ -59,7 +59,7 @@ class MedicalPanelService {
   /**
    * Obtiene las estadísticas del día para un médico específico
    */
-  async getDailyStats(medicoCode: string): Promise<PatientStats> {
+  async getDailyStats(medicoCode: string, tenantId: string = 'bsl'): Promise<PatientStats> {
     try {
       // Calcular inicio y fin del día en Colombia (UTC-5)
       const now = new Date();
@@ -76,8 +76,9 @@ class MedicalPanelService {
         `SELECT COUNT(*) as count FROM "HistoriaClinica"
          WHERE "medico" = $1
          AND "fechaAtencion" >= $2
-         AND "fechaAtencion" <= $3`,
-        [medicoCode, startOfDay, endOfDay]
+         AND "fechaAtencion" <= $3
+         AND tenant_id = $4`,
+        [medicoCode, startOfDay, endOfDay, tenantId]
       );
 
       // Query para atendidos hoy (programados hoy que ya tienen fechaConsulta)
@@ -86,8 +87,9 @@ class MedicalPanelService {
          WHERE "medico" = $1
          AND "fechaAtencion" >= $2
          AND "fechaAtencion" <= $3
-         AND "fechaConsulta" IS NOT NULL`,
-        [medicoCode, startOfDay, endOfDay]
+         AND "fechaConsulta" IS NOT NULL
+         AND tenant_id = $4`,
+        [medicoCode, startOfDay, endOfDay, tenantId]
       );
 
       // Query para restantes hoy (programados sin fechaConsulta)
@@ -96,8 +98,9 @@ class MedicalPanelService {
          WHERE "medico" = $1
          AND "fechaAtencion" >= $2
          AND "fechaAtencion" <= $3
-         AND "fechaConsulta" IS NULL`,
-        [medicoCode, startOfDay, endOfDay]
+         AND "fechaConsulta" IS NULL
+         AND tenant_id = $4`,
+        [medicoCode, startOfDay, endOfDay, tenantId]
       );
 
       return {
@@ -121,7 +124,8 @@ class MedicalPanelService {
   async getPendingPatients(
     medicoCode: string,
     page: number = 0,
-    pageSize: number = 10
+    pageSize: number = 10,
+    tenantId: string = 'bsl'
   ): Promise<PaginatedPatients> {
     try {
       // Calcular inicio y fin del día en Colombia (UTC-5)
@@ -147,9 +151,10 @@ class MedicalPanelService {
          AND "fechaAtencion" <= $3
          AND ("fechaConsulta" IS NULL)
          AND "numeroId" NOT IN ('TEST', 'test')
+         AND tenant_id = $6
          ORDER BY "fechaAtencion" ASC
          LIMIT $4 OFFSET $5`,
-        [medicoCode, startOfDay, endOfDay, pageSize, offset]
+        [medicoCode, startOfDay, endOfDay, pageSize, offset, tenantId]
       );
 
       // Query para contar total
@@ -159,8 +164,9 @@ class MedicalPanelService {
          AND "fechaAtencion" >= $2
          AND "fechaAtencion" <= $3
          AND ("fechaConsulta" IS NULL)
-         AND "numeroId" NOT IN ('TEST', 'test')`,
-        [medicoCode, startOfDay, endOfDay]
+         AND "numeroId" NOT IN ('TEST', 'test')
+         AND tenant_id = $4`,
+        [medicoCode, startOfDay, endOfDay, tenantId]
       );
 
       const totalItems = parseInt(countResult?.[0]?.count || '0');
@@ -205,7 +211,7 @@ class MedicalPanelService {
   /**
    * Busca un paciente por documento de identidad o celular
    */
-  async searchPatientByDocument(searchTerm: string): Promise<Patient | null> {
+  async searchPatientByDocument(searchTerm: string, tenantId: string = 'bsl'): Promise<Patient | null> {
     try {
       // Buscar por numeroId o celular
       const result = await postgresService.query(
@@ -213,10 +219,11 @@ class MedicalPanelService {
                 "celular", "fechaAtencion", "fechaConsulta", "atendido", "pvEstado", "codEmpresa",
                 "empresa", "medico", "motivoConsulta", "tipoExamen"
          FROM "HistoriaClinica"
-         WHERE "numeroId" = $1 OR "celular" = $1
+         WHERE ("numeroId" = $1 OR "celular" = $1)
+         AND tenant_id = $2
          ORDER BY "fechaAtencion" DESC
          LIMIT 1`,
-        [searchTerm]
+        [searchTerm, tenantId]
       );
 
       if (!result || result.length === 0) {
@@ -251,14 +258,14 @@ class MedicalPanelService {
   /**
    * Marca un paciente como "No Contesta"
    */
-  async markPatientAsNoAnswer(patientId: string): Promise<boolean> {
+  async markPatientAsNoAnswer(patientId: string, tenantId: string = 'bsl'): Promise<boolean> {
     try {
       const result = await postgresService.query(
         `UPDATE "HistoriaClinica"
          SET "pvEstado" = 'No Contesta', "medico" = 'RESERVA'
-         WHERE "_id" = $1
+         WHERE "_id" = $1 AND tenant_id = $2
          RETURNING "_id"`,
-        [patientId]
+        [patientId, tenantId]
       );
 
       return result !== null && result.length > 0;
@@ -271,14 +278,14 @@ class MedicalPanelService {
   /**
    * Obtiene detalles completos de un paciente
    */
-  async getPatientDetails(documento: string): Promise<PatientDetails | null> {
+  async getPatientDetails(documento: string, tenantId: string = 'bsl'): Promise<PatientDetails | null> {
     try {
       const result = await postgresService.query(
         `SELECT * FROM "HistoriaClinica"
-         WHERE "numeroId" = $1
+         WHERE "numeroId" = $1 AND tenant_id = $2
          ORDER BY "fechaAtencion" DESC
          LIMIT 1`,
-        [documento]
+        [documento, tenantId]
       );
 
       if (!result || result.length === 0) {

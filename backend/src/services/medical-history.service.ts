@@ -140,7 +140,7 @@ class MedicalHistoryService {
    * Obtiene la historia clínica de un paciente desde PostgreSQL (principal)
    * Si no existe en PostgreSQL, intenta obtener de Wix como fallback
    */
-  async getMedicalHistory(historiaId: string): Promise<MedicalHistoryData | null> {
+  async getMedicalHistory(historiaId: string, tenantId?: string): Promise<MedicalHistoryData | null> {
     try {
       console.log(`📋 Obteniendo historia clínica para ID: ${historiaId}`);
 
@@ -195,9 +195,10 @@ class MedicalHistoryService {
         FROM "HistoriaClinica" h
         LEFT JOIN formularios f ON h."numeroId" = f.numero_id
         WHERE h."_id" = $1
+        ${tenantId ? 'AND h.tenant_id = $2' : ''}
         ORDER BY f.fecha_registro DESC
         LIMIT 1`,
-        [historiaId]
+        tenantId ? [historiaId, tenantId] : [historiaId]
       );
 
       if (pgResult && pgResult.length > 0) {
@@ -308,7 +309,7 @@ class MedicalHistoryService {
    * Obtiene el historial de consultas anteriores de un paciente por su numeroId (documento de identidad)
    * Retorna todas las consultas completadas (atendido = 'ATENDIDO') ordenadas por fecha descendente
    */
-  async getPatientHistory(numeroId: string): Promise<PatientHistoryRecord[]> {
+  async getPatientHistory(numeroId: string, tenantId: string = 'bsl'): Promise<PatientHistoryRecord[]> {
     try {
       console.log(`📋 Obteniendo historial de consultas para paciente: ${numeroId}`);
 
@@ -334,9 +335,10 @@ class MedicalHistoryService {
         WHERE "numeroId" = $1
           AND "atendido" = 'ATENDIDO'
           AND "fechaConsulta" IS NOT NULL
+          AND tenant_id = $2
         ORDER BY "fechaConsulta" DESC
         LIMIT 20`,
-        [numeroId]
+        [numeroId, tenantId]
       );
 
       if (!pgResult || pgResult.length === 0) {

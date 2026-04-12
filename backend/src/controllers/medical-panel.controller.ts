@@ -1,6 +1,14 @@
 import { Request, Response } from 'express';
 import medicalPanelService from '../services/medical-panel.service';
 import historiaClinicaPostgresService from '../services/historia-clinica-postgres.service';
+import tenantService from '../services/tenant.service';
+
+/** Resuelve el tenantId a partir del hostname del request */
+async function getTenantId(req: Request): Promise<string> {
+  const hostname = req.hostname || (req.headers.host || '').split(':')[0];
+  const tenant = await tenantService.getByHostname(hostname);
+  return tenant.id;
+}
 
 class MedicalPanelController {
   /**
@@ -15,7 +23,8 @@ class MedicalPanelController {
         return;
       }
 
-      const stats = await medicalPanelService.getDailyStats(medicoCode);
+      const tenantId = await getTenantId(req);
+      const stats = await medicalPanelService.getDailyStats(medicoCode, tenantId);
       res.json(stats);
     } catch (error) {
       console.error('Error obteniendo estadísticas:', error);
@@ -37,7 +46,8 @@ class MedicalPanelController {
         return;
       }
 
-      const result = await medicalPanelService.getPendingPatients(medicoCode, page, pageSize);
+      const tenantId = await getTenantId(req);
+      const result = await medicalPanelService.getPendingPatients(medicoCode, page, pageSize, tenantId);
       res.json(result);
     } catch (error) {
       console.error('Error obteniendo pacientes pendientes:', error);
@@ -57,7 +67,8 @@ class MedicalPanelController {
         return;
       }
 
-      const patient = await medicalPanelService.searchPatientByDocument(documento);
+      const tenantId = await getTenantId(req);
+      const patient = await medicalPanelService.searchPatientByDocument(documento, tenantId);
 
       if (!patient) {
         res.status(404).json({ error: 'Paciente no encontrado' });
@@ -83,7 +94,8 @@ class MedicalPanelController {
         return;
       }
 
-      const updated = await medicalPanelService.markPatientAsNoAnswer(patientId);
+      const tenantId = await getTenantId(req);
+      const updated = await medicalPanelService.markPatientAsNoAnswer(patientId, tenantId);
 
       if (!updated) {
         res.status(404).json({ error: 'Paciente no encontrado' });
@@ -109,7 +121,8 @@ class MedicalPanelController {
         return;
       }
 
-      const patientDetails = await medicalPanelService.getPatientDetails(documento);
+      const tenantId = await getTenantId(req);
+      const patientDetails = await medicalPanelService.getPatientDetails(documento, tenantId);
 
       if (!patientDetails) {
         res.status(404).json({ error: 'Paciente no encontrado' });

@@ -384,7 +384,9 @@ class VideoController {
         return;
       }
 
-      const medicalHistory = await medicalHistoryService.getMedicalHistory(historiaId);
+      const hostname = req.hostname || (req.headers.host || '').split(':')[0];
+      const tenant = await tenantService.getByHostname(hostname);
+      const medicalHistory = await medicalHistoryService.getMedicalHistory(historiaId, tenant.id);
 
       if (!medicalHistory) {
         res.status(404).json({
@@ -420,7 +422,9 @@ class VideoController {
         return;
       }
 
-      const history = await medicalHistoryService.getPatientHistory(numeroId);
+      const hostname = req.hostname || (req.headers.host || '').split(':')[0];
+      const tenant = await tenantService.getByHostname(hostname);
+      const history = await medicalHistoryService.getPatientHistory(numeroId, tenant.id);
 
       res.status(200).json({
         success: true,
