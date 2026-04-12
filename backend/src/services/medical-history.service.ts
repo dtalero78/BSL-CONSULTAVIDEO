@@ -558,7 +558,7 @@ class MedicalHistoryService {
         mensaje += `\n*Observaciones para la empresa:*\n${payload.mdObsParaMiDocYa}\n`;
       }
 
-      const baseUrl = 'https://medico-bsl.com';
+      const baseUrl = process.env.APP_URL || 'https://medico-bsl.com';
       const approveUrl = `${baseUrl}/api/medical-panel/approve/${payload.historiaId}/APROBADO`;
       const rejectUrl = `${baseUrl}/api/medical-panel/approve/${payload.historiaId}/NO%20APROBADO`;
 

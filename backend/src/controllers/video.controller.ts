@@ -6,6 +6,7 @@ import medicalHistoryService from '../services/medical-history.service';
 import openaiService from '../services/openai.service';
 import postgresService from '../services/postgres.service';
 import emailService from '../services/email.service';
+import tenantService from '../services/tenant.service';
 
 class VideoController {
   /**
@@ -280,6 +281,11 @@ class VideoController {
         return;
       }
 
+      // Resolver tenant por hostname del request
+      const hostname = req.hostname || (req.headers.host || '').split(':')[0];
+      const tenant = await tenantService.getByHostname(hostname);
+      const baseUrl = process.env.APP_URL || 'https://medico-bsl.com';
+
       // Usar template aprobado con variables para pacientes
       const result = await whatsappService.sendTemplateMessage(
         phone,
@@ -291,8 +297,8 @@ class VideoController {
       if (result.success) {
         // Registrar el mensaje directamente en PostgreSQL para que aparezca en el chat
         try {
-          const videoCallUrl = `https://medico-bsl.com/patient/${roomNameWithParams}`;
-          const messageBody = `Hola ${patientName}. Te escribimos de BSL. Tienes una consulta médica programada con el Dr. ${doctorCode}.\n\nLink de videollamada: ${videoCallUrl}`;
+          const videoCallUrl = `${baseUrl}/patient/${roomNameWithParams}`;
+          const messageBody = `Hola ${patientName}. Te escribimos de ${tenant.nombre}. Tienes una consulta médica programada con el Dr. ${doctorCode}.\n\nLink de videollamada: ${videoCallUrl}`;
 
           // Formatear número de teléfono con prefijo +
           const phoneWithPlus = phone.startsWith('+') ? phone : `+${phone}`;
@@ -330,12 +336,13 @@ class VideoController {
 
             const correo = emailResult.rows[0]?.correo;
             if (correo) {
-              const videoCallUrl = `https://medico-bsl.com/patient/${roomNameWithParams}`;
+              const videoCallUrl = `${baseUrl}/patient/${roomNameWithParams}`;
               emailService.enviarEmailVideoConsulta({
                 correo,
                 nombrePaciente: patientName,
                 doctorCode,
                 videoCallUrl,
+                tenantNombre: tenant.nombre,
               }).catch(err => console.error('Error enviando email video consulta:', err));
             }
             }

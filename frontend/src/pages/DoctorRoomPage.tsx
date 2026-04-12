@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { VideoRoom } from '../components/VideoRoom';
+import { TenantLogo } from '../components/TenantLogo';
 
 export const DoctorRoomPage = () => {
   const { roomName } = useParams<{ roomName: string }>();
@@ -48,11 +49,7 @@ export const DoctorRoomPage = () => {
         {/* Logo y Título */}
         <div className="text-center mb-8">
           <div className="flex justify-center mb-6">
-            <img
-              src="/logoBlanco.png"
-              alt="BSL Logo"
-              className="h-20 w-auto"
-            />
+            <TenantLogo />
           </div>
           <h1 className="text-2xl sm:text-3xl font-semibold text-white mb-2">
             Consulta Video

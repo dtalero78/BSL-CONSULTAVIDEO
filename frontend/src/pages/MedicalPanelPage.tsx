@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
 import medicalPanelService, { Patient, PatientStats } from '../services/medical-panel.service';
 import apiService from '../services/api.service';
+import { TenantLogo } from '../components/TenantLogo';
+import { useTenant } from '../hooks/useTenant';
 
 // Helper function para reproducir sonido de notificación
 const playNotificationSound = () => {
@@ -65,6 +67,7 @@ const speakText = (text: string) => {
 };
 
 export function MedicalPanelPage() {
+  const tenant = useTenant();
   const [medicoCode, setMedicoCode] = useState('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -410,14 +413,16 @@ export function MedicalPanelPage() {
   };
 
   const generateWhatsAppMessage = (patient: Patient, includeLink: boolean = false) => {
+    const brandName = tenant.nombre;
+    const appBase = import.meta.env.VITE_APP_URL || 'https://medico-bsl.com';
     if (!includeLink) {
-      return `Hola ${patient.primerNombre}. Te escribimos de BSL. Tienes una cita médica programada conmigo`;
+      return `Hola ${patient.primerNombre}. Te escribimos de ${brandName}. Tienes una cita médica programada conmigo`;
     }
 
     const roomName = medicalPanelService.generateRoomName();
-    const patientLink = `https://bsl-consultavideo-58jne.ondigitalocean.app/patient/${roomName}?nombre=${patient.primerNombre}&apellido=${patient.primerApellido}`;
+    const patientLink = `${appBase}/patient/${roomName}?nombre=${patient.primerNombre}&apellido=${patient.primerApellido}`;
 
-    return `Hola ${patient.primerNombre}. Te escribimos de BSL. Tienes una cita médica programada conmigo\n\nConéctate al link:\n\n${patientLink}`;
+    return `Hola ${patient.primerNombre}. Te escribimos de ${brandName}. Tienes una cita médica programada conmigo\n\nConéctate al link:\n\n${patientLink}`;
   };
 
   if (!isLoggedIn) {
@@ -426,11 +431,7 @@ export function MedicalPanelPage() {
         <div className="bg-[#1f2c34] rounded-3xl shadow-2xl p-8 sm:p-10 max-w-md w-full">
           <div className="text-center mb-8">
             <div className="flex justify-center mb-6">
-              <img
-                src="/logoBlanco.png"
-                alt="BSL Logo"
-                className="h-20 w-auto"
-              />
+              <TenantLogo />
             </div>
             <h1 className="text-2xl sm:text-3xl font-semibold text-white mb-2">
               Panel Médico
@@ -496,7 +497,7 @@ export function MedicalPanelPage() {
         <div className="bg-[#1f2c34] rounded-2xl shadow-xl p-6 mb-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-4">
-              <img src="/logoBlanco.png" alt="BSL Logo" className="h-12 w-auto" />
+              <TenantLogo className="h-12 w-auto" />
               <div>
                 <h1 className="text-2xl font-bold text-white">Panel Médico</h1>
                 <p className="text-gray-400 text-sm">Código: {medicoCode}</p>

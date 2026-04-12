@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { VideoRoom } from '../components/VideoRoom';
+import { TenantLogo } from '../components/TenantLogo';
 import { generateRoomName, generatePatientLink, copyToClipboard } from '../utils/linkGenerator';
 
 export const DoctorPage = () => {
@@ -55,11 +56,7 @@ export const DoctorPage = () => {
         {/* Logo y Título */}
         <div className="text-center mb-8">
           <div className="flex justify-center mb-6">
-            <img
-              src="/logoBlanco.png"
-              alt="BSL Logo"
-              className="h-20 w-auto"
-            />
+            <TenantLogo />
           </div>
           <h1 className="text-2xl sm:text-3xl font-semibold text-white mb-2">
             Consulta Video

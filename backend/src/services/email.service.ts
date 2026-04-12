@@ -21,11 +21,13 @@ class EmailService {
     nombrePaciente,
     doctorCode,
     videoCallUrl,
+    tenantNombre,
   }: {
     correo: string;
     nombrePaciente: string;
     doctorCode: string;
     videoCallUrl: string;
+    tenantNombre?: string;
   }): Promise<{ success: boolean; error?: string }> {
     if (!correo || !EMAIL_FROM) {
       console.log('[EMAIL] No se envio email: correo o SMTP no configurado');
@@ -33,10 +35,11 @@ class EmailService {
     }
 
     try {
+      const brandName = tenantNombre || 'BSL Salud Ocupacional';
       const html = `
         <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff;">
           <div style="background: #0D6EFD; padding: 24px; text-align: center;">
-            <h1 style="color: #ffffff; margin: 0; font-size: 22px;">BSL - Salud Ocupacional</h1>
+            <h1 style="color: #ffffff; margin: 0; font-size: 22px;">${brandName}</h1>
           </div>
           <div style="padding: 32px 24px;">
             <h2 style="color: #181818; margin-top: 0;">Consulta Medica Virtual</h2>
@@ -61,13 +64,13 @@ class EmailService {
             </p>
           </div>
           <div style="background: #F9FAFB; padding: 16px 24px; text-align: center; border-top: 1px solid #E5E7EB;">
-            <p style="color: #9CA3AF; font-size: 12px; margin: 0;">BSL Salud Ocupacional - www.bsl.com.co</p>
+            <p style="color: #9CA3AF; font-size: 12px; margin: 0;">${brandName}</p>
           </div>
         </div>
       `;
 
       const info = await transporter.sendMail({
-        from: `"BSL Salud Ocupacional" <${EMAIL_FROM}>`,
+        from: `"${brandName}" <${EMAIL_FROM}>`,
         to: correo,
         subject: `Consulta medica virtual - Dr. ${doctorCode}`,
         html,
