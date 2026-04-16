@@ -281,6 +281,24 @@ class MedicalHistoryService {
           atendido: row.atendido,
           medico: row.medico,
         } as MedicalHistoryData;
+
+        // Obtener resultados de voximetría virtual si existen
+        try {
+          const voxResult = await postgresService.query(
+            `SELECT f0_mean, f0_min, f0_max, jitter_percent, shimmer_percent,
+                    hnr_db, intensidad_mean_db, tiempo_maximo_fonacion_s,
+                    concepto, interpretacion, recomendaciones, created_at
+             FROM voximetrias_virtual WHERE orden_id = $1`,
+            [historiaId]
+          );
+          if (voxResult && voxResult.length > 0) {
+            (result as any).voximetria = voxResult[0];
+          }
+        } catch (voxErr) {
+          console.warn('⚠️  Error obteniendo voximetría (tabla puede no existir):', (voxErr as any).message);
+        }
+
+        return result;
       }
 
       // PASO 2: Fallback a Wix si no está en PostgreSQL

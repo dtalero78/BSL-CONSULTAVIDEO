@@ -43,6 +43,21 @@ interface AntecedentesFamiliares {
   infecciosas?: boolean;
 }
 
+interface VoximetriaData {
+  f0_mean?: number;
+  f0_min?: number;
+  f0_max?: number;
+  jitter_percent?: number;
+  shimmer_percent?: number;
+  hnr_db?: number;
+  intensidad_mean_db?: number;
+  tiempo_maximo_fonacion_s?: number;
+  concepto?: string;
+  interpretacion?: string;
+  recomendaciones?: string;
+  created_at?: string;
+}
+
 interface MedicalHistoryData {
   historiaId: string;
   numeroId: string;
@@ -75,6 +90,7 @@ interface MedicalHistoryData {
   mdDx2?: string;
   talla?: string;
   peso?: string;
+  voximetria?: VoximetriaData;
 }
 
 interface MedicalHistoryPanelProps {
@@ -513,6 +529,62 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones }: Med
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Voximetría Virtual (resultados de prueba de voz) */}
+      {data.voximetria && (
+        <div className="bg-[#2a3942] rounded-lg p-3">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-semibold text-[#00a884]">🎤 Voximetría Virtual</h3>
+            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+              data.voximetria.concepto === 'Normal'
+                ? 'bg-green-900/30 text-green-300 border border-green-500/30'
+                : data.voximetria.concepto?.includes('Alteración') || data.voximetria.concepto?.includes('Alteracion')
+                  ? 'bg-red-900/30 text-red-300 border border-red-500/30'
+                  : 'bg-amber-900/30 text-amber-300 border border-amber-500/30'
+            }`}>
+              {data.voximetria.concepto || 'Sin concepto'}
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            <div className="bg-[#1f2c34] rounded p-2 text-center">
+              <div className="text-sm font-bold text-white">{data.voximetria.f0_mean || '--'}</div>
+              <div className="text-[10px] text-gray-400">F0 (Hz)</div>
+            </div>
+            <div className="bg-[#1f2c34] rounded p-2 text-center">
+              <div className="text-sm font-bold text-white">{data.voximetria.jitter_percent || '--'}</div>
+              <div className="text-[10px] text-gray-400">Jitter (%)</div>
+            </div>
+            <div className="bg-[#1f2c34] rounded p-2 text-center">
+              <div className="text-sm font-bold text-white">{data.voximetria.shimmer_percent || '--'}</div>
+              <div className="text-[10px] text-gray-400">Shimmer (%)</div>
+            </div>
+            <div className="bg-[#1f2c34] rounded p-2 text-center">
+              <div className="text-sm font-bold text-white">{data.voximetria.hnr_db || '--'}</div>
+              <div className="text-[10px] text-gray-400">HNR (dB)</div>
+            </div>
+            <div className="bg-[#1f2c34] rounded p-2 text-center">
+              <div className="text-sm font-bold text-white">{data.voximetria.intensidad_mean_db || '--'}</div>
+              <div className="text-[10px] text-gray-400">Intensidad (dB)</div>
+            </div>
+            <div className="bg-[#1f2c34] rounded p-2 text-center">
+              <div className="text-sm font-bold text-white">{data.voximetria.tiempo_maximo_fonacion_s || '--'}</div>
+              <div className="text-[10px] text-gray-400">TMF (seg)</div>
+            </div>
+          </div>
+          {data.voximetria.interpretacion && (
+            <div className="mb-2">
+              <span className="text-xs text-gray-400">Interpretación:</span>
+              <p className="text-xs text-white mt-1">{data.voximetria.interpretacion}</p>
+            </div>
+          )}
+          {data.voximetria.recomendaciones && (
+            <div>
+              <span className="text-xs text-gray-400">Recomendaciones:</span>
+              <p className="text-xs text-white mt-1">{data.voximetria.recomendaciones}</p>
+            </div>
+          )}
         </div>
       )}
 
