@@ -204,7 +204,7 @@ class MedicalHistoryService {
       if (pgResult && pgResult.length > 0) {
         const row = pgResult[0];
         console.log(`✅ [PostgreSQL] Historia clínica encontrada para ${historiaId}`);
-        return {
+        const medicalData: any = {
           _id: row._id,
           historiaId: row._id, // Alias para compatibilidad con frontend
           numeroId: row.numeroId,
@@ -280,7 +280,7 @@ class MedicalHistoryService {
           fechaConsulta: row.fechaConsulta,
           atendido: row.atendido,
           medico: row.medico,
-        } as MedicalHistoryData;
+        };
 
         // Obtener resultados de voximetría virtual si existen
         try {
@@ -292,13 +292,13 @@ class MedicalHistoryService {
             [historiaId]
           );
           if (voxResult && voxResult.length > 0) {
-            (result as any).voximetria = voxResult[0];
+            medicalData.voximetria = voxResult[0];
           }
-        } catch (voxErr) {
-          console.warn('⚠️  Error obteniendo voximetría (tabla puede no existir):', (voxErr as any).message);
+        } catch (voxErr: any) {
+          console.warn('⚠️  Error obteniendo voximetría (tabla puede no existir):', voxErr.message);
         }
 
-        return result;
+        return medicalData as MedicalHistoryData;
       }
 
       // PASO 2: Fallback a Wix si no está en PostgreSQL
