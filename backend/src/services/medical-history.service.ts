@@ -193,10 +193,9 @@ class MedicalHistoryService {
           f.familia_trastornos,
           f.familia_infecciosas
         FROM "HistoriaClinica" h
-        LEFT JOIN formularios f ON h."numeroId" = f.numero_id
+        LEFT JOIN formularios f ON f.wix_id = h."_id" AND f.tenant_id = h.tenant_id
         WHERE h."_id" = $1
         ${tenantId ? 'AND h.tenant_id = $2' : ''}
-        ORDER BY f.fecha_registro DESC
         LIMIT 1`,
         tenantId ? [historiaId, tenantId] : [historiaId]
       );
