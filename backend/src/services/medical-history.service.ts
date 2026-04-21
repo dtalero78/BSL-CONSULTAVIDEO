@@ -434,8 +434,9 @@ class MedicalHistoryService {
         peso: payload.peso,
         cargo: payload.cargo,
 
-        // Campos de estado
-        fechaConsulta: new Date(),
+        // fechaConsulta = null → el upsert la setea con NOW() de Postgres
+        // (evita problemas de zona horaria del server Node al serializar Date)
+        fechaConsulta: undefined,
         atendido: 'ATENDIDO',
       });
 
