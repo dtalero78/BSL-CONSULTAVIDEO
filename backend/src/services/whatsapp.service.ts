@@ -1,267 +1,218 @@
 import twilio from 'twilio';
+import postgresService from './postgres.service';
+
+interface TwilioCreds {
+  accountSid: string;
+  authToken: string;
+  fromNumber: string;
+  templateSid: string;
+}
 
 /**
- * Servicio para enviar mensajes de WhatsApp usando Twilio API
+ * Servicio multi-tenant para enviar mensajes de WhatsApp usando Twilio.
+ * Cada tenant tiene sus propias credenciales en tenants.credenciales.twilio.
+ * Si el tenant es 'bsl' o no tiene credenciales, cae a env vars TWILIO_* (zero-regression).
  */
 class WhatsAppService {
-  private readonly client: twilio.Twilio;
-  private readonly fromNumber: string;
-  private readonly templateSid: string;
   private readonly statusCallbackUrl: string;
   private readonly maxRetries = 3;
+  private readonly clientsCache = new Map<string, { client: twilio.Twilio; creds: TwilioCreds; t: number }>();
+  private readonly CREDS_TTL = 60_000; // 1 min
 
   constructor() {
-    const accountSid = process.env.TWILIO_ACCOUNT_SID || '';
-    const authToken = process.env.TWILIO_AUTH_TOKEN || '';
-    this.fromNumber = process.env.TWILIO_WHATSAPP_FROM || 'whatsapp:+3153369631';
-    this.templateSid = process.env.TWILIO_WHATSAPP_TEMPLATE_SID || 'HXc8473cfd60cd378314355e17e736d24d';
-    // URL de callback para registrar mensajes en BSL-PLATAFORMA
     this.statusCallbackUrl = process.env.WHATSAPP_STATUS_CALLBACK_URL || 'https://bsl-plataforma.com/api/whatsapp/status';
-
-    if (!accountSid || !authToken) {
-      console.warn('⚠️  Credenciales de Twilio no configuradas - servicio de WhatsApp no disponible');
-      this.client = {} as twilio.Twilio; // Cliente vacío para evitar errores
-    } else {
-      this.client = twilio(accountSid, authToken);
-      console.log('✅ Twilio WhatsApp Service inicializado');
-      console.log(`   Template SID: ${this.templateSid}`);
-      console.log(`   Status Callback: ${this.statusCallbackUrl}`);
-    }
+    console.log('✅ Twilio WhatsApp Service inicializado (multi-tenant)');
+    console.log(`   Status Callback: ${this.statusCallbackUrl}`);
   }
 
   /**
-   * Espera un tiempo determinado (para backoff exponencial)
+   * Resuelve credenciales Twilio del tenant. Cache 60s.
    */
+  private async getCreds(tenantId: string = 'bsl'): Promise<TwilioCreds | null> {
+    const tid = tenantId || 'bsl';
+    const cached = this.clientsCache.get(tid);
+    if (cached && Date.now() - cached.t < this.CREDS_TTL) {
+      return cached.creds;
+    }
+
+    let creds: TwilioCreds | null = null;
+
+    if (tid !== 'bsl') {
+      // Leer de tenants.credenciales.twilio
+      const rows = await postgresService.query(
+        "SELECT credenciales->'twilio' AS twilio FROM tenants WHERE id = $1 AND activo = true LIMIT 1",
+        [tid]
+      );
+      if (rows && rows.length > 0 && rows[0].twilio && rows[0].twilio.account_sid && rows[0].twilio.auth_token) {
+        const t = rows[0].twilio;
+        creds = {
+          accountSid: t.account_sid,
+          authToken: t.auth_token,
+          fromNumber: t.whatsapp_from || 'whatsapp:+573008021701',
+          templateSid: (t.templates && t.templates.cita_calendario) || t.template_cita_calendario || process.env.TWILIO_WHATSAPP_TEMPLATE_SID || 'HXc8473cfd60cd378314355e17e736d24d',
+        };
+      }
+    }
+
+    if (!creds) {
+      // Fallback a env vars (BSL default)
+      const accountSid = process.env.TWILIO_ACCOUNT_SID || '';
+      const authToken = process.env.TWILIO_AUTH_TOKEN || '';
+      if (!accountSid || !authToken) {
+        console.warn(`⚠️  Sin credenciales Twilio para tenant ${tid}`);
+        return null;
+      }
+      creds = {
+        accountSid,
+        authToken,
+        fromNumber: process.env.TWILIO_WHATSAPP_FROM || 'whatsapp:+3153369631',
+        templateSid: process.env.TWILIO_WHATSAPP_TEMPLATE_SID || 'HXc8473cfd60cd378314355e17e736d24d',
+      };
+    }
+
+    const client = twilio(creds.accountSid, creds.authToken);
+    this.clientsCache.set(tid, { client, creds, t: Date.now() });
+    return creds;
+  }
+
+  private async getClient(tenantId: string = 'bsl'): Promise<{ client: twilio.Twilio; creds: TwilioCreds } | null> {
+    const creds = await this.getCreds(tenantId);
+    if (!creds) return null;
+    const cached = this.clientsCache.get(tenantId || 'bsl');
+    return cached ? { client: cached.client, creds } : null;
+  }
+
   private async sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  /**
-   * Formatea un número de teléfono para WhatsApp de Twilio
-   * @param phone Número de teléfono (puede tener o no el prefijo +)
-   * @returns Número formateado como whatsapp:573001234567 (SIN +)
-   */
   private formatPhoneNumber(phone: string): string {
-    // Limpiar el número de teléfono (quitar espacios, paréntesis, guiones, y +)
     let cleanPhone = phone.replace(/[\s\(\)\-\+]/g, '');
-
-    // Si tiene exactamente 10 dígitos, es un número colombiano local
     if (cleanPhone.length === 10 && /^\d{10}$/.test(cleanPhone)) {
       return `whatsapp:57${cleanPhone}`;
     }
-
-    // Si empieza con 57 y tiene 12 dígitos, usar directamente
     if (cleanPhone.startsWith('57') && cleanPhone.length === 12) {
       return `whatsapp:${cleanPhone}`;
     }
-
-    // Para otros formatos, asumir que ya está completo
     return `whatsapp:${cleanPhone}`;
   }
 
   /**
-   * Envía un mensaje usando el template aprobado de Twilio con variables
-   * Template: "Hola {{1}}. Te escribimos de BSL. Tienes una consulta médica programada con el Dr. {{2}}..."
-   * @param phone Número de teléfono (ejemplo: 573001234567 o +573001234567)
-   * @param roomNameWithParams Path completo: "consulta-abc123?nombre=Juan&apellido=Perez&documento=123&doctor=JUAN"
-   * @param patientName Primer nombre del paciente
-   * @param doctorCode Código del doctor
-   * @param attempt Número de intento actual (uso interno)
-   * @returns Resultado del envío
+   * Envía template aprobado con variables. Usa credenciales del tenant.
    */
   async sendTemplateMessage(
     phone: string,
     roomNameWithParams: string,
     patientName: string,
     doctorCode: string,
+    tenantId: string = 'bsl',
     attempt: number = 1
   ): Promise<{ success: boolean; error?: string; messageSid?: string }> {
-    if (!this.client.messages) {
-      console.error('❌ Cliente de Twilio no está configurado');
-      return {
-        success: false,
-        error: 'Cliente de Twilio no configurado'
-      };
+    const clientData = await this.getClient(tenantId);
+    if (!clientData) {
+      return { success: false, error: 'Cliente de Twilio no configurado' };
     }
-
+    const { client, creds } = clientData;
     const toNumber = this.formatPhoneNumber(phone);
 
     try {
-      console.log(`📱 Enviando WhatsApp con template a: ${toNumber} (intento ${attempt}/${this.maxRetries})`);
-      console.log(`   Variables: roomPath=${roomNameWithParams}, name=${patientName}, doctor=${doctorCode}`);
+      console.log(`📱 Enviando WhatsApp template (tenant=${tenantId}) a: ${toNumber} (intento ${attempt}/${this.maxRetries})`);
 
-      const twilioMessage = await this.client.messages.create({
-        from: this.fromNumber,
+      const twilioMessage = await client.messages.create({
+        from: creds.fromNumber,
         to: toNumber,
-        contentSid: this.templateSid,
+        contentSid: creds.templateSid,
         contentVariables: JSON.stringify({
           '1': roomNameWithParams,
           '2': patientName,
-          '3': doctorCode
+          '3': doctorCode,
         }),
-        statusCallback: this.statusCallbackUrl
+        statusCallback: this.statusCallbackUrl,
       });
 
-      console.log(`✅ WhatsApp con template enviado exitosamente a ${toNumber}`);
-      console.log(`   Message SID: ${twilioMessage.sid}`);
-      console.log(`   Estado: ${twilioMessage.status}`);
-
-      return {
-        success: true,
-        messageSid: twilioMessage.sid
-      };
+      console.log(`✅ WhatsApp template enviado (tenant=${tenantId}, sid=${twilioMessage.sid})`);
+      return { success: true, messageSid: twilioMessage.sid };
     } catch (error: any) {
       const isRetryableError = this.isRetryableError(error);
       const shouldRetry = isRetryableError && attempt < this.maxRetries;
 
       if (shouldRetry) {
-        // Backoff exponencial: 2s, 4s, 8s
         const backoffMs = Math.pow(2, attempt) * 1000;
-        console.warn(
-          `⚠️  Error en intento ${attempt}/${this.maxRetries}. ` +
-          `Reintentando en ${backoffMs / 1000}s... ` +
-          `(Razón: ${error.message || 'Error desconocido'})`
-        );
-
+        console.warn(`⚠️  Intento ${attempt}/${this.maxRetries} falló. Reintentando en ${backoffMs / 1000}s (${error.message})`);
         await this.sleep(backoffMs);
-        return this.sendTemplateMessage(phone, roomNameWithParams, patientName, doctorCode, attempt + 1);
+        return this.sendTemplateMessage(phone, roomNameWithParams, patientName, doctorCode, tenantId, attempt + 1);
       }
 
-      // Error final después de todos los reintentos
       const errorMessage = this.getErrorMessage(error);
-      console.error(
-        `❌ Error enviando WhatsApp con template después de ${attempt} intentos:`,
-        errorMessage
-      );
-
-      return {
-        success: false,
-        error: errorMessage
-      };
+      console.error(`❌ Error enviando WhatsApp template (tenant=${tenantId}): ${errorMessage}`);
+      return { success: false, error: errorMessage };
     }
   }
 
   /**
-   * Envía un mensaje de texto libre por WhatsApp con reintentos automáticos
-   * NOTA: Solo usar para mensajes al admin o casos especiales. Para pacientes usar sendTemplateMessage()
-   * @param phone Número de teléfono (ejemplo: 573001234567 o +573001234567)
-   * @param message Mensaje a enviar
-   * @param attempt Número de intento actual (uso interno)
-   * @returns Resultado del envío
+   * Envía mensaje de texto libre. Usa credenciales del tenant.
    */
   async sendTextMessage(
     phone: string,
     message: string,
+    tenantId: string = 'bsl',
     attempt: number = 1
   ): Promise<{ success: boolean; error?: string; messageSid?: string }> {
-    if (!this.client.messages) {
-      console.error('❌ Cliente de Twilio no está configurado');
-      return {
-        success: false,
-        error: 'Cliente de Twilio no configurado'
-      };
+    const clientData = await this.getClient(tenantId);
+    if (!clientData) {
+      return { success: false, error: 'Cliente de Twilio no configurado' };
     }
-
+    const { client, creds } = clientData;
     const toNumber = this.formatPhoneNumber(phone);
 
     try {
-      console.log(`📱 Enviando WhatsApp (texto libre) a: ${toNumber} (intento ${attempt}/${this.maxRetries})`);
+      console.log(`📱 Enviando WhatsApp texto libre (tenant=${tenantId}) a: ${toNumber} (intento ${attempt}/${this.maxRetries})`);
 
-      const twilioMessage = await this.client.messages.create({
-        from: this.fromNumber,
+      const twilioMessage = await client.messages.create({
+        from: creds.fromNumber,
         to: toNumber,
         body: message,
-        statusCallback: this.statusCallbackUrl
+        statusCallback: this.statusCallbackUrl,
       });
 
-      console.log(`✅ WhatsApp enviado exitosamente a ${toNumber}`);
-      console.log(`   Message SID: ${twilioMessage.sid}`);
-      console.log(`   Estado: ${twilioMessage.status}`);
-
-      return {
-        success: true,
-        messageSid: twilioMessage.sid
-      };
+      console.log(`✅ WhatsApp enviado (tenant=${tenantId}, sid=${twilioMessage.sid})`);
+      return { success: true, messageSid: twilioMessage.sid };
     } catch (error: any) {
       const isRetryableError = this.isRetryableError(error);
       const shouldRetry = isRetryableError && attempt < this.maxRetries;
 
       if (shouldRetry) {
-        // Backoff exponencial: 2s, 4s, 8s
         const backoffMs = Math.pow(2, attempt) * 1000;
-        console.warn(
-          `⚠️  Error en intento ${attempt}/${this.maxRetries}. ` +
-          `Reintentando en ${backoffMs / 1000}s... ` +
-          `(Razón: ${error.message || 'Error desconocido'})`
-        );
-
+        console.warn(`⚠️  Intento ${attempt}/${this.maxRetries} falló. Reintentando en ${backoffMs / 1000}s (${error.message})`);
         await this.sleep(backoffMs);
-        return this.sendTextMessage(phone, message, attempt + 1);
+        return this.sendTextMessage(phone, message, tenantId, attempt + 1);
       }
 
-      // Error final después de todos los reintentos
       const errorMessage = this.getErrorMessage(error);
-      console.error(
-        `❌ Error enviando WhatsApp después de ${attempt} intentos:`,
-        errorMessage
-      );
-
-      return {
-        success: false,
-        error: errorMessage
-      };
+      console.error(`❌ Error enviando WhatsApp (tenant=${tenantId}): ${errorMessage}`);
+      return { success: false, error: errorMessage };
     }
   }
 
-  /**
-   * Determina si un error es recuperable y debe reintentarse
-   */
   private isRetryableError(error: any): boolean {
-    // Códigos de error de Twilio que son recuperables
-    const retryableErrorCodes = [
-      20429, // Too Many Requests (rate limit)
-      20500, // Internal Server Error
-      20503, // Service Unavailable
-      30001, // Queue overflow
-      30002, // Account suspended
-      30003, // Unreachable destination handset
-      30004, // Message blocked
-      30005, // Unknown destination handset
-      30006, // Landline or unreachable carrier
-      30007, // Message filtered
-      30008, // Unknown error
-    ];
-
-    if (error.code && retryableErrorCodes.includes(error.code)) {
-      return true;
-    }
-
-    // Errores de red (timeout, connection refused, etc.)
-    if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT' || error.code === 'ENOTFOUND') {
-      return true;
-    }
-
+    const retryableErrorCodes = [20429, 20500, 20503, 30001, 30002, 30003, 30004, 30005, 30006, 30007, 30008];
+    if (error.code && retryableErrorCodes.includes(error.code)) return true;
+    if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT' || error.code === 'ENOTFOUND') return true;
     return false;
   }
 
-  /**
-   * Extrae un mensaje de error legible
-   */
   private getErrorMessage(error: any): string {
     if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
       return 'Timeout - El servicio de Twilio tardó demasiado en responder';
     }
-
-    // Errores específicos de Twilio
-    if (error.code) {
-      return `Error ${error.code}: ${error.message || 'Error de Twilio'}`;
-    }
-
-    if (error.message) {
-      return error.message;
-    }
-
+    if (error.code) return `Error ${error.code}: ${error.message || 'Error de Twilio'}`;
+    if (error.message) return error.message;
     return 'Error desconocido al enviar WhatsApp';
+  }
+
+  /** Invalida cache de credenciales (para tests o cambios en BD) */
+  invalidateCache(): void {
+    this.clientsCache.clear();
   }
 }
 

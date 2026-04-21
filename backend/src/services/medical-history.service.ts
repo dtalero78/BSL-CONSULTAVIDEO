@@ -206,6 +206,7 @@ class MedicalHistoryService {
         const medicalData: any = {
           _id: row._id,
           historiaId: row._id, // Alias para compatibilidad con frontend
+          tenant_id: row.tenant_id || 'bsl',
           numeroId: row.numeroId,
           primerNombre: row.primerNombre,
           segundoNombre: row.segundoNombre,
@@ -479,8 +480,9 @@ class MedicalHistoryService {
           `${certificadoUrl}\n\n` +
           `_Este enlace estará disponible por 30 días._`;
 
-        // Enviar WhatsApp en background (fire-and-forget)
-        whatsappService.sendTextMessage(celularFormateado, mensaje)
+        // Enviar WhatsApp en background (fire-and-forget) con credenciales del tenant del paciente
+        const tenantIdPaciente = (historiaBase as any).tenant_id || 'bsl';
+        whatsappService.sendTextMessage(celularFormateado, mensaje, tenantIdPaciente)
           .then((result) => {
             if (result.success) {
               console.log(`✅ [Certificado] Link enviado por WhatsApp a ${celularFormateado}`);

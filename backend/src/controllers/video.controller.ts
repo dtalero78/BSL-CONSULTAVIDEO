@@ -286,12 +286,13 @@ class VideoController {
       const tenant = await tenantService.getByHostname(hostname);
       const baseUrl = process.env.APP_URL || 'https://medico-bsl.com';
 
-      // Usar template aprobado con variables para pacientes
+      // Usar template aprobado con variables para pacientes (credenciales del tenant)
       const result = await whatsappService.sendTemplateMessage(
         phone,
         roomNameWithParams,
         patientName,
-        doctorCode
+        doctorCode,
+        tenant.id
       );
 
       if (result.success) {
