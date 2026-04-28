@@ -50,7 +50,7 @@ class TwilioVoiceService {
       console.log(`📞 Using Auth Token: ***${this.authToken.substring(this.authToken.length - 4)}`);
 
       // Construir URL del webhook de voz
-      const webhookUrl = `https://www.bsl.com.co/_functions/voice?nombre=${encodeURIComponent(nombrePaciente)}`;
+      const webhookUrl = `https://medico-bsl.com/api/twilio/voice?nombre=${encodeURIComponent(nombrePaciente)}`;
       console.log(`📞 URL de webhook: ${webhookUrl}`);
 
       // Credenciales Basic Auth
