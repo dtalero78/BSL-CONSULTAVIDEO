@@ -49,7 +49,7 @@ class WhatsAppService {
           accountSid: t.account_sid,
           authToken: t.auth_token,
           fromNumber: t.whatsapp_from || 'whatsapp:+573008021701',
-          templateSid: (t.templates && t.templates.cita_calendario) || t.template_cita_calendario || process.env.TWILIO_WHATSAPP_TEMPLATE_SID || 'HXc8473cfd60cd378314355e17e736d24d',
+          templateSid: (t.templates && t.templates.consulta_video) || t.template_consulta_video || process.env.TWILIO_WHATSAPP_TEMPLATE_SID || 'HXc8473cfd60cd378314355e17e736d24d',
         };
       }
     }
