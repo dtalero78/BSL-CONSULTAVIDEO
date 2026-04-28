@@ -55,5 +55,11 @@ export function useTenantLoader(): TenantConfig {
       .catch(() => { /* usa cache */ });
   }, []);
 
+  useEffect(() => {
+    if (tenant?.nombre) {
+      document.title = tenant.nombre;
+    }
+  }, [tenant?.nombre]);
+
   return tenant;
 }
