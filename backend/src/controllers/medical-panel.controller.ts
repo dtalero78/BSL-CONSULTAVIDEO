@@ -12,6 +12,33 @@ async function getTenantId(req: Request): Promise<string> {
 
 class MedicalPanelController {
   /**
+   * Valida que el código de médico exista para el tenant actual
+   */
+  async validateMedico(req: Request, res: Response): Promise<void> {
+    try {
+      const { medicoCode } = req.params;
+
+      if (!medicoCode) {
+        res.status(400).json({ error: 'Código de médico requerido' });
+        return;
+      }
+
+      const tenantId = await getTenantId(req);
+      const exists = await medicalPanelService.medicoExists(medicoCode, tenantId);
+
+      if (!exists) {
+        res.status(404).json({ exists: false, error: 'Código de médico no registrado' });
+        return;
+      }
+
+      res.json({ exists: true });
+    } catch (error) {
+      console.error('Error validando código de médico:', error);
+      res.status(500).json({ error: 'Error validando código de médico' });
+    }
+  }
+
+  /**
    * Obtiene estadísticas del día para un médico
    */
   async getDailyStats(req: Request, res: Response): Promise<void> {

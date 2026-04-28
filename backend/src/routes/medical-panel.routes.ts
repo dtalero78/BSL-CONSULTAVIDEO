@@ -3,6 +3,9 @@ import medicalPanelController from '../controllers/medical-panel.controller';
 
 const router = Router();
 
+// Validación de código de médico (login)
+router.get('/medico/validate/:medicoCode', medicalPanelController.validateMedico);
+
 // Estadísticas del día para un médico
 router.get('/stats/:medicoCode', medicalPanelController.getDailyStats);
 

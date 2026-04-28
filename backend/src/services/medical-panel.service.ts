@@ -57,6 +57,25 @@ class MedicalPanelService {
   }
 
   /**
+   * Verifica si el código de médico existe en HistoriaClinica para el tenant.
+   * Un código es válido si tiene al menos una historia clínica asociada.
+   */
+  async medicoExists(medicoCode: string, tenantId: string = 'bsl'): Promise<boolean> {
+    try {
+      const result = await postgresService.query(
+        `SELECT 1 FROM "HistoriaClinica"
+         WHERE "medico" = $1 AND tenant_id = $2
+         LIMIT 1`,
+        [medicoCode, tenantId]
+      );
+      return Array.isArray(result) && result.length > 0;
+    } catch (error) {
+      console.error('❌ Error validando código de médico en PostgreSQL:', error);
+      return false;
+    }
+  }
+
+  /**
    * Obtiene las estadísticas del día para un médico específico
    */
   async getDailyStats(medicoCode: string, tenantId: string = 'bsl'): Promise<PatientStats> {

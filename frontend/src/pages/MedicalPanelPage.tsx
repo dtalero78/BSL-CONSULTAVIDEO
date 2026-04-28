@@ -100,6 +100,15 @@ export function MedicalPanelPage() {
     setError(null);
 
     try {
+      // Validar que el código de médico exista antes de permitir entrar
+      if (!isLoggedIn) {
+        const exists = await medicalPanelService.validateMedicoCode(medicoCode.trim());
+        if (!exists) {
+          setError('Código de médico no registrado. Verifique e intente nuevamente.');
+          return;
+        }
+      }
+
       // Cargar estadísticas
       const statsData = await medicalPanelService.getDailyStats(medicoCode);
       setStats(statsData);

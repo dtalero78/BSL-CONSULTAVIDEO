@@ -56,6 +56,24 @@ class MedicalPanelService {
   }
 
   /**
+   * Valida que el código de médico exista en la base de datos del tenant.
+   * Devuelve true si está registrado, false si no.
+   */
+  async validateMedicoCode(medicoCode: string): Promise<boolean> {
+    try {
+      const response = await this.client.get<{ exists: boolean }>(
+        `/api/medical-panel/medico/validate/${encodeURIComponent(medicoCode)}`
+      );
+      return response.data?.exists === true;
+    } catch (err: any) {
+      if (err?.response?.status === 404) {
+        return false;
+      }
+      throw err;
+    }
+  }
+
+  /**
    * Obtiene estadísticas del día para un médico
    */
   async getDailyStats(medicoCode: string): Promise<PatientStats> {
