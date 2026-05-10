@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import apiService from '../services/api.service';
 import { useVideoRoom } from '../hooks/useVideoRoom';
 import { useBackgroundEffects } from '../hooks/useBackgroundEffects';
 import { usePosturalAnalysis } from '../hooks/usePosturalAnalysis';
@@ -76,6 +77,9 @@ export const VideoRoom = ({ identity, roomName, role, historiaId, documento, med
 
   const handleLeave = () => {
     disconnectFromRoom();
+    if (role === 'doctor') {
+      apiService.endRoom(roomName).catch(() => {});
+    }
     onLeave?.();
   };
 
