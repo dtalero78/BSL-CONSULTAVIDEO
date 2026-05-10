@@ -11,6 +11,7 @@ import telemedicineRoutes from './routes/telemedicine.routes';
 import medicalPanelRoutes from './routes/medical-panel.routes';
 import twilioVoiceRoutes from './routes/twilio-voice.routes';
 import tenantRoutes from './routes/tenant.routes';
+import webhookRoutes from './routes/webhook.routes';
 import { telemedicineSocketService } from './services/telemedicine-socket.service';
 import { sessionTracker } from './services/session-tracker.service';
 
@@ -90,6 +91,7 @@ app.use('/api/telemedicine', telemedicineRoutes);
 app.use('/api/medical-panel', medicalPanelRoutes);
 app.use('/api/twilio', twilioVoiceRoutes);
 app.use('/api/tenant', tenantRoutes);
+app.use('/api/webhook', webhookRoutes);
 
 // Servir archivos estaticos del frontend (despues de las rutas API)
 const frontendPath = path.join(__dirname, '..', 'frontend-dist');
