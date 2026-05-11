@@ -1,4 +1,3 @@
-import twilio from 'twilio';
 import { Server as SocketIOServer } from 'socket.io';
 import twilioService from './twilio.service';
 import postgresService from './postgres.service';
@@ -24,24 +23,9 @@ interface VideoSession {
 
 class SessionTrackerService {
   private sessions: Map<string, VideoSession> = new Map();
-  private readonly ADMIN_PHONE = 'whatsapp:+573008021701';
-  private readonly twilioClient: twilio.Twilio;
-  private readonly twilioWhatsAppFrom: string;
   private io: SocketIOServer | null = null;
 
-  constructor() {
-    const accountSid = process.env.TWILIO_ACCOUNT_SID || '';
-    const authToken = process.env.TWILIO_AUTH_TOKEN || '';
-    this.twilioWhatsAppFrom = process.env.TWILIO_WHATSAPP_FROM || 'whatsapp:+3153369631';
-
-    if (!accountSid || !authToken) {
-      console.warn('⚠️  Credenciales de Twilio no configuradas - reportes de sesión no disponibles');
-      this.twilioClient = {} as twilio.Twilio;
-    } else {
-      this.twilioClient = twilio(accountSid, authToken);
-      console.log('✅ SessionTrackerService inicializado con Twilio WhatsApp');
-    }
-  }
+  constructor() {}
 
   /**
    * Inicializa el servicio con la instancia de Socket.io
@@ -219,120 +203,8 @@ class SessionTrackerService {
     );
 
     if (allDisconnected && session.participants.size >= 2) {
-      console.log(`[SessionTracker] All participants disconnected from ${roomName}. Sending report...`);
       session.completedAt = new Date();
-      this.sendSessionReport(session);
-    }
-  }
-
-  /**
-   * Envía el reporte de la sesión completada
-   */
-  private async sendSessionReport(session: VideoSession): Promise<void> {
-    try {
-      const doctor = Array.from(session.participants.values()).find((p) => p.role === 'doctor');
-      const patient = Array.from(session.participants.values()).find((p) => p.role === 'patient');
-
-      if (!doctor || !patient) {
-        console.warn('[SessionTracker] Session incomplete: missing doctor or patient');
-        return;
-      }
-
-      const duration = this.calculateDuration(session);
-      const report = this.formatSessionReport(session, doctor, patient, duration);
-
-      await this.sendWhatsAppMessage(report);
-
-      console.log(`[SessionTracker] Report sent successfully for room ${session.roomName}`);
-
-      // Limpiar la sesión después de enviar el reporte
-      this.sessions.delete(session.roomName);
-    } catch (error) {
-      console.error('[SessionTracker] Error sending session report:', error);
-    }
-  }
-
-  /**
-   * Calcula la duración de la sesión
-   */
-  private calculateDuration(session: VideoSession): string {
-    const participants = Array.from(session.participants.values());
-    const earliestConnection = Math.min(...participants.map((p) => p.connectedAt.getTime()));
-    const latestDisconnection = Math.max(
-      ...participants.map((p) => p.disconnectedAt?.getTime() || 0)
-    );
-
-    const durationMs = latestDisconnection - earliestConnection;
-    const minutes = Math.floor(durationMs / 60000);
-    const seconds = Math.floor((durationMs % 60000) / 1000);
-
-    return `${minutes}m ${seconds}s`;
-  }
-
-  /**
-   * Formatea el reporte de la sesión
-   */
-  private formatSessionReport(
-    session: VideoSession,
-    doctor: SessionParticipant,
-    patient: SessionParticipant,
-    duration: string
-  ): string {
-    const timestamp = new Date().toLocaleString('es-CO', {
-      timeZone: 'America/Bogota',
-      hour12: false,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-
-    let report = `📹 *VIDEOLLAMADA COMPLETADA*\n`;
-    report += `📅 ${timestamp}\n\n`;
-
-    report += `🏥 *SALA*\n`;
-    report += `• ID: ${session.roomName}\n`;
-    report += `• Duración: ${duration}\n\n`;
-
-    report += `⚕️ *DOCTOR*\n`;
-    report += `• Código: ${doctor.identity.replace('Dr. ', '')}\n`;
-    report += `• Conectado: ${doctor.connectedAt.toLocaleTimeString('es-CO')}\n`;
-    report += `• Desconectado: ${doctor.disconnectedAt?.toLocaleTimeString('es-CO') || 'N/A'}\n\n`;
-
-    report += `👤 *PACIENTE*\n`;
-    report += `• Nombre: ${patient.identity}\n`;
-    report += `• Conectado: ${patient.connectedAt.toLocaleTimeString('es-CO')}\n`;
-    report += `• Desconectado: ${patient.disconnectedAt?.toLocaleTimeString('es-CO') || 'N/A'}\n\n`;
-
-    report += `✅ Sesión finalizada correctamente`;
-
-    return report;
-  }
-
-  /**
-   * Envía mensaje por WhatsApp usando Twilio
-   */
-  private async sendWhatsAppMessage(message: string): Promise<void> {
-    if (!this.twilioClient.messages) {
-      console.error('[SessionTracker] Twilio client not configured');
-      return;
-    }
-
-    try {
-      const twilioMessage = await this.twilioClient.messages.create({
-        from: this.twilioWhatsAppFrom,
-        to: this.ADMIN_PHONE,
-        body: message,
-      });
-
-      console.log('[SessionTracker] WhatsApp message sent via Twilio');
-      console.log(`   Message SID: ${twilioMessage.sid}`);
-      console.log(`   Estado: ${twilioMessage.status}`);
-    } catch (error) {
-      console.error('[SessionTracker] Error sending WhatsApp message:', error);
-      throw error;
+      this.sessions.delete(roomName);
     }
   }
 
