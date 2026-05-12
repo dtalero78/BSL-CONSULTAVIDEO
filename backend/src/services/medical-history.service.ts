@@ -473,21 +473,33 @@ class MedicalHistoryService {
           celularFormateado = `57${celularFormateado}`;
         }
 
-        // Construir mensaje de WhatsApp
         const nombreCompleto = `${historiaBase.primerNombre} ${historiaBase.primerApellido}`;
-        const mensaje = `Hola ${nombreCompleto}! 👋\n\n` +
+        const tenantIdPaciente = (historiaBase as any).tenant_id || 'bsl';
+        const certificadoListoSid = process.env.TWILIO_TEMPLATE_CERTIFICADO_LISTO || 'HX2bdfa33cf1f2e36fe5f11bd6d735f848';
+
+        // Free-text fallback por si el template aún no está aprobado por Meta.
+        const mensajeFallback = `Hola ${nombreCompleto}! 👋\n\n` +
           `Tu certificado médico ya está listo. Puedes descargarlo en el siguiente enlace:\n\n` +
           `${certificadoUrl}\n\n` +
           `_Este enlace estará disponible por 30 días._`;
 
-        // Enviar WhatsApp en background (fire-and-forget) con credenciales del tenant del paciente
-        const tenantIdPaciente = (historiaBase as any).tenant_id || 'bsl';
-        whatsappService.sendTextMessage(celularFormateado, mensaje, tenantIdPaciente)
-          .then((result) => {
+        whatsappService.sendContentTemplate(
+          celularFormateado,
+          certificadoListoSid,
+          { '1': nombreCompleto, '2': certificadoUrl },
+          tenantIdPaciente
+        )
+          .then(async (result) => {
             if (result.success) {
-              console.log(`✅ [Certificado] Link enviado por WhatsApp a ${celularFormateado}`);
+              console.log(`✅ [Certificado] Template enviado por WhatsApp a ${celularFormateado}`);
+              return;
+            }
+            console.warn(`⚠️  [Certificado] Template falló (${result.error}); intentando free-text`);
+            const fallback = await whatsappService.sendTextMessage(celularFormateado, mensajeFallback, tenantIdPaciente);
+            if (fallback.success) {
+              console.log(`✅ [Certificado] Free-text enviado por WhatsApp a ${celularFormateado}`);
             } else {
-              console.error(`⚠️  [Certificado] Error enviando WhatsApp: ${result.error}`);
+              console.error(`⚠️  [Certificado] Error enviando free-text: ${fallback.error}`);
             }
           })
           .catch((error: any) => {

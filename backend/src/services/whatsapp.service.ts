@@ -150,6 +150,54 @@ class WhatsAppService {
   }
 
   /**
+   * Envía un template arbitrario por contentSid. Usa credenciales del tenant.
+   * Útil para templates distintos al de videoconsulta (ej: certificado_listo).
+   */
+  async sendContentTemplate(
+    phone: string,
+    contentSid: string,
+    contentVariables: Record<string, string>,
+    tenantId: string = 'bsl',
+    attempt: number = 1
+  ): Promise<{ success: boolean; error?: string; messageSid?: string }> {
+    const clientData = await this.getClient(tenantId);
+    if (!clientData) {
+      return { success: false, error: 'Cliente de Twilio no configurado' };
+    }
+    const { client, creds } = clientData;
+    const toNumber = this.formatPhoneNumber(phone);
+
+    try {
+      console.log(`📱 Enviando WhatsApp template ${contentSid} (tenant=${tenantId}) a: ${toNumber} (intento ${attempt}/${this.maxRetries})`);
+
+      const twilioMessage = await client.messages.create({
+        from: creds.fromNumber,
+        to: toNumber,
+        contentSid,
+        contentVariables: JSON.stringify(contentVariables),
+        statusCallback: this.statusCallbackUrl,
+      });
+
+      console.log(`✅ WhatsApp template enviado (tenant=${tenantId}, sid=${twilioMessage.sid})`);
+      return { success: true, messageSid: twilioMessage.sid };
+    } catch (error: any) {
+      const isRetryableError = this.isRetryableError(error);
+      const shouldRetry = isRetryableError && attempt < this.maxRetries;
+
+      if (shouldRetry) {
+        const backoffMs = Math.pow(2, attempt) * 1000;
+        console.warn(`⚠️  Intento ${attempt}/${this.maxRetries} falló. Reintentando en ${backoffMs / 1000}s (${error.message})`);
+        await this.sleep(backoffMs);
+        return this.sendContentTemplate(phone, contentSid, contentVariables, tenantId, attempt + 1);
+      }
+
+      const errorMessage = this.getErrorMessage(error);
+      console.error(`❌ Error enviando WhatsApp template (tenant=${tenantId}): ${errorMessage}`);
+      return { success: false, error: errorMessage };
+    }
+  }
+
+  /**
    * Envía mensaje de texto libre. Usa credenciales del tenant.
    */
   async sendTextMessage(
