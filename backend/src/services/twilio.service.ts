@@ -178,7 +178,10 @@ class TwilioService {
           },
         },
         format: 'mp4',
-        resolution: '640x480',
+        // 480x360: ~50% del peso de 640x480 manteniendo legibilidad para
+        // revisión visual posterior. Ahorra ~$0.20/llamada en
+        // composition-minutes según Twilio Usage Records.
+        resolution: '480x360',
       });
 
       return {
