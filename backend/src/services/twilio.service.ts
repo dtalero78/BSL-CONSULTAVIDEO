@@ -74,6 +74,9 @@ class TwilioService {
         uniqueName: roomName,
         type: 'group',
         maxParticipants,
+        // Límite de 30 minutos por participante (Twilio cierra la sala al alcanzarlo).
+        // Evita salas olvidadas abiertas durante horas que disparan costos de grabación.
+        maxParticipantDuration: 1800,
       });
 
       return {
