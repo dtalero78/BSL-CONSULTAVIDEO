@@ -302,15 +302,31 @@ class MedicalHistoryService {
         return medicalData as MedicalHistoryData;
       }
 
-      // PASO 2: Fallback a Wix si no está en PostgreSQL
-      console.log(`⚠️  [PostgreSQL] No encontrado, intentando Wix para ${historiaId}`);
-      const response = await axios.get(`${this.wixBaseUrl}/getHistoriaClinica`, {
-        params: { historiaId: historiaId },
-      });
+      // ¿Existe el registro pero está borrado? Lo distinguimos del 'no existe'
+      // para no caer al fallback de Wix (devolvería 404 y propagaría como 500).
+      const deletedCheck = await postgresService.query(
+        'SELECT deleted_at FROM "HistoriaClinica" WHERE "_id" = $1 LIMIT 1',
+        [historiaId]
+      );
+      if (deletedCheck && deletedCheck.length > 0 && deletedCheck[0].deleted_at !== null) {
+        console.warn(`🗑️  Historia clínica ${historiaId} está soft-deleted — no se carga`);
+        return null;
+      }
 
-      if (response.data && response.data.success && response.data.data) {
-        console.log(`✅ [Wix] Historia clínica encontrada para ${historiaId}`);
-        return response.data.data as MedicalHistoryData;
+      // PASO 2: Fallback a Wix si no está en PostgreSQL (registro legacy)
+      console.log(`⚠️  [PostgreSQL] No encontrado, intentando Wix para ${historiaId}`);
+      try {
+        const response = await axios.get(`${this.wixBaseUrl}/getHistoriaClinica`, {
+          params: { historiaId: historiaId },
+        });
+
+        if (response.data && response.data.success && response.data.data) {
+          console.log(`✅ [Wix] Historia clínica encontrada para ${historiaId}`);
+          return response.data.data as MedicalHistoryData;
+        }
+      } catch (wixErr: any) {
+        // 404 u otro error de Wix no debe romper el endpoint — solo no hay registro
+        console.warn(`⚠️  [Wix] No se pudo cargar ${historiaId}: ${wixErr.message}`);
       }
 
       console.warn(`⚠️  No se encontró historia clínica para ${historiaId}`);
