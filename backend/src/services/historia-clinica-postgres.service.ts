@@ -45,6 +45,18 @@ class HistoriaClinicaPostgresService {
    */
   async upsert(data: HistoriaClinicaData): Promise<boolean> {
     try {
+      // Guard: no sobrescribir registros borrados (soft delete).
+      // Si la orden fue eliminada y recreada con otro _id, el link viejo no debe
+      // resucitar al registro borrado: el médico tiene que atender contra el _id vivo.
+      const existing = await postgresService.query(
+        'SELECT deleted_at FROM "HistoriaClinica" WHERE "_id" = $1',
+        [data._id]
+      );
+      if (existing && existing.length > 0 && existing[0].deleted_at !== null) {
+        console.warn(`⛔ [PostgreSQL] Bloqueado upsert sobre registro borrado: ${data._id} (deleted_at=${existing[0].deleted_at})`);
+        return false;
+      }
+
       const query = `
         INSERT INTO "HistoriaClinica" (
           "_id", "numeroId", "primerNombre", "segundoNombre", "primerApellido", "segundoApellido",
@@ -152,7 +164,7 @@ class HistoriaClinicaPostgresService {
    */
   async getById(id: string): Promise<HistoriaClinicaData | null> {
     try {
-      const query = 'SELECT * FROM "HistoriaClinica" WHERE "_id" = $1';
+      const query = 'SELECT * FROM "HistoriaClinica" WHERE "_id" = $1 AND deleted_at IS NULL';
       const result = await postgresService.query(query, [id]);
 
       if (result && result.length > 0) {
@@ -171,7 +183,7 @@ class HistoriaClinicaPostgresService {
    */
   async getByNumeroId(numeroId: string): Promise<HistoriaClinicaData[]> {
     try {
-      const query = 'SELECT * FROM "HistoriaClinica" WHERE "numeroId" = $1 ORDER BY "_createdDate" DESC';
+      const query = 'SELECT * FROM "HistoriaClinica" WHERE "numeroId" = $1 AND deleted_at IS NULL ORDER BY "_createdDate" DESC';
       const result = await postgresService.query(query, [numeroId]);
 
       return (result || []) as HistoriaClinicaData[];
