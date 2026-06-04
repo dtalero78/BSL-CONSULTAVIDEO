@@ -140,9 +140,45 @@ class MedicalHistoryService {
    * Obtiene la historia clínica de un paciente desde PostgreSQL (principal)
    * Si no existe en PostgreSQL, intenta obtener de Wix como fallback
    */
+  /**
+   * Si el _id recibido apunta a un registro soft-deleted, intenta resolver
+   * al _id vivo más reciente del mismo paciente (mismo numeroId + tenant).
+   * Esto permite que un link de videoconsulta viejo (de orden borrada y
+   * recreada) siga funcionando: el médico atiende contra el registro vivo
+   * sin tener que regenerar el link.
+   * Retorna el _id original si no está borrado, el _id vivo si hay redirect,
+   * o null si está borrado y no hay reemplazo vivo.
+   */
+  private async resolveLiveHistoriaId(historiaId: string): Promise<string | null> {
+    const deleted = await postgresService.query(
+      'SELECT "numeroId", tenant_id, deleted_at FROM "HistoriaClinica" WHERE "_id" = $1 LIMIT 1',
+      [historiaId]
+    );
+    if (!deleted || deleted.length === 0) return historiaId; // No existe en PG, dejar caer a Wix
+    if (deleted[0].deleted_at === null) return historiaId; // Vivo, sin cambios
+
+    const live = await postgresService.query(
+      `SELECT "_id" FROM "HistoriaClinica"
+       WHERE "numeroId" = $1 AND tenant_id = $2 AND deleted_at IS NULL
+       ORDER BY "_createdDate" DESC LIMIT 1`,
+      [deleted[0].numeroId, deleted[0].tenant_id]
+    );
+    if (live && live.length > 0) {
+      console.warn(`♻️  Redirect ${historiaId} (borrado) → ${live[0]._id} (vivo, mismo paciente ${deleted[0].numeroId})`);
+      return live[0]._id;
+    }
+    console.warn(`🗑️  ${historiaId} está borrado y no hay reemplazo vivo para numeroId=${deleted[0].numeroId}`);
+    return null;
+  }
+
   async getMedicalHistory(historiaId: string, tenantId?: string): Promise<MedicalHistoryData | null> {
     try {
       console.log(`📋 Obteniendo historia clínica para ID: ${historiaId}`);
+
+      // Si el _id está borrado, resolver al _id vivo del mismo paciente
+      const resolved = await this.resolveLiveHistoriaId(historiaId);
+      if (resolved === null) return null;
+      historiaId = resolved;
 
       // PASO 1: Intentar obtener de PostgreSQL con JOIN a formularios para datos demográficos y antecedentes
       const pgResult = await postgresService.query(
@@ -302,17 +338,6 @@ class MedicalHistoryService {
         return medicalData as MedicalHistoryData;
       }
 
-      // ¿Existe el registro pero está borrado? Lo distinguimos del 'no existe'
-      // para no caer al fallback de Wix (devolvería 404 y propagaría como 500).
-      const deletedCheck = await postgresService.query(
-        'SELECT deleted_at FROM "HistoriaClinica" WHERE "_id" = $1 LIMIT 1',
-        [historiaId]
-      );
-      if (deletedCheck && deletedCheck.length > 0 && deletedCheck[0].deleted_at !== null) {
-        console.warn(`🗑️  Historia clínica ${historiaId} está soft-deleted — no se carga`);
-        return null;
-      }
-
       // PASO 2: Fallback a Wix si no está en PostgreSQL (registro legacy)
       console.log(`⚠️  [PostgreSQL] No encontrado, intentando Wix para ${historiaId}`);
       try {
@@ -414,6 +439,16 @@ class MedicalHistoryService {
 
       if (!payload.mdConceptoFinal) {
         return { success: false, error: 'El campo Concepto Final es obligatorio' };
+      }
+
+      // Si el _id está borrado, resolver al _id vivo del mismo paciente (link viejo → orden actual)
+      const resolved = await this.resolveLiveHistoriaId(payload.historiaId);
+      if (resolved === null) {
+        return { success: false, error: 'No se encontró historia clínica activa para este paciente' };
+      }
+      if (resolved !== payload.historiaId) {
+        console.log(`♻️  updateMedicalHistory: redirigiendo ${payload.historiaId} → ${resolved}`);
+        payload.historiaId = resolved;
       }
 
       // PASO 0: Obtener datos base del paciente
