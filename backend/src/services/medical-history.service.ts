@@ -195,6 +195,7 @@ class MedicalHistoryService {
         FROM "HistoriaClinica" h
         LEFT JOIN formularios f ON f.wix_id = h."_id" AND f.tenant_id = h.tenant_id
         WHERE h."_id" = $1
+          AND h.deleted_at IS NULL
         ${tenantId ? 'AND h.tenant_id = $2' : ''}
         LIMIT 1`,
         tenantId ? [historiaId, tenantId] : [historiaId]
@@ -354,6 +355,7 @@ class MedicalHistoryService {
           AND "atendido" = 'ATENDIDO'
           AND "fechaConsulta" IS NOT NULL
           AND tenant_id = $2
+          AND deleted_at IS NULL
         ORDER BY "fechaConsulta" DESC
         LIMIT 20`,
         [numeroId, tenantId]
@@ -475,9 +477,11 @@ class MedicalHistoryService {
 
         const nombreCompleto = `${historiaBase.primerNombre} ${historiaBase.primerApellido}`;
         const tenantIdPaciente = (historiaBase as any).tenant_id || 'bsl';
-        const certificadoListoSid = process.env.TWILIO_TEMPLATE_CERTIFICADO_LISTO || 'HX2bdfa33cf1f2e36fe5f11bd6d735f848';
+        // Template atendido_desde_nubia (CTA): botón con URL base fija + {{2}}=ordenId.
+        // NO usar certificado_listo (HX2bdfa3...): tiene {{2}}=URL completa en body → Meta bloquea con 21656.
+        const certificadoTemplateSid = process.env.TWILIO_TEMPLATE_CERTIFICADO_LISTO || 'HX87de46b685187c21e29fe09e2eaa1845';
 
-        // Free-text fallback por si el template aún no está aprobado por Meta.
+        // Free-text fallback (solo funciona si el paciente escribió en las últimas 24h).
         const mensajeFallback = `Hola ${nombreCompleto}! 👋\n\n` +
           `Tu certificado médico ya está listo. Puedes descargarlo en el siguiente enlace:\n\n` +
           `${certificadoUrl}\n\n` +
@@ -485,8 +489,8 @@ class MedicalHistoryService {
 
         whatsappService.sendContentTemplate(
           celularFormateado,
-          certificadoListoSid,
-          { '1': nombreCompleto, '2': certificadoUrl },
+          certificadoTemplateSid,
+          { '1': nombreCompleto, '2': payload.historiaId },
           tenantIdPaciente
         )
           .then(async (result) => {
