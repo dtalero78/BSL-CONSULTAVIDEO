@@ -505,6 +505,16 @@ class MedicalHistoryService {
       if (historiaBase.codEmpresa === 'PARTICULAR' || historiaBase.codEmpresa === 'SANITHELP-JJ') {
         console.log(`📜 [Certificado] Enviando link de certificado para ${payload.historiaId} (${historiaBase.codEmpresa})...`);
 
+        // Idempotencia: reclamar atómicamente el envío del certificado. Evita duplicados
+        // cuando updateMedicalHistory se llama varias veces al guardar/aprobar la misma orden.
+        // Solo el primer llamado "gana" (rows.length > 0); los demás se saltan el envío.
+        const certClaim = await postgresService.query(
+          `UPDATE "HistoriaClinica" SET "certificadoWaEnviado" = true
+           WHERE "_id" = $1 AND COALESCE("certificadoWaEnviado", false) = false
+           RETURNING "_id"`,
+          [payload.historiaId]
+        );
+
         // Construir URL del certificado
         const certificadoUrl = `https://bsl-utilidades-yp78a.ondigitalocean.app/generar-certificado-desde-wix/${payload.historiaId}`;
 
@@ -538,30 +548,37 @@ class MedicalHistoryService {
           `${certificadoUrl}\n\n` +
           `_Este enlace estará disponible por 30 días._`;
 
-        whatsappService.sendContentTemplate(
-          celularFormateado,
-          certificadoTemplateSid,
-          { '1': nombreCompleto, '2': payload.historiaId },
-          tenantIdPaciente
-        )
-          .then(async (result) => {
-            if (result.success) {
-              console.log(`✅ [Certificado] Template enviado por WhatsApp a ${celularFormateado}`);
-              return;
-            }
-            console.warn(`⚠️  [Certificado] Template falló (${result.error}); intentando free-text`);
-            const fallback = await whatsappService.sendTextMessage(celularFormateado, mensajeFallback, tenantIdPaciente);
-            if (fallback.success) {
-              console.log(`✅ [Certificado] Free-text enviado por WhatsApp a ${celularFormateado}`);
-            } else {
-              console.error(`⚠️  [Certificado] Error enviando free-text: ${fallback.error}`);
-            }
-          })
-          .catch((error: any) => {
-            console.error(`⚠️  [Certificado] Error inesperado al enviar WhatsApp: ${error.message}`);
-          });
+        if (!certClaim || certClaim.length === 0) {
+          console.log(`⏭️  [Certificado] Ya se envió antes para ${payload.historiaId}; no se reenvía.`);
+        } else {
+          whatsappService.sendContentTemplate(
+            celularFormateado,
+            certificadoTemplateSid,
+            { '1': nombreCompleto, '2': payload.historiaId },
+            tenantIdPaciente
+          )
+            .then(async (result) => {
+              if (result.success) {
+                console.log(`✅ [Certificado] Template enviado por WhatsApp a ${celularFormateado}`);
+                return;
+              }
+              console.warn(`⚠️  [Certificado] Template falló (${result.error}); intentando free-text`);
+              const fallback = await whatsappService.sendTextMessage(celularFormateado, mensajeFallback, tenantIdPaciente);
+              if (fallback.success) {
+                console.log(`✅ [Certificado] Free-text enviado por WhatsApp a ${celularFormateado}`);
+              } else {
+                console.error(`⚠️  [Certificado] Error enviando free-text: ${fallback.error}`);
+                // Falló template Y free-text: liberar el guard para reintentar en un próximo guardado.
+                await postgresService.query(`UPDATE "HistoriaClinica" SET "certificadoWaEnviado" = false WHERE "_id" = $1`, [payload.historiaId]);
+              }
+            })
+            .catch(async (error: any) => {
+              console.error(`⚠️  [Certificado] Error inesperado al enviar WhatsApp: ${error.message}`);
+              await postgresService.query(`UPDATE "HistoriaClinica" SET "certificadoWaEnviado" = false WHERE "_id" = $1`, [payload.historiaId]);
+            });
 
-        console.log(`📤 [Certificado] Enviando link por WhatsApp a ${celularFormateado}...`);
+          console.log(`📤 [Certificado] Enviando link por WhatsApp a ${celularFormateado}...`);
+        }
       } else {
         console.log(`ℹ️  [Certificado] No se envía certificado para ${historiaBase.codEmpresa || 'N/A'}`);
       }
