@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
+import type { Room } from 'twilio-video';
 import apiService from '../services/api.service';
 import { PatientHistoryModal } from './PatientHistoryModal';
+import { useConsultationRecorder } from '../hooks/useConsultationRecorder';
 
 interface AntecedentesPersonales {
   cirugiaOcular?: boolean;
@@ -96,9 +98,10 @@ interface MedicalHistoryData {
 interface MedicalHistoryPanelProps {
   historiaId: string;
   onAppendToObservaciones?: (text: string) => void;
+  room?: Room | null;
 }
 
-export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones }: MedicalHistoryPanelProps) => {
+export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones, room }: MedicalHistoryPanelProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -118,10 +121,73 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones }: Med
   const [aiSuggestions, setAiSuggestions] = useState('');
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [transcriptionNotice, setTranscriptionNotice] = useState<string | null>(null);
+
+  // Grabación de la consulta → transcripción + auto-llenado de campos con IA
+  const recorder = useConsultationRecorder(room ?? null, historiaId);
 
   useEffect(() => {
     loadMedicalHistory();
   }, [historiaId]);
+
+  // Formatear segundos a mm:ss para el cronómetro de grabación
+  const formatElapsed = (totalSeconds: number): string => {
+    const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+    const s = (totalSeconds % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
+
+  // Campos largos: la IA se anexa si ya hay contenido. Campos cortos: solo si está vacío.
+  const LONG_FIELDS = new Set([
+    'mdAntecedentes',
+    'mdObservacionesCertificado',
+    'mdRecomendacionesMedicasAdicionales',
+  ]);
+
+  // Vuelca los campos extraídos por la IA al formulario. El médico revisa y guarda.
+  const applyExtractedFields = (fields: Record<string, string>) => {
+    const setters: Record<string, React.Dispatch<React.SetStateAction<string>>> = {
+      mdAntecedentes: setMdAntecedentes,
+      mdDx1: setMdDx1,
+      mdDx2: setMdDx2,
+      mdObservacionesCertificado: setMdObservacionesCertificado,
+      mdRecomendacionesMedicasAdicionales: setMdRecomendacionesMedicasAdicionales,
+      talla: setTalla,
+      peso: setPeso,
+    };
+
+    const appliedKeys: string[] = [];
+    Object.entries(fields).forEach(([key, value]) => {
+      const setter = setters[key];
+      if (!setter || !value) return;
+      appliedKeys.push(key);
+      if (LONG_FIELDS.has(key)) {
+        setter((prev) => (prev && prev.trim() ? `${prev}\n\n${value}` : value));
+      } else {
+        // Campos cortos (talla, peso, Dx): no pisar lo que el médico ya escribió.
+        setter((prev) => (prev && prev.trim() ? prev : value));
+      }
+    });
+
+    return appliedKeys.length;
+  };
+
+  const handleToggleRecording = async () => {
+    setTranscriptionNotice(null);
+    if (recorder.isRecording) {
+      const result = await recorder.stopRecording();
+      if (result) {
+        const count = applyExtractedFields(result.fields || {});
+        setTranscriptionNotice(
+          count > 0
+            ? `✅ Transcripción lista. Se rellenaron ${count} campo(s) con IA — revísalos antes de guardar.`
+            : 'ℹ️ Transcripción lista, pero la IA no encontró campos que rellenar automáticamente.'
+        );
+      }
+    } else {
+      await recorder.startRecording();
+    }
+  };
 
   // Exponer función para agregar texto a observaciones desde componentes externos
   useEffect(() => {
@@ -412,6 +478,48 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones }: Med
         <h2 className="text-lg font-bold text-[#00a884]">Historia Clínica</h2>
         {data?.numeroId && (
           <div className="flex items-center gap-2">
+            {room && (
+              <button
+                onClick={handleToggleRecording}
+                disabled={recorder.isProcessing}
+                title={
+                  recorder.isRecording
+                    ? 'Detener grabación y transcribir'
+                    : 'Grabar consulta y transcribir con IA'
+                }
+                className={`flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition font-medium disabled:opacity-60 disabled:cursor-not-allowed ${
+                  recorder.isRecording
+                    ? 'bg-red-600 text-white hover:bg-red-700'
+                    : 'bg-purple-600 text-white hover:bg-purple-700'
+                }`}
+              >
+                {recorder.isProcessing ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Transcribiendo...
+                  </>
+                ) : recorder.isRecording ? (
+                  <>
+                    <span className="relative flex items-center justify-center w-2.5 h-2.5">
+                      <span className="absolute w-2.5 h-2.5 bg-white rounded-full animate-ping"></span>
+                      <span className="relative w-2.5 h-2.5 bg-white rounded-full"></span>
+                    </span>
+                    Detener · {formatElapsed(recorder.seconds)}
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z" />
+                      <path d="M17 11a1 1 0 1 0-2 0 3 3 0 0 1-6 0 1 1 0 1 0-2 0 5 5 0 0 0 4 4.9V19H8a1 1 0 1 0 0 2h8a1 1 0 1 0 0-2h-3v-3.1A5 5 0 0 0 17 11z" />
+                    </svg>
+                    Grabar
+                  </>
+                )}
+              </button>
+            )}
             <button
               onClick={() => {
                 const certBase =
@@ -447,6 +555,32 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones }: Med
 
       {/* Contenido scrollable */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
+
+      {/* Estado de la grabación / transcripción */}
+      {recorder.isRecording && (
+        <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-3 text-red-300 text-xs flex items-center gap-2">
+          <span className="relative flex items-center justify-center w-2.5 h-2.5">
+            <span className="absolute w-2.5 h-2.5 bg-red-500 rounded-full animate-ping"></span>
+            <span className="relative w-2.5 h-2.5 bg-red-500 rounded-full"></span>
+          </span>
+          Grabando la consulta (médico + paciente)… {formatElapsed(recorder.seconds)}
+        </div>
+      )}
+      {recorder.isProcessing && (
+        <div className="bg-purple-500/10 border border-purple-500/50 rounded-lg p-3 text-purple-200 text-xs">
+          Transcribiendo y analizando la consulta con IA… esto puede tardar unos segundos.
+        </div>
+      )}
+      {recorder.error && (
+        <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-3 text-red-400 text-xs">
+          {recorder.error}
+        </div>
+      )}
+      {transcriptionNotice && (
+        <div className="bg-[#00a884]/10 border border-[#00a884]/50 rounded-lg p-3 text-[#7fe7cd] text-xs">
+          {transcriptionNotice}
+        </div>
+      )}
 
       {/* Información del Paciente (Solo lectura) */}
       <div className="bg-[#2a3942] rounded-lg p-3">

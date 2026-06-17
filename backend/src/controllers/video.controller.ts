@@ -4,6 +4,7 @@ import { sessionTracker } from '../services/session-tracker.service';
 import whatsappService from '../services/whatsapp.service';
 import medicalHistoryService from '../services/medical-history.service';
 import openaiService from '../services/openai.service';
+import consultaTranscriptionService from '../services/consulta-transcription.service';
 import postgresService from '../services/postgres.service';
 import emailService from '../services/email.service';
 import tenantService from '../services/tenant.service';
@@ -503,6 +504,55 @@ class VideoController {
       console.error('Error generating AI suggestions:', error);
       res.status(500).json({
         error: 'Failed to generate AI suggestions',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  /**
+   * Transcribir el audio de una consulta y extraer campos clínicos con IA.
+   * POST /api/video/transcribe-consulta/:historiaId
+   *
+   * Body: audio crudo (binario) grabado en el navegador del médico.
+   *   El Content-Type indica el formato (audio/webm, audio/mp4, etc.).
+   * Respuesta: { transcript, fields } — el frontend vuelca `fields` al
+   *   formulario para que el médico los revise y guarde. NO autoguarda.
+   */
+  async transcribeConsulta(req: Request, res: Response): Promise<void> {
+    try {
+      const { historiaId } = req.params;
+      if (!historiaId) {
+        res.status(400).json({ error: 'historiaId is required' });
+        return;
+      }
+
+      const audio = req.body as Buffer;
+      if (!Buffer.isBuffer(audio) || audio.length === 0) {
+        res.status(400).json({ error: 'audio is required (cuerpo binario vacío)' });
+        return;
+      }
+
+      const contentType = (req.headers['content-type'] as string) || 'audio/webm';
+      console.log(
+        `🎙️  [transcribeConsulta] historia=${historiaId} bytes=${audio.length} type=${contentType}`
+      );
+
+      const result = await consultaTranscriptionService.transcribeAndExtract(audio, contentType);
+
+      if (!result.transcript) {
+        res.status(422).json({
+          success: false,
+          error: 'No se pudo transcribir el audio (transcripción vacía)',
+        });
+        return;
+      }
+
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      console.error('Error transcribing consulta:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to transcribe consulta',
         message: error instanceof Error ? error.message : 'Unknown error',
       });
     }

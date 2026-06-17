@@ -199,6 +199,26 @@ class ApiService {
   }
 
   /**
+   * Transcribir el audio de una consulta y extraer campos clínicos con IA.
+   * Sube el audio crudo (Blob de MediaRecorder) y devuelve la transcripción
+   * más los campos sugeridos para el formulario de historia clínica.
+   */
+  async transcribeConsulta(
+    historiaId: string,
+    audio: Blob
+  ): Promise<{ transcript: string; fields: Record<string, string> }> {
+    const response = await this.client.post(
+      `/api/video/transcribe-consulta/${historiaId}`,
+      audio,
+      {
+        headers: { 'Content-Type': audio.type || 'application/octet-stream' },
+        timeout: 180000, // hasta 3 min: subida + Whisper + GPT
+      }
+    );
+    return response.data.data;
+  }
+
+  /**
    * Realizar llamada telefónica con Twilio Voice
    */
   async makeVoiceCall(phoneNumber: string, patientName?: string): Promise<void> {

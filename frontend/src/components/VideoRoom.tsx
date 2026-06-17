@@ -25,6 +25,7 @@ export const VideoRoom = ({ identity, roomName, role, historiaId, documento, med
   const [appendToObservacionesFunc, setAppendToObservacionesFunc] = useState<((text: string) => void) | null>(null);
 
   const {
+    room,
     localParticipant,
     remoteParticipants,
     isConnecting,
@@ -212,6 +213,7 @@ export const VideoRoom = ({ identity, roomName, role, historiaId, documento, med
           <MedicalHistoryPanel
             historiaId={historiaId}
             onAppendToObservaciones={(func) => setAppendToObservacionesFunc(() => func)}
+            room={room}
           />
         </div>
       )}

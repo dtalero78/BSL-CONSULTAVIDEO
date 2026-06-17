@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
 import videoController from '../controllers/video.controller';
 
 const router = Router();
@@ -34,5 +34,13 @@ router.post('/medical-history', videoController.updateMedicalHistory);
 
 // AI Suggestions
 router.post('/ai-suggestions', videoController.generateAISuggestions);
+
+// Transcripción de consulta (audio grabado en el navegador del médico).
+// express.raw captura el cuerpo binario sin importar el Content-Type del audio.
+router.post(
+  '/transcribe-consulta/:historiaId',
+  express.raw({ type: () => true, limit: '60mb' }),
+  videoController.transcribeConsulta
+);
 
 export default router;

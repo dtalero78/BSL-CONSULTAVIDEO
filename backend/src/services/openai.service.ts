@@ -1,6 +1,8 @@
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
+// Instancia compartida del cliente de OpenAI. Se exporta para reutilizarla en
+// otros servicios (ej. transcripción de consulta con Whisper).
+export const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
