@@ -92,6 +92,7 @@ interface MedicalHistoryData {
   mdDx2?: string;
   talla?: string;
   peso?: string;
+  transcriptionText?: string;
   voximetria?: VoximetriaData;
 }
 
@@ -122,9 +123,12 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones, room 
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [transcriptionNotice, setTranscriptionNotice] = useState<string | null>(null);
+  const [transcriptText, setTranscriptText] = useState('');
+  const [showTranscript, setShowTranscript] = useState(false);
 
-  // Grabación de la consulta → transcripción + auto-llenado de campos con IA
-  const recorder = useConsultationRecorder(room ?? null, historiaId);
+  // Grabación de la consulta → transcripción + auto-llenado de campos con IA.
+  // Usa el _id vigente (data.historiaId) si ya cargó, para persistir bien el transcript.
+  const recorder = useConsultationRecorder(room ?? null, data?.historiaId || historiaId);
 
   useEffect(() => {
     loadMedicalHistory();
@@ -178,10 +182,14 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones, room 
       const result = await recorder.stopRecording();
       if (result) {
         const count = applyExtractedFields(result.fields || {});
+        if (result.transcript) {
+          setTranscriptText(result.transcript);
+          setShowTranscript(true);
+        }
         setTranscriptionNotice(
           count > 0
             ? `✅ Transcripción lista. Se rellenaron ${count} campo(s) con IA — revísalos antes de guardar.`
-            : 'ℹ️ Transcripción lista, pero la IA no encontró campos que rellenar automáticamente.'
+            : 'ℹ️ Transcripción lista. La IA no encontró campos para rellenar, pero abajo tienes el texto completo de la consulta.'
         );
       }
     } else {
@@ -333,6 +341,7 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones, room 
       setMdDx2(history.mdDx2 || '');
       setTalla(history.talla || '');
       setPeso(history.peso || '');
+      setTranscriptText(history.transcriptionText || '');
     } catch (err: any) {
       setError(err.message || 'Error al cargar historia clínica');
       console.error('Error loading medical history:', err);
@@ -579,6 +588,40 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones, room 
       {transcriptionNotice && (
         <div className="bg-[#00a884]/10 border border-[#00a884]/50 rounded-lg p-3 text-[#7fe7cd] text-xs">
           {transcriptionNotice}
+        </div>
+      )}
+
+      {/* Transcripción de la consulta (se muestra siempre que exista) */}
+      {transcriptText && (
+        <div className="bg-[#2a3942] rounded-lg p-3">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => setShowTranscript((v) => !v)}
+              className="flex items-center gap-2 text-sm font-semibold text-[#00a884]"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" style={{ transform: showTranscript ? 'rotate(90deg)' : 'none', transformOrigin: 'center' }} />
+              </svg>
+              Transcripción de la consulta
+            </button>
+            <button
+              onClick={() => {
+                navigator.clipboard?.writeText(transcriptText);
+                setTranscriptionNotice('📋 Transcripción copiada al portapapeles.');
+              }}
+              className="text-xs px-2 py-1 bg-[#1f2c34] text-gray-300 rounded hover:text-white transition"
+              title="Copiar transcripción"
+            >
+              Copiar
+            </button>
+          </div>
+          {showTranscript && (
+            <textarea
+              readOnly
+              value={transcriptText}
+              className="mt-3 w-full h-40 bg-[#1f2c34] border border-gray-700 rounded-lg p-2 text-xs text-gray-200 resize-y focus:outline-none"
+            />
+          )}
         </div>
       )}
 

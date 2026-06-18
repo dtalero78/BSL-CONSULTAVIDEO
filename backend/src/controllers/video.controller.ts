@@ -547,6 +547,10 @@ class VideoController {
         return;
       }
 
+      // Persistir el transcript (best-effort) para que el médico lo vea aunque
+      // la IA no extraiga campos, y para poder diagnosticar después.
+      await consultaTranscriptionService.saveTranscript(historiaId, result.transcript);
+
       res.status(200).json({ success: true, data: result });
     } catch (error) {
       console.error('Error transcribing consulta:', error);

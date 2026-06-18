@@ -1,5 +1,6 @@
 import { toFile } from 'openai/uploads';
 import { openai } from './openai.service';
+import postgresService from './postgres.service';
 
 /**
  * Transcripción de la consulta médica a partir de un audio grabado en el
@@ -166,6 +167,32 @@ class ConsultaTranscriptionService {
 
     console.log(`[ConsultaTranscription] Listo en ${Date.now() - t0} ms`);
     return { transcript, fields };
+  }
+
+  /**
+   * Persiste el transcript completo en HistoriaClinica.transcription_text.
+   * Best-effort: nunca lanza. La columna no forma parte del upsert de guardado,
+   * así que el transcript sobrevive aunque el médico guarde la historia después.
+   */
+  async saveTranscript(historiaId: string, transcript: string): Promise<void> {
+    if (!historiaId || !transcript) return;
+    try {
+      const rows = await postgresService.query(
+        `UPDATE "HistoriaClinica" SET "transcription_text" = $1 WHERE "_id" = $2 RETURNING "_id"`,
+        [transcript, historiaId]
+      );
+      if (!rows || rows.length === 0) {
+        console.warn(
+          `[ConsultaTranscription] saveTranscript: ninguna fila actualizada para ${historiaId} (¿_id no vigente?)`
+        );
+      } else {
+        console.log(
+          `[ConsultaTranscription] Transcript persistido en ${historiaId} (${transcript.length} chars)`
+        );
+      }
+    } catch (e: any) {
+      console.error('[ConsultaTranscription] Error persistiendo transcript:', e?.message || e);
+    }
   }
 
   private extensionFromContentType(contentType: string): string {

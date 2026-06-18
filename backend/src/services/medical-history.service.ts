@@ -313,6 +313,7 @@ class MedicalHistoryService {
           mdDx2: row.mdDx2,
           talla: row.talla,
           peso: row.peso,
+          transcriptionText: row.transcription_text,
           fechaAtencion: row.fechaAtencion,
           fechaConsulta: row.fechaConsulta,
           atendido: row.atendido,
