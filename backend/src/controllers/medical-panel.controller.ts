@@ -95,14 +95,11 @@ class MedicalPanelController {
       }
 
       const tenantId = await getTenantId(req);
-      const patient = await medicalPanelService.searchPatientByDocument(documento, tenantId);
+      const patients = await medicalPanelService.searchPatientByDocument(documento, tenantId);
 
-      if (!patient) {
-        res.status(404).json({ error: 'Paciente no encontrado' });
-        return;
-      }
-
-      res.json(patient);
+      // Devuelve siempre un array (vacío si no hay coincidencias). Un mismo
+      // paciente puede tener varios registros activos y se devuelven todos.
+      res.json(patients);
     } catch (error) {
       console.error('Error buscando paciente:', error);
       res.status(500).json({ error: 'Error buscando paciente' });

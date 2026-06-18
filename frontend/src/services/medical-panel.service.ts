@@ -106,8 +106,8 @@ class MedicalPanelService {
   async searchPatientByDocument(
     documento: string,
     medicoCode?: string
-  ): Promise<Patient> {
-    const response = await this.client.get<Patient>(
+  ): Promise<Patient[]> {
+    const response = await this.client.get<Patient[]>(
       `/api/medical-panel/patients/search/${documento}`,
       {
         params: medicoCode ? { medicoCode } : {}

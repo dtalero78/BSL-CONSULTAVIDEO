@@ -77,7 +77,7 @@ export function MedicalPanelPage() {
   const [totalPages, setTotalPages] = useState(0);
   const [collapsedItems, setCollapsedItems] = useState<{ [key: string]: boolean }>({});
   const [searchDocument, setSearchDocument] = useState('');
-  const [searchResult, setSearchResult] = useState<Patient | null>(null);
+  const [searchResults, setSearchResults] = useState<Patient[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -393,17 +393,17 @@ export function MedicalPanelPage() {
 
     setIsSearching(true);
     setSearchError(null);
-    setSearchResult(null);
+    setSearchResults([]);
 
     try {
       // Buscar sin filtro de médico (busca en toda la base de datos)
-      const result = await medicalPanelService.searchPatientByDocument(
+      const results = await medicalPanelService.searchPatientByDocument(
         searchDocument.trim()
         // No enviamos medicoCode para buscar en todos los pacientes
       );
 
-      if (result) {
-        setSearchResult(result);
+      if (results && results.length > 0) {
+        setSearchResults(results);
       } else {
         setSearchError('No se encontró paciente con ese documento o celular');
       }
@@ -417,7 +417,7 @@ export function MedicalPanelPage() {
 
   const clearSearch = () => {
     setSearchDocument('');
-    setSearchResult(null);
+    setSearchResults([]);
     setSearchError(null);
   };
 
@@ -559,7 +559,7 @@ export function MedicalPanelPage() {
               >
                 {isSearching ? '🔍' : '🔎 Buscar'}
               </button>
-              {(searchResult || searchError) && (
+              {(searchResults.length > 0 || searchError) && (
                 <button
                   type="button"
                   onClick={clearSearch}
@@ -576,8 +576,14 @@ export function MedicalPanelPage() {
               </div>
             )}
 
-            {searchResult && (
-              <div className="bg-[#2a3942] rounded-xl p-4 mt-4">
+            {searchResults.length > 1 && (
+              <p className="text-amber-400 text-sm mt-4">
+                ⚠️ Se encontraron {searchResults.length} registros para esta búsqueda
+              </p>
+            )}
+
+            {searchResults.map((patient) => (
+              <div key={patient._id} className="bg-[#2a3942] rounded-xl p-4 mt-4">
                 <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
                   ✅ Paciente encontrado
                 </h3>
@@ -587,15 +593,15 @@ export function MedicalPanelPage() {
                       <div>
                         <span className="text-gray-400">Nombre:</span>
                         <span className="text-white ml-2 font-semibold">
-                          {searchResult.nombres}
-                          {searchResult.tipoExamen && (
+                          {patient.nombres}
+                          {patient.tipoExamen && (
                             <span className="ml-2 text-sm font-normal text-gray-400">
-                              ({searchResult.tipoExamen})
+                              ({patient.tipoExamen})
                             </span>
                           )}
                         </span>
                       </div>
-                      {connectedPatients.has(searchResult._id) && (
+                      {connectedPatients.has(patient._id) && (
                         <div className="flex items-center gap-2 bg-green-500/20 px-3 py-1 rounded-full border border-green-500/50">
                           <div className="relative flex items-center justify-center w-2 h-2">
                             <div className="absolute w-2 h-2 bg-green-500 rounded-full animate-ping"></div>
@@ -609,16 +615,16 @@ export function MedicalPanelPage() {
                     </div>
                     <div>
                       <span className="text-gray-400">Doc:</span>
-                      <span className="text-white ml-2">{searchResult.numeroId}</span>
+                      <span className="text-white ml-2">{patient.numeroId}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-gray-400">Celular:</span>
-                      <span className="text-white ml-2">{searchResult.celular || 'NO REGISTRA'}</span>
-                      {searchResult.celular && (
+                      <span className="text-white ml-2">{patient.celular || 'NO REGISTRA'}</span>
+                      {patient.celular && (
                         <a
                           href={medicalPanelService.generateWhatsAppLink(
-                            searchResult.celular,
-                            generateWhatsAppMessage(searchResult, false)
+                            patient.celular,
+                            generateWhatsAppMessage(patient, false)
                           )}
                           target="_blank"
                           rel="noopener noreferrer"
@@ -634,29 +640,29 @@ export function MedicalPanelPage() {
                     <div>
                       <span className="text-gray-400">Empresa:</span>
                       <span className="text-white ml-2">
-                        {searchResult.empresaListado === 'SANITHELP-JJ' ? 'PARTICULAR' : searchResult.empresaListado}
+                        {patient.empresaListado === 'SANITHELP-JJ' ? 'PARTICULAR' : patient.empresaListado}
                       </span>
                     </div>
                     <div>
                       <span className="text-gray-400">Fecha atención:</span>
                       <span className="text-white ml-2">
-                        {new Date(searchResult.fechaAtencion).toLocaleString()}
+                        {new Date(patient.fechaAtencion).toLocaleString()}
                       </span>
                     </div>
                     <div>
                       <span className="text-gray-400">Estado:</span>
-                      <span className="text-white ml-2">{searchResult.estado}</span>
+                      <span className="text-white ml-2">{patient.estado}</span>
                     </div>
                   </div>
 
                   <div className="mt-4 pt-4 border-t border-gray-700 flex justify-between items-center">
                     <div className="flex gap-2">
                       <button
-                        onClick={() => handleContactar(searchResult)}
-                        disabled={contactingPatient === searchResult._id || contactedPatients.has(searchResult._id)}
+                        onClick={() => handleContactar(patient)}
+                        disabled={contactingPatient === patient._id || contactedPatients.has(patient._id)}
                         className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       >
-                        {contactingPatient === searchResult._id ? (
+                        {contactingPatient === patient._id ? (
                           <>
                             <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -664,7 +670,7 @@ export function MedicalPanelPage() {
                             </svg>
                             Contactando...
                           </>
-                        ) : contactedPatients.has(searchResult._id) ? (
+                        ) : contactedPatients.has(patient._id) ? (
                           <>
                             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                               <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
@@ -683,11 +689,11 @@ export function MedicalPanelPage() {
                       </button>
 
                       <button
-                        onClick={() => handleRellamar(searchResult)}
-                        disabled={recallingPatient === searchResult._id}
+                        onClick={() => handleRellamar(patient)}
+                        disabled={recallingPatient === patient._id}
                         className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       >
-                        {recallingPatient === searchResult._id ? (
+                        {recallingPatient === patient._id ? (
                           <>
                             <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -708,11 +714,11 @@ export function MedicalPanelPage() {
 
                     <div className="flex gap-2">
                       <button
-                        onClick={() => handleAtender(searchResult)}
-                        disabled={attendingPatient === searchResult._id}
+                        onClick={() => handleAtender(patient)}
+                        disabled={attendingPatient === patient._id}
                         className="bg-[#00a884] text-white px-4 py-2 rounded-lg hover:bg-[#008f6f] transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       >
-                        {attendingPatient === searchResult._id ? (
+                        {attendingPatient === patient._id ? (
                           <>
                             <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -731,7 +737,7 @@ export function MedicalPanelPage() {
                       </button>
 
                       <button
-                        onClick={() => handleNoAnswer(searchResult._id)}
+                        onClick={() => handleNoAnswer(patient._id)}
                         className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition text-sm font-medium flex items-center gap-2"
                       >
                         No Contesta
@@ -740,7 +746,7 @@ export function MedicalPanelPage() {
                   </div>
                 </div>
               </div>
-            )}
+            ))}
           </form>
         </div>
 

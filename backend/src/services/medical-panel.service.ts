@@ -230,9 +230,10 @@ class MedicalPanelService {
   /**
    * Busca un paciente por documento de identidad o celular
    */
-  async searchPatientByDocument(searchTerm: string, tenantId: string = 'bsl'): Promise<Patient | null> {
+  async searchPatientByDocument(searchTerm: string, tenantId: string = 'bsl'): Promise<Patient[]> {
     try {
-      // Buscar por numeroId o celular
+      // Buscar por numeroId o celular. Devuelve TODOS los registros activos
+      // (un mismo paciente puede tener varios), del más reciente al más antiguo.
       const result = await postgresService.query(
         `SELECT "_id", "numeroId", "primerNombre", "segundoNombre", "primerApellido", "segundoApellido",
                 "celular", "fechaAtencion", "fechaConsulta", "atendido", "pvEstado", "codEmpresa",
@@ -240,17 +241,17 @@ class MedicalPanelService {
          FROM "HistoriaClinica"
          WHERE ("numeroId" = $1 OR "celular" = $1)
          AND tenant_id = $2
+         AND deleted_at IS NULL
          ORDER BY "fechaAtencion" DESC
-         LIMIT 1`,
+         LIMIT 50`,
         [searchTerm, tenantId]
       );
 
       if (!result || result.length === 0) {
-        return null;
+        return [];
       }
 
-      const row = result[0];
-      return {
+      return result.map((row: any) => ({
         _id: row._id,
         nombres: `${row.primerNombre || ''} ${row.primerApellido || ''}`.trim(),
         primerNombre: row.primerNombre || '',
@@ -267,10 +268,10 @@ class MedicalPanelService {
         medico: row.medico,
         motivoConsulta: row.motivoConsulta || '',
         tipoExamen: row.tipoExamen || ''
-      };
+      }));
     } catch (error) {
       console.error('❌ Error buscando paciente en PostgreSQL:', error);
-      return null;
+      return [];
     }
   }
 
