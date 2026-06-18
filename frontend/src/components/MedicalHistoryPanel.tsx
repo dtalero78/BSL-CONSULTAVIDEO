@@ -125,8 +125,10 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones, room 
   const [transcriptionNotice, setTranscriptionNotice] = useState<string | null>(null);
   const [transcriptText, setTranscriptText] = useState('');
   const [showTranscript, setShowTranscript] = useState(false);
-  // Propuestas de la IA pendientes de aprobación (clave = campo, valor = texto editable)
-  const [aiProposals, setAiProposals] = useState<Record<string, string>>({});
+  // Campos que la IA acaba de rellenar (para resaltarlos en el formulario).
+  const [aiFilledFields, setAiFilledFields] = useState<Set<string>>(new Set());
+  // Diagnóstico sugerido por la IA cuando no calza con ninguna opción del select.
+  const [dxSuggestion, setDxSuggestion] = useState('');
 
   // Grabación de la consulta → transcripción + auto-llenado de campos con IA.
   // Usa el _id vigente (data.historiaId) si ya cargó, para persistir bien el transcript.
@@ -143,73 +145,83 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones, room 
     return `${m}:${s}`;
   };
 
-  // Campos largos: al aprobar, la propuesta se ANEXA a lo que ya haya. Campos
-  // cortos (talla, peso, Dx): al aprobar se REEMPLAZA el valor.
-  const LONG_FIELDS = new Set([
-    'mdAntecedentes',
-    'mdObservacionesCertificado',
-    'mdRecomendacionesMedicasAdicionales',
-  ]);
+  // Resaltado de los campos que la IA acaba de rellenar.
+  const aiRing = (field: string): string =>
+    aiFilledFields.has(field) ? ' !border-[#00a884] ring-2 ring-[#00a884]/40' : '';
+  const aiTag = (field: string) =>
+    aiFilledFields.has(field) ? (
+      <span className="ml-1 text-[10px] font-bold text-[#00a884] bg-[#00a884]/15 px-1.5 py-0.5 rounded align-middle">
+        ✨ IA
+      </span>
+    ) : null;
 
-  // Etiqueta legible + orden de las tarjetas de propuesta
+  // Texto de los campos que la IA puede autocompletar (para el aviso). Los de
+  // texto largo se ANEXAN a lo que ya haya; los cortos se rellenan si están vacíos.
   const FIELD_LABELS: Record<string, string> = {
     mdAntecedentes: 'Antecedentes',
-    mdObservacionesCertificado: 'Observaciones / Certificado',
-    mdRecomendacionesMedicasAdicionales: 'Recomendaciones médicas',
-    mdDx1: 'Diagnóstico 1',
-    mdDx2: 'Diagnóstico 2',
-    talla: 'Talla (cm)',
-    peso: 'Peso (kg)',
+    mdObservacionesCertificado: 'Obs. Certificado',
+    mdRecomendacionesMedicasAdicionales: 'Recomendaciones',
+    mdDx1: 'Diagnóstico',
+    talla: 'Talla',
+    peso: 'Peso',
   };
-  const FIELD_ORDER = [
-    'mdAntecedentes',
-    'mdObservacionesCertificado',
-    'mdRecomendacionesMedicasAdicionales',
-    'mdDx1',
-    'mdDx2',
-    'talla',
-    'peso',
-  ];
 
-  const getSetter = (field: string): React.Dispatch<React.SetStateAction<string>> | undefined =>
-    ({
+  // ¿Calza el texto libre de la IA con alguna opción del <select> de diagnóstico?
+  const matchDxOption = (selectId: string, aiText: string): string => {
+    const el = document.getElementById(selectId) as HTMLSelectElement | null;
+    if (!el || !aiText) return '';
+    const norm = (s: string) => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    const t = norm(aiText);
+    const opts = Array.from(el.options).map((o) => o.value).filter(Boolean);
+    const hits = opts.filter((o) => t.includes(norm(o))).sort((a, b) => b.length - a.length);
+    return hits[0] || '';
+  };
+
+  // Auto-llena los campos del formulario con lo que extrajo la IA y los resalta.
+  // El médico revisa, edita o borra, y guarda con el flujo normal.
+  const applyAiFields = (fields: Record<string, string>): { count: number; dxSug: string } => {
+    const filled: string[] = [];
+    let dxSug = '';
+
+    // Texto largo: anexar si ya hay contenido, o setear si está vacío.
+    const longSetters: Record<string, React.Dispatch<React.SetStateAction<string>>> = {
       mdAntecedentes: setMdAntecedentes,
-      mdDx1: setMdDx1,
-      mdDx2: setMdDx2,
       mdObservacionesCertificado: setMdObservacionesCertificado,
       mdRecomendacionesMedicasAdicionales: setMdRecomendacionesMedicasAdicionales,
-      talla: setTalla,
-      peso: setPeso,
-    } as Record<string, React.Dispatch<React.SetStateAction<string>>>)[field];
-
-  // Aprueba una propuesta: la vuelca al campo y la quita de la lista de pendientes.
-  const approveProposal = (field: string) => {
-    const value = aiProposals[field];
-    const setter = getSetter(field);
-    if (setter && value && value.trim()) {
-      if (LONG_FIELDS.has(field)) {
-        setter((prev) => (prev && prev.trim() ? `${prev}\n\n${value}` : value));
-      } else {
-        setter(value);
+    };
+    for (const f of Object.keys(longSetters)) {
+      const v = fields[f];
+      if (v && v.trim()) {
+        longSetters[f]((prev) => (prev && prev.trim() ? `${prev}\n\n${v.trim()}` : v.trim()));
+        filled.push(f);
       }
     }
-    setAiProposals((prev) => {
-      const next = { ...prev };
-      delete next[field];
-      return next;
-    });
-  };
 
-  const dismissProposal = (field: string) => {
-    setAiProposals((prev) => {
-      const next = { ...prev };
-      delete next[field];
-      return next;
-    });
-  };
+    // Talla / peso: tomar solo el número, setear si está vacío.
+    if (fields.talla) {
+      const n = String(fields.talla).replace(/[^\d.]/g, '');
+      if (n) { setTalla((prev) => (prev && prev.trim() ? prev : n)); filled.push('talla'); }
+    }
+    if (fields.peso) {
+      const n = String(fields.peso).replace(/[^\d.]/g, '');
+      if (n) { setPeso((prev) => (prev && prev.trim() ? prev : n)); filled.push('peso'); }
+    }
 
-  const approveAllProposals = () => {
-    Object.keys(aiProposals).forEach((f) => approveProposal(f));
+    // Diagnóstico: mapear el texto libre a una opción del select; si no calza,
+    // dejarlo vacío (correcto para sanos) y mostrar la sugerencia como hint.
+    if (fields.mdDx1) {
+      const m = matchDxOption('dx1-select', fields.mdDx1);
+      if (m) { setMdDx1((prev) => (prev ? prev : m)); filled.push('mdDx1'); }
+      else { dxSug = String(fields.mdDx1).trim(); }
+    }
+    if (fields.mdDx2) {
+      const m = matchDxOption('dx2-select', fields.mdDx2);
+      if (m) { setMdDx2((prev) => (prev ? prev : m)); }
+    }
+
+    setAiFilledFields(new Set(filled));
+    setDxSuggestion(dxSug);
+    return { count: filled.length, dxSug };
   };
 
   const handleToggleRecording = async () => {
@@ -218,16 +230,20 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones, room 
       const result = await recorder.stopRecording();
       if (result) {
         const fields = result.fields || {};
-        setAiProposals(fields);
         if (result.transcript) {
           setTranscriptText(result.transcript);
           setShowTranscript(true);
         }
-        const count = Object.keys(fields).length;
+        const { count, dxSug } = applyAiFields(fields);
+        const labels = Array.from(new Set(Object.keys(fields)))
+          .filter((f) => FIELD_LABELS[f])
+          .map((f) => FIELD_LABELS[f]);
         setTranscriptionNotice(
           count > 0
-            ? `✅ Transcripción lista. La IA propone ${count} campo(s) abajo — apruébalos o edítalos.`
-            : 'ℹ️ Transcripción lista. La IA no propuso campos, pero abajo tienes el texto completo de la consulta.'
+            ? `✅ La IA rellenó ${count} campo(s) (resaltados): ${labels.join(', ')}. Revísalos y guarda.${dxSug ? ` · Diagnóstico sugerido: "${dxSug}" — selecciona el código.` : ''}`
+            : (dxSug
+                ? `ℹ️ Transcripción lista. Diagnóstico sugerido: "${dxSug}" — selecciona el código. El texto completo está abajo.`
+                : 'ℹ️ Transcripción lista, sin campos para autocompletar. El texto completo está abajo.')
         );
       }
     } else {
@@ -380,6 +396,8 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones, room 
       setTalla(history.talla || '');
       setPeso(history.peso || '');
       setTranscriptText(history.transcriptionText || '');
+      setAiFilledFields(new Set());
+      setDxSuggestion('');
     } catch (err: any) {
       setError(err.message || 'Error al cargar historia clínica');
       console.error('Error loading medical history:', err);
@@ -629,69 +647,6 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones, room 
         </div>
       )}
 
-      {/* Propuestas de la IA: el médico aprueba o edita cada campo */}
-      {Object.keys(aiProposals).length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-purple-300">
-              Propuestas de la IA · {Object.keys(aiProposals).length}
-            </h3>
-            <button
-              onClick={approveAllProposals}
-              className="text-xs px-3 py-1.5 bg-[#00a884] text-white rounded-lg hover:bg-[#008f6f] transition font-medium"
-            >
-              Aprobar todas
-            </button>
-          </div>
-
-          {FIELD_ORDER.filter((f) => f in aiProposals).map((field) => {
-            const isLong = LONG_FIELDS.has(field);
-            return (
-              <div
-                key={field}
-                className="bg-[#2a3942] border border-purple-500/40 rounded-lg p-3 space-y-2"
-              >
-                <div className="text-xs font-semibold text-purple-200 uppercase tracking-wide">
-                  {FIELD_LABELS[field] || field}
-                </div>
-                {isLong ? (
-                  <textarea
-                    value={aiProposals[field]}
-                    onChange={(e) =>
-                      setAiProposals((prev) => ({ ...prev, [field]: e.target.value }))
-                    }
-                    className="w-full h-28 bg-[#1f2c34] border border-gray-700 rounded-lg p-2 text-xs text-gray-100 resize-y focus:outline-none focus:border-purple-400"
-                  />
-                ) : (
-                  <input
-                    type="text"
-                    value={aiProposals[field]}
-                    onChange={(e) =>
-                      setAiProposals((prev) => ({ ...prev, [field]: e.target.value }))
-                    }
-                    className="w-full bg-[#1f2c34] border border-gray-700 rounded-lg p-2 text-xs text-gray-100 focus:outline-none focus:border-purple-400"
-                  />
-                )}
-                <div className="flex items-center justify-end gap-2">
-                  <button
-                    onClick={() => dismissProposal(field)}
-                    className="text-xs px-3 py-1.5 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition"
-                  >
-                    Descartar
-                  </button>
-                  <button
-                    onClick={() => approveProposal(field)}
-                    className="text-xs px-4 py-1.5 bg-[#00a884] text-white rounded-lg hover:bg-[#008f6f] transition font-medium"
-                  >
-                    Aprobar
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
       {/* Transcripción de la consulta (se muestra siempre que exista) */}
       {transcriptText && (
         <div className="bg-[#2a3942] rounded-lg p-3">
@@ -892,22 +847,22 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones, room 
         <h3 className="text-sm font-semibold mb-2 text-[#00a884]">Medidas Físicas</h3>
         <div className="grid grid-cols-3 gap-2">
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Talla (cm)</label>
+            <label className="block text-xs text-gray-400 mb-1">Talla (cm){aiTag('talla')}</label>
             <input
               type="text"
               value={talla}
               onChange={(e) => setTalla(e.target.value)}
-              className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none"
+              className={`w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none${aiRing('talla')}`}
               placeholder="170"
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Peso (kg)</label>
+            <label className="block text-xs text-gray-400 mb-1">Peso (kg){aiTag('peso')}</label>
             <input
               type="text"
               value={peso}
               onChange={(e) => setPeso(e.target.value)}
-              className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none"
+              className={`w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none${aiRing('peso')}`}
               placeholder="70"
             />
           </div>
@@ -931,11 +886,11 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones, room 
 
         {/* 1. ANTECEDENTES */}
         <div>
-          <label className="block text-xs text-gray-400 mb-1">Antecedentes</label>
+          <label className="block text-xs text-gray-400 mb-1">Antecedentes{aiTag('mdAntecedentes')}</label>
           <textarea
             value={mdAntecedentes}
             onChange={(e) => setMdAntecedentes(e.target.value)}
-            className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none"
+            className={`w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none${aiRing('mdAntecedentes')}`}
             rows={3}
             placeholder="Antecedentes médicos relevantes..."
           />
@@ -943,11 +898,11 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones, room 
 
         {/* 2. OBS. CERTIFICADO */}
         <div>
-          <label className="block text-xs text-gray-400 mb-1">Obs. Certificado</label>
+          <label className="block text-xs text-gray-400 mb-1">Obs. Certificado{aiTag('mdObservacionesCertificado')}</label>
           <textarea
             value={mdObservacionesCertificado}
             onChange={(e) => setMdObservacionesCertificado(e.target.value)}
-            className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none"
+            className={`w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none${aiRing('mdObservacionesCertificado')}`}
             rows={3}
             placeholder="Observaciones para el certificado..."
           />
@@ -955,11 +910,11 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones, room 
 
         {/* 3. RECOMENDACIONES MÉDICAS ADICIONALES */}
         <div>
-          <label className="block text-xs text-gray-400 mb-1">Recomendaciones Médicas Adicionales</label>
+          <label className="block text-xs text-gray-400 mb-1">Recomendaciones Médicas Adicionales{aiTag('mdRecomendacionesMedicasAdicionales')}</label>
           <textarea
             value={mdRecomendacionesMedicasAdicionales}
             onChange={(e) => setMdRecomendacionesMedicasAdicionales(e.target.value)}
-            className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none"
+            className={`w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none${aiRing('mdRecomendacionesMedicasAdicionales')}`}
             rows={3}
             placeholder="Recomendaciones médicas adicionales..."
           />
@@ -980,11 +935,17 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones, room 
         {/* 5. DIAGNÓSTICOS */}
         <div className="grid grid-cols-1 gap-2">
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Diagnóstico 1 (Principal)</label>
+            <label className="block text-xs text-gray-400 mb-1">Diagnóstico 1 (Principal){aiTag('mdDx1')}</label>
+            {dxSuggestion && (
+              <div className="mb-1 text-[11px] text-[#7fe7cd] bg-[#00a884]/10 border border-[#00a884]/40 rounded px-2 py-1">
+                ✨ Sugerencia IA: “{dxSuggestion}” — selecciona el código que corresponda.
+              </div>
+            )}
             <select
+              id="dx1-select"
               value={mdDx1}
               onChange={(e) => setMdDx1(e.target.value)}
-              className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none"
+              className={`w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none${aiRing('mdDx1')}`}
             >
               <option value="">Seleccione diagnóstico</option>
               <option value="Asma ocupacional">Asma ocupacional</option>
@@ -1033,11 +994,12 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones, room 
             </select>
           </div>
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Diagnóstico 2 (Secundario)</label>
+            <label className="block text-xs text-gray-400 mb-1">Diagnóstico 2 (Secundario){aiTag('mdDx2')}</label>
             <select
+              id="dx2-select"
               value={mdDx2}
               onChange={(e) => setMdDx2(e.target.value)}
-              className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none"
+              className={`w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none${aiRing('mdDx2')}`}
             >
               <option value="">Seleccione diagnóstico</option>
               <option value="Asma ocupacional">Asma ocupacional</option>
