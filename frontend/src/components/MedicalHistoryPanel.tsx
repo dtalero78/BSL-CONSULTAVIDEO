@@ -125,6 +125,8 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones, room 
   const [transcriptionNotice, setTranscriptionNotice] = useState<string | null>(null);
   const [transcriptText, setTranscriptText] = useState('');
   const [showTranscript, setShowTranscript] = useState(false);
+  // Propuestas de la IA pendientes de aprobación (clave = campo, valor = texto editable)
+  const [aiProposals, setAiProposals] = useState<Record<string, string>>({});
 
   // Grabación de la consulta → transcripción + auto-llenado de campos con IA.
   // Usa el _id vigente (data.historiaId) si ya cargó, para persistir bien el transcript.
@@ -141,16 +143,36 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones, room 
     return `${m}:${s}`;
   };
 
-  // Campos largos: la IA se anexa si ya hay contenido. Campos cortos: solo si está vacío.
+  // Campos largos: al aprobar, la propuesta se ANEXA a lo que ya haya. Campos
+  // cortos (talla, peso, Dx): al aprobar se REEMPLAZA el valor.
   const LONG_FIELDS = new Set([
     'mdAntecedentes',
     'mdObservacionesCertificado',
     'mdRecomendacionesMedicasAdicionales',
   ]);
 
-  // Vuelca los campos extraídos por la IA al formulario. El médico revisa y guarda.
-  const applyExtractedFields = (fields: Record<string, string>) => {
-    const setters: Record<string, React.Dispatch<React.SetStateAction<string>>> = {
+  // Etiqueta legible + orden de las tarjetas de propuesta
+  const FIELD_LABELS: Record<string, string> = {
+    mdAntecedentes: 'Antecedentes',
+    mdObservacionesCertificado: 'Observaciones / Certificado',
+    mdRecomendacionesMedicasAdicionales: 'Recomendaciones médicas',
+    mdDx1: 'Diagnóstico 1',
+    mdDx2: 'Diagnóstico 2',
+    talla: 'Talla (cm)',
+    peso: 'Peso (kg)',
+  };
+  const FIELD_ORDER = [
+    'mdAntecedentes',
+    'mdObservacionesCertificado',
+    'mdRecomendacionesMedicasAdicionales',
+    'mdDx1',
+    'mdDx2',
+    'talla',
+    'peso',
+  ];
+
+  const getSetter = (field: string): React.Dispatch<React.SetStateAction<string>> | undefined =>
+    ({
       mdAntecedentes: setMdAntecedentes,
       mdDx1: setMdDx1,
       mdDx2: setMdDx2,
@@ -158,22 +180,36 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones, room 
       mdRecomendacionesMedicasAdicionales: setMdRecomendacionesMedicasAdicionales,
       talla: setTalla,
       peso: setPeso,
-    };
+    } as Record<string, React.Dispatch<React.SetStateAction<string>>>)[field];
 
-    const appliedKeys: string[] = [];
-    Object.entries(fields).forEach(([key, value]) => {
-      const setter = setters[key];
-      if (!setter || !value) return;
-      appliedKeys.push(key);
-      if (LONG_FIELDS.has(key)) {
+  // Aprueba una propuesta: la vuelca al campo y la quita de la lista de pendientes.
+  const approveProposal = (field: string) => {
+    const value = aiProposals[field];
+    const setter = getSetter(field);
+    if (setter && value && value.trim()) {
+      if (LONG_FIELDS.has(field)) {
         setter((prev) => (prev && prev.trim() ? `${prev}\n\n${value}` : value));
       } else {
-        // Campos cortos (talla, peso, Dx): no pisar lo que el médico ya escribió.
-        setter((prev) => (prev && prev.trim() ? prev : value));
+        setter(value);
       }
+    }
+    setAiProposals((prev) => {
+      const next = { ...prev };
+      delete next[field];
+      return next;
     });
+  };
 
-    return appliedKeys.length;
+  const dismissProposal = (field: string) => {
+    setAiProposals((prev) => {
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
+
+  const approveAllProposals = () => {
+    Object.keys(aiProposals).forEach((f) => approveProposal(f));
   };
 
   const handleToggleRecording = async () => {
@@ -181,15 +217,17 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones, room 
     if (recorder.isRecording) {
       const result = await recorder.stopRecording();
       if (result) {
-        const count = applyExtractedFields(result.fields || {});
+        const fields = result.fields || {};
+        setAiProposals(fields);
         if (result.transcript) {
           setTranscriptText(result.transcript);
           setShowTranscript(true);
         }
+        const count = Object.keys(fields).length;
         setTranscriptionNotice(
           count > 0
-            ? `✅ Transcripción lista. Se rellenaron ${count} campo(s) con IA — revísalos antes de guardar.`
-            : 'ℹ️ Transcripción lista. La IA no encontró campos para rellenar, pero abajo tienes el texto completo de la consulta.'
+            ? `✅ Transcripción lista. La IA propone ${count} campo(s) abajo — apruébalos o edítalos.`
+            : 'ℹ️ Transcripción lista. La IA no propuso campos, pero abajo tienes el texto completo de la consulta.'
         );
       }
     } else {
@@ -588,6 +626,69 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones, room 
       {transcriptionNotice && (
         <div className="bg-[#00a884]/10 border border-[#00a884]/50 rounded-lg p-3 text-[#7fe7cd] text-xs">
           {transcriptionNotice}
+        </div>
+      )}
+
+      {/* Propuestas de la IA: el médico aprueba o edita cada campo */}
+      {Object.keys(aiProposals).length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-purple-300">
+              Propuestas de la IA · {Object.keys(aiProposals).length}
+            </h3>
+            <button
+              onClick={approveAllProposals}
+              className="text-xs px-3 py-1.5 bg-[#00a884] text-white rounded-lg hover:bg-[#008f6f] transition font-medium"
+            >
+              Aprobar todas
+            </button>
+          </div>
+
+          {FIELD_ORDER.filter((f) => f in aiProposals).map((field) => {
+            const isLong = LONG_FIELDS.has(field);
+            return (
+              <div
+                key={field}
+                className="bg-[#2a3942] border border-purple-500/40 rounded-lg p-3 space-y-2"
+              >
+                <div className="text-xs font-semibold text-purple-200 uppercase tracking-wide">
+                  {FIELD_LABELS[field] || field}
+                </div>
+                {isLong ? (
+                  <textarea
+                    value={aiProposals[field]}
+                    onChange={(e) =>
+                      setAiProposals((prev) => ({ ...prev, [field]: e.target.value }))
+                    }
+                    className="w-full h-28 bg-[#1f2c34] border border-gray-700 rounded-lg p-2 text-xs text-gray-100 resize-y focus:outline-none focus:border-purple-400"
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    value={aiProposals[field]}
+                    onChange={(e) =>
+                      setAiProposals((prev) => ({ ...prev, [field]: e.target.value }))
+                    }
+                    className="w-full bg-[#1f2c34] border border-gray-700 rounded-lg p-2 text-xs text-gray-100 focus:outline-none focus:border-purple-400"
+                  />
+                )}
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    onClick={() => dismissProposal(field)}
+                    className="text-xs px-3 py-1.5 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition"
+                  >
+                    Descartar
+                  </button>
+                  <button
+                    onClick={() => approveProposal(field)}
+                    className="text-xs px-4 py-1.5 bg-[#00a884] text-white rounded-lg hover:bg-[#008f6f] transition font-medium"
+                  >
+                    Aprobar
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
