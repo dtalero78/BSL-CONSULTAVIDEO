@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { Room } from 'twilio-video';
 import apiService from '../services/api.service';
 import { PatientHistoryModal } from './PatientHistoryModal';
@@ -100,9 +100,10 @@ interface MedicalHistoryPanelProps {
   historiaId: string;
   onAppendToObservaciones?: (text: string) => void;
   room?: Room | null;
+  patientConnected?: boolean;
 }
 
-export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones, room }: MedicalHistoryPanelProps) => {
+export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones, room, patientConnected }: MedicalHistoryPanelProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -133,10 +134,49 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones, room 
   // Grabación de la consulta → transcripción + auto-llenado de campos con IA.
   // Usa el _id vigente (data.historiaId) si ya cargó, para persistir bien el transcript.
   const recorder = useConsultationRecorder(room ?? null, data?.historiaId || historiaId);
+  // Evita que el auto-inicio se dispare más de una vez por sesión.
+  const autoStartedRef = useRef(false);
 
   useEffect(() => {
     loadMedicalHistory();
   }, [historiaId]);
+
+  // Auto-inicia la grabación cuando el paciente se conecta. Espera (poll corto)
+  // a que el audio remoto esté suscrito para capturar ambas voces. Una sola vez.
+  useEffect(() => {
+    if (!patientConnected || !room || autoStartedRef.current) return;
+    if (recorder.isRecording || recorder.isProcessing) return;
+    autoStartedRef.current = true;
+
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    let tries = 0;
+
+    const hasRemoteAudio = (): boolean =>
+      Array.from(room.participants.values()).some((p) =>
+        Array.from(p.audioTracks.values()).some(
+          (pub) => (pub.track as any)?.mediaStreamTrack
+        )
+      );
+
+    const tryStart = () => {
+      if (cancelled) return;
+      if (hasRemoteAudio() || tries >= 8) {
+        recorder.startRecording();
+        setTranscriptionNotice('🎙️ Grabación iniciada automáticamente al conectarse el paciente.');
+      } else {
+        tries += 1;
+        timer = setTimeout(tryStart, 600);
+      }
+    };
+    timer = setTimeout(tryStart, 800);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [patientConnected, room]);
 
   // Formatear segundos a mm:ss para el cronómetro de grabación
   const formatElapsed = (totalSeconds: number): string => {

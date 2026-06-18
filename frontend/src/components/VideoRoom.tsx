@@ -214,6 +214,7 @@ export const VideoRoom = ({ identity, roomName, role, historiaId, documento, med
             historiaId={historiaId}
             onAppendToObservaciones={(func) => setAppendToObservacionesFunc(() => func)}
             room={room}
+            patientConnected={remoteParticipants.size > 0}
           />
         </div>
       )}
