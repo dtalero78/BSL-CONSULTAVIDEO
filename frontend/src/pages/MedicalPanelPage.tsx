@@ -646,7 +646,9 @@ export function MedicalPanelPage() {
                     <div>
                       <span className="text-gray-400">Fecha atención:</span>
                       <span className="text-white ml-2">
-                        {new Date(patient.fechaAtencion).toLocaleString()}
+                        {patient.fechaAtencion
+                          ? (() => { const d = new Date(patient.fechaAtencion); return isNaN(d.getTime()) ? 'Sin fecha' : d.toLocaleString(); })()
+                          : 'Sin fecha'}
                       </span>
                     </div>
                     <div>
@@ -833,7 +835,9 @@ export function MedicalPanelPage() {
                           <div>
                             <span className="text-gray-400">Fecha:</span>
                             <span className="text-white ml-2">
-                              {new Date(patient.fechaAtencion).toLocaleString()}
+                              {patient.fechaAtencion
+                                ? (() => { const d = new Date(patient.fechaAtencion); return isNaN(d.getTime()) ? 'Sin fecha' : d.toLocaleString(); })()
+                                : 'Sin fecha'}
                             </span>
                           </div>
                         </div>

@@ -242,7 +242,7 @@ class MedicalPanelService {
          WHERE ("numeroId" = $1 OR "celular" = $1)
          AND tenant_id = $2
          AND deleted_at IS NULL
-         ORDER BY "fechaAtencion" DESC
+         ORDER BY "fechaAtencion" DESC NULLS LAST
          LIMIT 50`,
         [searchTerm, tenantId]
       );
