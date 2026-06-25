@@ -1137,23 +1137,13 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones, room,
             className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none"
           >
             <option value="">Seleccione una opción</option>
-            {data?.codEmpresa === 'SIIGO' ? (
-              <>
-                <option value="APTO">APTO</option>
-                <option value="NO APTO">NO APTO</option>
-                <option value="APLAZADO">APLAZADO</option>
-                <option value="NO PRESENTA DETERIORO FÍSICO POR ACTIVIDAD LABORAL">NO PRESENTA DETERIORO FÍSICO POR ACTIVIDAD LABORAL</option>
-              </>
-            ) : (
-              <>
-                <option value="APTO">APTO</option>
-                <option value="APTO CON RECOMENDACIONES">APTO CON RECOMENDACIONES</option>
-                <option value="APLAZADO">APLAZADO</option>
-                <option value="NO APTO">NO APTO</option>
-                <option value="NO PRESENTA DETERIORO FÍSICO POR ACTIVIDAD LABORAL">NO PRESENTA DETERIORO FÍSICO POR ACTIVIDAD LABORAL</option>
-                <option value="Puede realizar actividades escolares y grupales">Puede realizar actividades escolares y grupales</option>
-              </>
-            )}
+            <option value="Apto para el cargo sin restricciones médico-laborales.">Apto para el cargo sin restricciones médico-laborales.</option>
+            <option value="Apto para el cargo recomendaciones médico-laborales.">Apto para el cargo recomendaciones médico-laborales.</option>
+            <option value="Apto para el cargo restricciones médico-laborales temporales.">Apto para el cargo restricciones médico-laborales temporales.</option>
+            <option value="Apto para el cargo restricciones médico-laborales permanentes.">Apto para el cargo restricciones médico-laborales permanentes.</option>
+            <option value="Concepto pendiente por valoración médica complementaria.">Concepto pendiente por valoración médica complementaria.</option>
+            <option value="Presenta restricciones médico-laborales actualmente incompatibles con las exigencias del cargo evaluado.">Presenta restricciones médico-laborales actualmente incompatibles con las exigencias del cargo evaluado.</option>
+            <option value="NO PRESENTA DETERIORO FÍSICO POR ACTIVIDAD LABORAL">NO PRESENTA DETERIORO FÍSICO POR ACTIVIDAD LABORAL</option>
           </select>
         </div>
 
