@@ -324,6 +324,7 @@ export const VideoRoom = ({ identity, roomName, role, historiaId, documento, med
           roomName={roomName}
           sessionActive={sessionActive}
           patientConnected={patientConnected}
+          patientInCall={remoteParticipants.size > 0}
           latestPoseData={latestPoseData}
           hasReceivedFirstFrame={hasReceivedFirstFrame}
           onStartSession={startSession}

@@ -24,6 +24,7 @@ interface PosturalAnalysisModalProps {
   roomName: string;
   sessionActive: boolean;
   patientConnected: boolean;
+  patientInCall: boolean;
   latestPoseData?: PoseData | null;
   hasReceivedFirstFrame?: boolean;
   onStartSession: () => void;
@@ -37,6 +38,7 @@ export const PosturalAnalysisModal: React.FC<PosturalAnalysisModalProps> = ({
   roomName,
   sessionActive,
   patientConnected,
+  patientInCall,
   latestPoseData,
   hasReceivedFirstFrame = false,
   onStartSession,
@@ -310,15 +312,31 @@ export const PosturalAnalysisModal: React.FC<PosturalAnalysisModalProps> = ({
                     </svg>
                   </div>
                   <h3 className="text-xl text-gray-400 mb-2">Análisis Postural No Iniciado</h3>
-                  <p className="text-sm text-gray-500 mb-6">
-                    Haz clic en "Iniciar Análisis" para comenzar
-                  </p>
-                  <button
-                    onClick={onStartSession}
-                    className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-                  >
-                    Iniciar Análisis
-                  </button>
+                  {patientInCall ? (
+                    <>
+                      <p className="text-sm text-gray-500 mb-6">
+                        Haz clic en "Iniciar Análisis" para comenzar
+                      </p>
+                      <button
+                        onClick={onStartSession}
+                        className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+                      >
+                        Iniciar Análisis
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm text-yellow-400/90 mb-6">
+                        El paciente debe estar conectado a la videollamada antes de iniciar el análisis
+                      </p>
+                      <button
+                        disabled
+                        className="px-6 py-3 bg-gray-600 text-gray-300 rounded-lg font-medium cursor-not-allowed opacity-60"
+                      >
+                        Esperando al paciente...
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             ) : !patientConnected ? (
