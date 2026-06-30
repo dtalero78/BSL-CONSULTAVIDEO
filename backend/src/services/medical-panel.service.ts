@@ -2,7 +2,6 @@
  * Medical Panel Service
  *
  * Este servicio consulta PostgreSQL como base de datos principal.
- * Wix queda como backup secundario.
  */
 
 import postgresService from './postgres.service';
