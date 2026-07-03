@@ -1137,12 +1137,13 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones, room,
             className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-gray-600 focus:border-[#00a884] focus:outline-none"
           >
             <option value="">Seleccione una opción</option>
-            <option value="Apto para el cargo sin restricciones médico-laborales.">Apto para el cargo sin restricciones médico-laborales.</option>
-            <option value="Apto para el cargo recomendaciones médico-laborales.">Apto para el cargo recomendaciones médico-laborales.</option>
-            <option value="Apto para el cargo restricciones médico-laborales temporales.">Apto para el cargo restricciones médico-laborales temporales.</option>
-            <option value="Apto para el cargo restricciones médico-laborales permanentes.">Apto para el cargo restricciones médico-laborales permanentes.</option>
-            <option value="Concepto pendiente por valoración médica complementaria.">Concepto pendiente por valoración médica complementaria.</option>
-            <option value="Presenta restricciones médico-laborales actualmente incompatibles con las exigencias del cargo evaluado.">Presenta restricciones médico-laborales actualmente incompatibles con las exigencias del cargo evaluado.</option>
+            <option value="APTO PARA EL CARGO SIN RESTRICCIONES MÉDICO-LABORALES.">APTO PARA EL CARGO SIN RESTRICCIONES MÉDICO-LABORALES.</option>
+            <option value="APTO PARA EL CARGO SIN RECOMENDACIONES MÉDICO-LABORALES.">APTO PARA EL CARGO SIN RECOMENDACIONES MÉDICO-LABORALES.</option>
+            <option value="APTO PARA EL CARGO CON RESTRICCIONES MÉDICO-LABORALES TEMPORALES.">APTO PARA EL CARGO CON RESTRICCIONES MÉDICO-LABORALES TEMPORALES.</option>
+            <option value="APTO PARA EL CARGO CON RESTRICCIONES MÉDICO-LABORALES PERMANENTES.">APTO PARA EL CARGO CON RESTRICCIONES MÉDICO-LABORALES PERMANENTES.</option>
+            <option value="CONCEPTO PENDIENTE POR VALORACIÓN MÉDICA COMPLEMENTARIA.">CONCEPTO PENDIENTE POR VALORACIÓN MÉDICA COMPLEMENTARIA.</option>
+            <option value="PRESENTA RESTRICCIONES MÉDICO-LABORALES ACTUALMENTE INCOMPATIBLES CON LAS EXIGENCIAS DEL CARGO EVALUADO.">PRESENTA RESTRICCIONES MÉDICO-LABORALES ACTUALMENTE INCOMPATIBLES CON LAS EXIGENCIAS DEL CARGO EVALUADO.</option>
+            <option value="APTO CON RECOMENDACIONES Y AJUSTES RAZONABLES PARA LA DISCAPACIDAD QUE PRESENTA">APTO CON RECOMENDACIONES Y AJUSTES RAZONABLES PARA LA DISCAPACIDAD QUE PRESENTA</option>
             <option value="NO PRESENTA DETERIORO FÍSICO POR ACTIVIDAD LABORAL">NO PRESENTA DETERIORO FÍSICO POR ACTIVIDAD LABORAL</option>
           </select>
         </div>
