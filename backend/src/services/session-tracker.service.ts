@@ -92,14 +92,16 @@ class SessionTrackerService {
   }
 
   /**
-   * Busca codEmpresa del paciente y activa grabación si es SIIGO.
-   * También guarda el registro en video_sessions.
+   * Busca datos del paciente y activa grabación solo si el tipo de examen requiere
+   * revisión de calidad (RECOMENDACIONES o POST-INCAPACIDAD). También guarda el
+   * registro en video_sessions. La composición NO se crea acá (es lazy — ver
+   * trackParticipantDisconnected y el módulo de calidad de bsl-plataforma-2).
    */
   private async setupRecordingIfNeeded(session: VideoSession, historiaId: string, doctorIdentity: string): Promise<void> {
     try {
       // Buscar datos del paciente en PostgreSQL
       const rows = await postgresService.query(
-        `SELECT "numeroId", "primerNombre", "primerApellido", "codEmpresa" FROM "HistoriaClinica" WHERE "_id" = $1 LIMIT 1`,
+        `SELECT "numeroId", "primerNombre", "primerApellido", "codEmpresa", "tipoExamen" FROM "HistoriaClinica" WHERE "_id" = $1 LIMIT 1`,
         [historiaId]
       );
 
@@ -112,13 +114,18 @@ class SessionTrackerService {
       session.codEmpresa = patient.codEmpresa;
       session.patientDocumento = patient.numeroId;
 
-      // Si es SIIGO, activar grabación
-      if (patient.codEmpresa === 'SIIGO') {
+      // Grabar SOLO consultas cuyo tipoExamen sea RECOMENDACIONES o POST-INCAPACIDAD.
+      // Match normalizado (ignora mayúsculas, espacios y guiones) para tolerar las
+      // variantes que existen en la BD: "POST-INCAPACIDAD" / "PostIncapacidad" /
+      // "Post Incapacidad", "RECOMENDACIONES" / "Recomendaciones".
+      const tipoNorm = String(patient.tipoExamen || '').toLowerCase().replace(/[\s\-_]/g, '');
+      const debeGrabar = tipoNorm === 'recomendaciones' || tipoNorm === 'postincapacidad';
+      if (debeGrabar) {
         try {
           const room = await twilioService.getRoom(session.roomName);
           await twilioService.enableRecording(room.sid);
           session.recordingEnabled = true;
-          console.log(`[SessionTracker] Recording enabled for SIIGO patient in room ${session.roomName}`);
+          console.log(`[SessionTracker] Recording enabled (${patient.tipoExamen}) in room ${session.roomName}`);
         } catch (err: any) {
           console.error(`[SessionTracker] Error enabling recording: ${err.message}`);
         }
@@ -162,25 +169,14 @@ class SessionTrackerService {
     if (participant) {
       participant.disconnectedAt = new Date();
 
-      // Si el doctor se desconecta, cerrar la sala en Twilio para que nadie más pueda entrar
+      // Si el doctor se desconecta, cerrar la sala en Twilio para que nadie más pueda entrar.
+      // Composición LAZY: NO se crea al terminar la llamada. Antes se componía toda consulta
+      // grabada, pero ~99% nunca se evaluaban (413 composiciones/mes vs 2 evaluaciones). La
+      // composición se crea on-demand desde el módulo de calidad al hacer clic en "Evaluar".
+      // Los tracks grabados quedan guardados en Twilio y se pueden componer después.
       if (participant.role === 'doctor') {
-        const shouldCreateComposition = session.recordingEnabled;
-        twilioService.endRoom(roomName, shouldCreateComposition)
-          .then(async (result) => {
-            console.log(`[SessionTracker] Room ${roomName} completed (doctor disconnected)`);
-            // Guardar composition_sid en video_sessions
-            if (result.compositionSid) {
-              try {
-                await postgresService.query(
-                  `UPDATE video_sessions SET composition_sid = $1 WHERE room_name = $2`,
-                  [result.compositionSid, roomName]
-                );
-                console.log(`[SessionTracker] Composition ${result.compositionSid} saved for room ${roomName}`);
-              } catch (err: any) {
-                console.error(`[SessionTracker] Error saving composition_sid: ${err.message}`);
-              }
-            }
-          })
+        twilioService.endRoom(roomName, false)
+          .then(() => console.log(`[SessionTracker] Room ${roomName} completed (doctor disconnected, sin auto-composición)`))
           .catch((err: any) => console.error(`[SessionTracker] Error ending room ${roomName}:`, err.message));
       }
 
