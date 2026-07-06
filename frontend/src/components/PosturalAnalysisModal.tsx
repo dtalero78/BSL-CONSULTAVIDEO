@@ -109,7 +109,7 @@ export const PosturalAnalysisModal: React.FC<PosturalAnalysisModalProps> = ({
 
       doc.setFontSize(12);
       doc.text(`Sala: ${roomName}`, 20, 50);
-      doc.text(`Fecha: ${new Date().toLocaleString('es-CO')}`, 20, 60);
+      doc.text(`Fecha: ${new Date().toLocaleDateString('es-CO')}`, 20, 60);
       doc.text(`Snapshots capturados: ${capturedSnapshots.length}`, 20, 70);
 
       let yPosition = 90;
@@ -126,11 +126,6 @@ export const PosturalAnalysisModal: React.FC<PosturalAnalysisModalProps> = ({
         doc.setFontSize(18);
         doc.setTextColor(0, 100, 200);
         doc.text(`${snapshot.description}`, pageWidth / 2, yPosition, { align: 'center' });
-        yPosition += 10;
-
-        doc.setFontSize(10);
-        doc.setTextColor(100, 100, 100);
-        doc.text(`Capturado: ${new Date(snapshot.timestamp).toLocaleString('es-CO')}`, pageWidth / 2, yPosition, { align: 'center' });
         yPosition += 15;
 
         // Agregar imagen del esqueleto si existe
@@ -520,9 +515,6 @@ export const PosturalAnalysisModal: React.FC<PosturalAnalysisModalProps> = ({
                       {/* Info */}
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-white truncate">{snapshot.description}</p>
-                        <p className="text-xs text-gray-500">
-                          {new Date(snapshot.timestamp).toLocaleTimeString('es-CO')}
-                        </p>
                       </div>
                       {/* Delete button */}
                       <button

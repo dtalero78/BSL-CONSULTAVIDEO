@@ -41,13 +41,7 @@ export function formatPosturalMetricsAsText(snapshots: CapturedSnapshot[]): stri
   lines.push('');
 
   snapshots.forEach((snapshot, index) => {
-    const date = new Date(snapshot.timestamp);
-    const timeStr = date.toLocaleTimeString('es-CO', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-
-    lines.push(`${index + 1}. ${snapshot.description.toUpperCase()} (${timeStr})`);
+    lines.push(`${index + 1}. ${snapshot.description.toUpperCase()}`);
 
     // Postura
     if (snapshot.metrics.posture) {
