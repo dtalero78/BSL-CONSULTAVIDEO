@@ -91,6 +91,16 @@ export function MedicalPanelPage() {
   // Chat de WhatsApp abierto (por celular del paciente).
   const [chatPatient, setChatPatient] = useState<{ celular: string; nombre: string } | null>(null);
 
+  // Modal "Crear sala" (consulta suelta) — solo visible para el ADMINISTRADOR.
+  const [showCrearSala, setShowCrearSala] = useState(false);
+  const [salaNombre, setSalaNombre] = useState('');
+  const [salaEmpresa, setSalaEmpresa] = useState('');
+  const [salaCelular, setSalaCelular] = useState('');
+  const [crearSalaLoading, setCrearSalaLoading] = useState(false);
+  const [crearSalaError, setCrearSalaError] = useState<string | null>(null);
+
+  const isAdmin = medicoCode.trim().toUpperCase() === 'ADMINISTRADOR';
+
   const pageSize = 10;
 
   const loadData = async () => {
@@ -335,6 +345,85 @@ export function MedicalPanelPage() {
     }
   };
 
+  // Genera un _id para un paciente "suelto" que aún no existe en la base de datos.
+  // El registro se creará recién cuando el médico guarde la historia clínica.
+  const generarHistoriaIdSuelta = (): string => {
+    const timestamp = Date.now().toString(36);
+    const random = Math.random().toString(36).substring(2, 9);
+    return `suelta-${timestamp}-${random}`;
+  };
+
+  const handleCrearSala = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCrearSalaError(null);
+
+    const nombre = salaNombre.trim();
+    const empresa = salaEmpresa.trim();
+    const celular = salaCelular.trim();
+
+    if (!nombre || !empresa || !celular) {
+      setCrearSalaError('Complete Nombre, Empresa y Celular.');
+      return;
+    }
+
+    setCrearSalaLoading(true);
+    try {
+      // 1. Generar sala + id de historia clínica (el registro se creará al guardar)
+      const roomName = medicalPanelService.generateRoomName();
+      const historiaId = generarHistoriaIdSuelta();
+
+      // 2. Formatear teléfono
+      const phoneWithPlus = formatPhoneNumber(celular);
+      const phoneWithoutPlus = phoneWithPlus.substring(1);
+
+      // 3. Link del paciente (mismos params que el flujo con órdenes + flag suelta)
+      const patientParams = new URLSearchParams({
+        nombre,
+        documento: historiaId,
+        doctor: medicoCode,
+        empresa,
+        suelta: '1',
+      });
+      const roomNameWithParams = `${roomName}?${patientParams.toString()}`;
+
+      // 4. Enviar WhatsApp con el template videoconsulta_suelta
+      await apiService.sendWhatsAppSuelta(phoneWithoutPlus, roomNameWithParams, nombre, empresa);
+      console.log('✅ WhatsApp (consulta suelta) enviado');
+
+      // 5. Llamada telefónica (best-effort, igual que el botón Contactar)
+      try {
+        await apiService.makeVoiceCall(phoneWithPlus, nombre);
+        console.log('✅ Llamada telefónica iniciada (consulta suelta)');
+      } catch (callError) {
+        console.error('❌ Error en llamada telefónica (consulta suelta):', callError);
+      }
+
+      // 6. Abrir la sala del doctor (lleva los datos base para crear el registro al guardar)
+      const doctorParams = new URLSearchParams({
+        doctor: medicoCode,
+        documento: historiaId,
+        paciente: nombre,
+        empresa,
+        celular: phoneWithPlus,
+        suelta: '1',
+      });
+      const doctorUrl = `${window.location.origin}/doctor/${roomName}?${doctorParams.toString()}`;
+      window.open(doctorUrl, '_blank');
+
+      // 7. Cerrar y limpiar
+      setShowCrearSala(false);
+      setSalaNombre('');
+      setSalaEmpresa('');
+      setSalaCelular('');
+      alert(`✅ Sala creada. Se envió el link por WhatsApp a ${nombre} y se abrió la consulta.`);
+    } catch (error) {
+      console.error('Error creando sala suelta:', error);
+      setCrearSalaError('Error al crear la sala. Inténtalo nuevamente.');
+    } finally {
+      setCrearSalaLoading(false);
+    }
+  };
+
   const handleRellamar = async (patient: Patient) => {
     setRecallingPatient(patient._id);
     try {
@@ -515,13 +604,30 @@ export function MedicalPanelPage() {
                 <p className="text-gray-400 text-sm">Código: {medicoCode}</p>
               </div>
             </div>
-            <button
-              onClick={handleRefresh}
-              disabled={isLoading}
-              className="bg-[#00a884] text-white px-4 py-2 rounded-xl hover:bg-[#008f6f] transition font-semibold disabled:opacity-50"
-            >
-              {isLoading ? '⟳' : '↻ Actualizar'}
-            </button>
+            <div className="flex items-center gap-2">
+              {isAdmin && (
+                <button
+                  onClick={() => {
+                    setCrearSalaError(null);
+                    setShowCrearSala(true);
+                  }}
+                  className="bg-sky-400 text-white px-4 py-2 rounded-xl hover:bg-sky-500 transition font-semibold flex items-center gap-2"
+                  title="Crear una sala de consulta para un paciente sin orden previa"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                  Crear sala
+                </button>
+              )}
+              <button
+                onClick={handleRefresh}
+                disabled={isLoading}
+                className="bg-[#00a884] text-white px-4 py-2 rounded-xl hover:bg-[#008f6f] transition font-semibold disabled:opacity-50"
+              >
+                {isLoading ? '⟳' : '↻ Actualizar'}
+              </button>
+            </div>
           </div>
 
           {/* Estadísticas */}
@@ -1018,6 +1124,107 @@ export function MedicalPanelPage() {
           nombre={chatPatient.nombre}
           onClose={() => setChatPatient(null)}
         />
+      )}
+
+      {/* Modal Crear sala (consulta suelta) — solo ADMINISTRADOR */}
+      {showCrearSala && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-[#1f2c34] rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="flex items-center justify-between p-5 border-b border-gray-700">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <svg className="w-5 h-5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                Crear sala de consulta
+              </h3>
+              <button
+                onClick={() => setShowCrearSala(false)}
+                className="text-gray-400 hover:text-white transition"
+                aria-label="Cerrar"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleCrearSala} className="p-5 space-y-4">
+              <p className="text-xs text-gray-400">
+                Para contactar a un paciente sin orden previa. Se enviará el link de la
+                videollamada por WhatsApp y se abrirá la consulta. El registro del paciente
+                se creará al guardar la historia clínica.
+              </p>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Nombre</label>
+                <input
+                  type="text"
+                  value={salaNombre}
+                  onChange={(e) => setSalaNombre(e.target.value)}
+                  className="w-full px-4 py-3 bg-[#2a3942] border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-sky-400 transition"
+                  placeholder="Nombre del paciente"
+                  autoFocus
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Empresa</label>
+                <input
+                  type="text"
+                  value={salaEmpresa}
+                  onChange={(e) => setSalaEmpresa(e.target.value)}
+                  className="w-full px-4 py-3 bg-[#2a3942] border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-sky-400 transition"
+                  placeholder="Empresa"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Celular</label>
+                <input
+                  type="tel"
+                  value={salaCelular}
+                  onChange={(e) => setSalaCelular(e.target.value)}
+                  className="w-full px-4 py-3 bg-[#2a3942] border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-sky-400 transition"
+                  placeholder="Ej: 3001234567"
+                  required
+                />
+              </div>
+
+              {crearSalaError && (
+                <div className="bg-red-500/10 border border-red-500/50 rounded-xl p-3 text-red-400 text-sm">
+                  {crearSalaError}
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCrearSala(false)}
+                  className="flex-1 bg-gray-600 text-white px-4 py-3 rounded-xl hover:bg-gray-700 transition font-semibold"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={crearSalaLoading}
+                  className="flex-1 bg-sky-400 text-white px-4 py-3 rounded-xl hover:bg-sky-500 transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {crearSalaLoading ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Creando...
+                    </>
+                  ) : (
+                    'Crear y enviar'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

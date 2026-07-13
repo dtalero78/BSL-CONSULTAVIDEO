@@ -13,6 +13,19 @@ export const DoctorRoomPage = () => {
   const doctorParam = searchParams.get('doctor');
   const historiaIdParam = searchParams.get('documento'); // ID de la historia clínica (el parámetro aún se llama "documento" en la URL)
   const pacienteParam = searchParams.get('paciente'); // Nombre del paciente
+  // Consulta "suelta": paciente sin orden previa. Estos datos permiten crear la
+  // historia clínica al guardar (el registro aún no existe en la base de datos).
+  const empresaParam = searchParams.get('empresa');
+  const celularParam = searchParams.get('celular');
+  const esSuelta = searchParams.get('suelta') === '1';
+  const sueltaBase = esSuelta && pacienteParam
+    ? {
+        nombre: pacienteParam,
+        empresa: empresaParam || undefined,
+        celular: celularParam || undefined,
+        medico: doctorParam || undefined,
+      }
+    : undefined;
 
   // Auto-llenar nombre del doctor si viene en la URL
   useEffect(() => {
@@ -38,6 +51,7 @@ export const DoctorRoomPage = () => {
         roomName={roomName}
         role="doctor"
         historiaId={historiaIdParam || undefined}
+        sueltaBase={sueltaBase}
         onLeave={handleLeaveCall}
       />
     );

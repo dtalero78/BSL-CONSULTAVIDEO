@@ -15,10 +15,11 @@ export const PatientPage = () => {
   const doctorParam = searchParams.get('doctor');
   const documentoParam = searchParams.get('documento');
 
-  // Auto-llenar nombre del paciente si viene en la URL
+  // Auto-llenar nombre del paciente si viene en la URL.
+  // En consultas "sueltas" solo llega `nombre` (nombre completo, sin `apellido`).
   useEffect(() => {
-    if (nombreParam && apellidoParam) {
-      const fullName = `${nombreParam} ${apellidoParam}`;
+    if (nombreParam) {
+      const fullName = apellidoParam ? `${nombreParam} ${apellidoParam}` : nombreParam;
       setPatientName(fullName);
     }
   }, [nombreParam, apellidoParam]);

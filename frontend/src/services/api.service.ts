@@ -178,6 +178,29 @@ class ApiService {
   }
 
   /**
+   * Enviar mensaje de WhatsApp para una "consulta suelta" (paciente sin orden previa).
+   * Usa el template `videoconsulta_suelta`.
+   *
+   * @param phone - Número de teléfono sin el prefijo + (ejemplo: 573001234567)
+   * @param roomNameWithParams - Path completo con query params de la sala del paciente
+   * @param nombre - Nombre del paciente (para {{1}} en el mensaje)
+   * @param empresa - Empresa del paciente (para {{2}} en el mensaje)
+   */
+  async sendWhatsAppSuelta(
+    phone: string,
+    roomNameWithParams: string,
+    nombre: string,
+    empresa: string
+  ): Promise<void> {
+    await this.client.post('/api/video/whatsapp/send-suelta', {
+      phone,
+      roomNameWithParams,
+      nombre,
+      empresa,
+    });
+  }
+
+  /**
    * Obtener historia clínica de un paciente
    */
   async getMedicalHistory(historiaId: string): Promise<any> {
@@ -210,6 +233,15 @@ class ApiService {
     talla?: string;
     peso?: string;
     cargo?: string;
+    // Datos base del paciente: solo se envían en consultas "sueltas" (registro
+    // inexistente) para que el backend cree la historia clínica al guardar.
+    numeroId?: string;
+    primerNombre?: string;
+    primerApellido?: string;
+    celular?: string;
+    empresa?: string;
+    medico?: string;
+    tipoExamen?: string;
   }): Promise<void> {
     await this.client.post('/api/video/medical-history', payload);
   }

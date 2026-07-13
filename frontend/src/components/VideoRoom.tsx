@@ -10,6 +10,13 @@ import { PosturalAnalysisPatient } from './PosturalAnalysisPatient';
 import { MedicalHistoryPanel } from './MedicalHistoryPanel';
 import { TenantLogo } from './TenantLogo';
 
+interface SueltaBase {
+  nombre: string;
+  empresa?: string;
+  celular?: string;
+  medico?: string;
+}
+
 interface VideoRoomProps {
   identity: string;
   roomName: string;
@@ -17,10 +24,11 @@ interface VideoRoomProps {
   historiaId?: string; // ID de la historia clínica
   documento?: string; // Documento del paciente (para notificaciones en tiempo real)
   medicoCode?: string; // Código del médico (para Socket.io Rooms)
+  sueltaBase?: SueltaBase; // Datos base cuando la historia aún no existe (consulta suelta)
   onLeave?: () => void;
 }
 
-export const VideoRoom = ({ identity, roomName, role, historiaId, documento, medicoCode, onLeave }: VideoRoomProps) => {
+export const VideoRoom = ({ identity, roomName, role, historiaId, documento, medicoCode, sueltaBase, onLeave }: VideoRoomProps) => {
   const [isPosturalAnalysisOpen, setIsPosturalAnalysisOpen] = useState(false);
   const [appendToObservacionesFunc, setAppendToObservacionesFunc] = useState<((text: string) => void) | null>(null);
 
@@ -212,6 +220,7 @@ export const VideoRoom = ({ identity, roomName, role, historiaId, documento, med
         >
           <MedicalHistoryPanel
             historiaId={historiaId}
+            sueltaBase={sueltaBase}
             onAppendToObservaciones={(func) => setAppendToObservacionesFunc(() => func)}
             room={room}
             patientConnected={remoteParticipants.size > 0}

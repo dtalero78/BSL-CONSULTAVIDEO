@@ -374,6 +374,90 @@ class VideoController {
   }
 
   /**
+   * Enviar mensaje de WhatsApp para una "consulta suelta" (paciente sin orden previa).
+   * POST /api/video/whatsapp/send-suelta
+   * Body: { phone: string, roomNameWithParams: string, nombre: string, empresa: string }
+   *
+   * Usa el template aprobado `videoconsulta_suelta` (SID en TWILIO_TEMPLATE_VIDEOCONSULTA_SUELTA):
+   * Body:   "Hola {{1}}, vas a realizar la consulta médica de {{2}}.\n\nPara conectarte haz clic en el botón."
+   * Botón:  URL https://medico-bsl.com/patient/{{3}}   ({{3}} = roomNameWithParams)
+   */
+  async sendWhatsAppSuelta(req: Request, res: Response): Promise<void> {
+    try {
+      const { phone, roomNameWithParams, nombre, empresa } = req.body;
+
+      if (!phone || !roomNameWithParams || !nombre || !empresa) {
+        res.status(400).json({
+          error: 'phone, roomNameWithParams, nombre, and empresa are required',
+        });
+        return;
+      }
+
+      const sueltaTemplateSid = process.env.TWILIO_TEMPLATE_VIDEOCONSULTA_SUELTA;
+      if (!sueltaTemplateSid) {
+        res.status(500).json({
+          success: false,
+          error: 'Template de consulta suelta no configurado (TWILIO_TEMPLATE_VIDEOCONSULTA_SUELTA)',
+        });
+        return;
+      }
+
+      // Resolver tenant por hostname del request
+      const hostname = req.hostname || (req.headers.host || '').split(':')[0];
+      const tenant = await tenantService.getByHostname(hostname);
+      const baseUrl = process.env.APP_URL || 'https://medico-bsl.com';
+
+      // Template genérico por contentSid: {{1}}=nombre, {{2}}=empresa, {{3}}=roomNameWithParams
+      const result = await whatsappService.sendContentTemplate(
+        phone,
+        sueltaTemplateSid,
+        {
+          '1': nombre,
+          '2': empresa,
+          '3': roomNameWithParams,
+        },
+        tenant.id
+      );
+
+      if (result.success) {
+        // Registrar el mensaje en PostgreSQL para que aparezca en el chat de WhatsApp
+        try {
+          const videoCallUrl = `${baseUrl}/patient/${roomNameWithParams}`;
+          const messageBody = `Hola ${nombre}, vas a realizar la consulta médica de ${empresa}.\n\nPara conectarte haz clic en el botón.\n\n${videoCallUrl}`;
+          const phoneWithPlus = phone.startsWith('+') ? phone : `+${phone}`;
+
+          await postgresService.registrarMensajeSaliente(
+            phoneWithPlus,
+            messageBody,
+            result.messageSid || '',
+            nombre
+          );
+          console.log(`✅ Mensaje suelto registrado en PostgreSQL para ${phoneWithPlus}`);
+        } catch (registerError) {
+          console.error('⚠️ Error registrando mensaje suelto en PostgreSQL:', registerError);
+        }
+
+        res.status(200).json({
+          success: true,
+          message: 'WhatsApp (consulta suelta) sent successfully',
+          messageSid: result.messageSid,
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          error: result.error || 'Failed to send WhatsApp template (suelta)',
+        });
+      }
+    } catch (error) {
+      console.error('Error sending WhatsApp (suelta):', error);
+      res.status(500).json({
+        error: 'Failed to send WhatsApp (suelta)',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  /**
    * Obtener historia clínica de un paciente por _id
    * GET /api/video/medical-history/:historiaId
    */
