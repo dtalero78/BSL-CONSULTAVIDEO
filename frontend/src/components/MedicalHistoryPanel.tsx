@@ -96,18 +96,37 @@ interface MedicalHistoryData {
   voximetria?: VoximetriaData;
 }
 
+interface SueltaBase {
+  nombre: string;
+  empresa?: string;
+  celular?: string;
+  medico?: string;
+}
+
 interface MedicalHistoryPanelProps {
   historiaId: string;
+  sueltaBase?: SueltaBase; // Datos base cuando la historia aún no existe (consulta suelta)
   onAppendToObservaciones?: (text: string) => void;
   room?: Room | null;
   patientConnected?: boolean;
 }
 
-export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones, room, patientConnected }: MedicalHistoryPanelProps) => {
+// Divide un nombre completo en primer nombre / primer apellido (para el registro nuevo).
+const splitNombre = (full: string): { primerNombre: string; primerApellido: string } => {
+  const parts = (full || '').trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return { primerNombre: 'Paciente', primerApellido: '' };
+  if (parts.length === 1) return { primerNombre: parts[0], primerApellido: '' };
+  return { primerNombre: parts[0], primerApellido: parts.slice(1).join(' ') };
+};
+
+export const MedicalHistoryPanel = ({ historiaId, sueltaBase, onAppendToObservaciones, room, patientConnected }: MedicalHistoryPanelProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<MedicalHistoryData | null>(null);
+  // true cuando la historia clínica NO existe todavía (consulta suelta): al guardar
+  // se enviarán los datos base para que el backend cree el registro.
+  const [isNuevoRegistro, setIsNuevoRegistro] = useState(false);
 
   // Campos editables
   const [mdAntecedentes, setMdAntecedentes] = useState('');
@@ -424,6 +443,7 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones, room,
       setError(null);
       const history = await apiService.getMedicalHistory(historiaId);
       setData(history);
+      setIsNuevoRegistro(false);
 
       // Pre-llenar campos editables
       setMdAntecedentes(history.mdAntecedentes || '');
@@ -439,8 +459,38 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones, room,
       setAiFilledFields(new Set());
       setDxSuggestion('');
     } catch (err: any) {
-      setError(err.message || 'Error al cargar historia clínica');
-      console.error('Error loading medical history:', err);
+      // Consulta "suelta": el registro aún no existe en la base de datos. En vez de
+      // mostrar el error, armamos un formulario en blanco con los datos base del
+      // paciente. El registro se creará al guardar la historia clínica.
+      if (sueltaBase) {
+        const { primerNombre, primerApellido } = splitNombre(sueltaBase.nombre);
+        setData({
+          historiaId,
+          numeroId: sueltaBase.celular || historiaId,
+          primerNombre,
+          primerApellido,
+          celular: sueltaBase.celular || '',
+          codEmpresa: sueltaBase.empresa,
+          tipoExamen: 'VIDEOCONSULTA',
+        });
+        setIsNuevoRegistro(true);
+        setMdAntecedentes('');
+        setMdObsParaMiDocYa('');
+        setMdObservacionesCertificado('');
+        setMdRecomendacionesMedicasAdicionales('');
+        setMdConceptoFinal('');
+        setMdDx1('');
+        setMdDx2('');
+        setTalla('');
+        setPeso('');
+        setTranscriptText('');
+        setAiFilledFields(new Set());
+        setDxSuggestion('');
+        setError(null);
+      } else {
+        setError(err.message || 'Error al cargar historia clínica');
+        console.error('Error loading medical history:', err);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -516,7 +566,22 @@ export const MedicalHistoryPanel = ({ historiaId, onAppendToObservaciones, room,
         talla,
         peso,
         cargo: data.cargo,
+        // Consulta suelta: enviar datos base para que el backend CREE el registro.
+        ...(isNuevoRegistro
+          ? {
+              numeroId: data.numeroId,
+              primerNombre: data.primerNombre,
+              primerApellido: data.primerApellido,
+              celular: data.celular,
+              empresa: data.codEmpresa,
+              medico: sueltaBase?.medico,
+              tipoExamen: data.tipoExamen,
+            }
+          : {}),
       });
+
+      // Tras crearse, el registro ya existe: los próximos guardados son updates normales.
+      if (isNuevoRegistro) setIsNuevoRegistro(false);
 
       alert('Historia clínica guardada exitosamente');
     } catch (err: any) {

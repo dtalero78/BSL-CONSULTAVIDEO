@@ -107,6 +107,20 @@ interface UpdateMedicalHistoryPayload {
   talla?: string;
   peso?: string;
   cargo?: string;
+
+  // Datos base del paciente. Solo se usan cuando la historia NO existe todavía
+  // (consulta "suelta" creada por el ADMINISTRADOR): permiten crear el registro
+  // al guardar. Para registros existentes se ignoran (los datos base ya están en BD).
+  numeroId?: string;
+  primerNombre?: string;
+  segundoNombre?: string;
+  primerApellido?: string;
+  segundoApellido?: string;
+  celular?: string;
+  email?: string;
+  empresa?: string;
+  tipoExamen?: string;
+  medico?: string;
 }
 
 interface PatientHistoryRecord {
@@ -429,10 +443,33 @@ class MedicalHistoryService {
       }
 
       // PASO 0: Obtener datos base del paciente
-      const historiaBase = await this.getMedicalHistory(payload.historiaId);
+      let historiaBase = await this.getMedicalHistory(payload.historiaId);
 
       if (!historiaBase) {
-        return { success: false, error: 'No se encontró historia clínica' };
+        // Consulta "suelta": la historia clínica aún NO existe en la base de datos.
+        // Si el frontend envió los datos base del paciente (creación diferida desde
+        // el botón "Crear sala"), la creamos ahora al guardar. Para el flujo normal
+        // (sin datos base) se mantiene el error de siempre.
+        if (payload.primerNombre && payload.celular) {
+          console.log(`🆕 [Suelta] Historia ${payload.historiaId} no existe; se creará con los datos base del payload`);
+          historiaBase = {
+            _id: payload.historiaId,
+            historiaId: payload.historiaId,
+            numeroId: payload.numeroId || payload.celular,
+            primerNombre: payload.primerNombre,
+            segundoNombre: payload.segundoNombre,
+            primerApellido: payload.primerApellido || '',
+            segundoApellido: payload.segundoApellido,
+            celular: payload.celular,
+            email: payload.email,
+            codEmpresa: payload.empresa,
+            tipoExamen: payload.tipoExamen || 'VIDEOCONSULTA',
+            medico: payload.medico,
+            fechaAtencion: new Date(),
+          } as MedicalHistoryData;
+        } else {
+          return { success: false, error: 'No se encontró historia clínica' };
+        }
       }
 
       // PASO 1: Guardar en PostgreSQL PRIMERO (fuente principal - OBLIGATORIO)
