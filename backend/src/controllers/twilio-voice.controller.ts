@@ -1,7 +1,9 @@
 import { Request, Response } from 'express';
 import twilioVoiceService from '../services/twilio-voice.service';
 
-const VOICE_AUDIO_URL = 'https://medico-bsl.com/twilioVoz.mp3';
+// Usa el dominio propio de cada instancia (DO: medico-bsl.com, AWS: aws.medico-bsl.com)
+// vía APP_URL, para que la voz no dependa del dominio de otra instancia.
+const VOICE_AUDIO_URL = `${process.env.APP_URL || 'https://medico-bsl.com'}/twilioVoz.mp3`;
 
 export class TwilioVoiceController {
   /**

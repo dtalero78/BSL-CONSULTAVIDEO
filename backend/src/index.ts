@@ -1,4 +1,4 @@
-import express, { Application, Request, Response } from 'express';
+import express, { Application, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -76,6 +76,26 @@ app.use(express.urlencoded({ extended: true }));
 if (appConfig.nodeEnv === 'development') {
   app.use(morgan('dev'));
 }
+
+// ---------------------------------------------------------------------------
+// Cutover redirect: enviar el tráfico WEB de medico-bsl.com a AWS.
+// - Gated por REDIRECT_TO_AWS (default off) → activar/desactivar sin tocar código.
+// - Solo redirige el host viejo (medico-bsl.com / www); en AWS (aws.medico-bsl.com)
+//   no hace nada (evita loops).
+// - NO redirige /api, /health ni /twilioVoz.mp3 (TwiML/audio de Twilio Voice y
+//   webhooks) para no romper integraciones.
+// - 302 (temporal) para que sea reversible al instante (el 301 lo cachean los
+//   navegadores).
+// ---------------------------------------------------------------------------
+app.use((req: Request, res: Response, next: NextFunction) => {
+  if (process.env.REDIRECT_TO_AWS !== 'true') return next();
+  const host = (req.headers.host || '').split(':')[0].toLowerCase();
+  if (host !== 'medico-bsl.com' && host !== 'www.medico-bsl.com') return next();
+  const p = req.path;
+  if (p.startsWith('/api') || p === '/health' || p === '/twilioVoz.mp3') return next();
+  const target = (process.env.REDIRECT_TARGET || 'https://aws.medico-bsl.com') + req.originalUrl;
+  return res.redirect(302, target);
+});
 
 // Health check
 app.get('/health', (_req: Request, res: Response) => {

@@ -49,8 +49,9 @@ class TwilioVoiceService {
       console.log(`📞 Using Account SID: ${this.accountSid.substring(0, 8)}...${this.accountSid.substring(this.accountSid.length - 4)}`);
       console.log(`📞 Using Auth Token: ***${this.authToken.substring(this.authToken.length - 4)}`);
 
-      // Construir URL del webhook de voz
-      const webhookUrl = `https://medico-bsl.com/api/twilio/voice?nombre=${encodeURIComponent(nombrePaciente)}`;
+      // Construir URL del webhook de voz (dominio propio de la instancia vía APP_URL)
+      const baseUrl = process.env.APP_URL || 'https://medico-bsl.com';
+      const webhookUrl = `${baseUrl}/api/twilio/voice?nombre=${encodeURIComponent(nombrePaciente)}`;
       console.log(`📞 URL de webhook: ${webhookUrl}`);
 
       // Credenciales Basic Auth
