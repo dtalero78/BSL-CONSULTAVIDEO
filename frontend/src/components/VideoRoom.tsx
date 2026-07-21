@@ -78,6 +78,9 @@ export const VideoRoom = ({ identity, roomName, role, historiaId, documento, med
   } = posturalAnalysis;
 
   // Aplicar fondo virtual BSL automáticamente al doctor cuando se conecta
+  // (mismo fondo por defecto que en DigitalOcean). En Chime se procesa a
+  // resolución reducida (ver chime-engine.startVideoTransform) para no
+  // desestabilizar la llamada.
   useEffect(() => {
     if (role === 'doctor' && localVideoTrack && currentEffect === 'none') {
       applyVirtualBackground(localVideoTrack, '/fondoVideoSalaDoc.png');

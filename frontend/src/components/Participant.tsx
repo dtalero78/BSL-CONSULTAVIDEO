@@ -1,161 +1,82 @@
 import { useEffect, useRef, useState } from 'react';
-import {
-  Participant as TwilioParticipant,
-  RemoteVideoTrack,
-  RemoteAudioTrack,
-  LocalVideoTrack,
-  LocalAudioTrack,
-  LocalTrackPublication,
-  RemoteTrackPublication,
-} from 'twilio-video';
+import type { NormalizedParticipant, NormalizedVideoRef } from '../video/video-engine';
 
 interface ParticipantProps {
-  participant: TwilioParticipant;
+  participant: NormalizedParticipant;
   isLocal?: boolean;
 }
 
 export const Participant = ({ participant, isLocal = false }: ParticipantProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const [videoTrack, setVideoTrack] = useState<LocalVideoTrack | RemoteVideoTrack | null>(null);
-  const [audioTrack, setAudioTrack] = useState<LocalAudioTrack | RemoteAudioTrack | null>(null);
+  const [videoTrackRef, setVideoTrackRef] = useState<NormalizedVideoRef | null>(participant.videoTrackRef);
+  const [audioTrackRef, setAudioTrackRef] = useState<NormalizedVideoRef | null>(participant.audioTrackRef);
 
-  // Attach video track when ref is ready
+  // Subscribe to track changes on the (provider-agnostic) participant. Twilio
+  // and Chime both update `participant.videoTrackRef`/`audioTrackRef` in
+  // place and call `emitTracksChanged()` — this mirrors the old
+  // trackSubscribed/trackUnsubscribed listeners that used to live here.
   useEffect(() => {
-    if (videoTrack && videoRef.current) {
+    const sync = () => {
+      setVideoTrackRef(participant.videoTrackRef);
+      setAudioTrackRef(participant.audioTrackRef);
+    };
+    sync(); // capture whatever is already available at mount time
+    const unsubscribe = participant.onTracksChanged(sync);
+    return unsubscribe;
+  }, [participant]);
+
+  // Attach video track when the normalized ref AND the DOM element are both ready.
+  useEffect(() => {
+    if (videoTrackRef && videoRef.current) {
       try {
-        videoTrack.attach(videoRef.current);
+        videoTrackRef.attach(videoRef.current);
+        // En móvil, el autoplay puede quedar pendiente; forzar play() tras el
+        // gesto de "Unirse" garantiza que el video del remoto se reproduzca.
+        videoRef.current.play?.().catch(() => undefined);
         console.log('Video track attached successfully for', participant.identity);
       } catch (error) {
         console.error('Error attaching video track:', error);
       }
 
       return () => {
-        videoTrack.detach().forEach((element) => element.remove());
+        videoTrackRef.detach();
       };
     }
-  }, [videoTrack, participant.identity]);
+  }, [videoTrackRef, participant.identity]);
 
-  // Attach audio track when ref is ready
+  // Attach audio track when ready (remote only, matches previous behavior).
   useEffect(() => {
-    if (audioTrack && audioRef.current && !isLocal) {
+    if (audioTrackRef && audioRef.current && !isLocal) {
       try {
-        audioTrack.attach(audioRef.current);
+        audioTrackRef.attach(audioRef.current);
         console.log('Audio track attached successfully for', participant.identity);
       } catch (error) {
         console.error('Error attaching audio track:', error);
       }
 
       return () => {
-        audioTrack.detach().forEach((element) => element.remove());
+        audioTrackRef.detach();
       };
     }
-  }, [audioTrack, isLocal, participant.identity]);
-
-  useEffect(() => {
-    const trackSubscribed = (
-      track: RemoteVideoTrack | RemoteAudioTrack | LocalVideoTrack | LocalAudioTrack
-    ) => {
-      console.log(`Track ${track.kind} subscribed for ${participant.identity}`, track);
-      if (track.kind === 'video') {
-        setVideoTrack(track as LocalVideoTrack | RemoteVideoTrack);
-      } else if (track.kind === 'audio') {
-        setAudioTrack(track as LocalAudioTrack | RemoteAudioTrack);
-      }
-    };
-
-    const trackUnsubscribed = (
-      track: RemoteVideoTrack | RemoteAudioTrack | LocalVideoTrack | LocalAudioTrack
-    ) => {
-      console.log(`Track ${track.kind} unsubscribed for ${participant.identity}`);
-      if (track.kind === 'video') {
-        setVideoTrack(null);
-      } else if (track.kind === 'audio') {
-        setAudioTrack(null);
-      }
-    };
-
-    console.log(`Setting up participant: ${participant.identity}, tracks:`, participant.tracks.size);
-
-    // Attach existing tracks
-    participant.tracks.forEach((publication) => {
-      if ('isSubscribed' in publication) {
-        // Remote publication
-        const remotePublication = publication as RemoteTrackPublication;
-        console.log('Publication:', remotePublication.trackName, remotePublication.isSubscribed, remotePublication.track);
-        if (remotePublication.isSubscribed && remotePublication.track) {
-          const track = remotePublication.track;
-          if (track.kind === 'video' || track.kind === 'audio') {
-            trackSubscribed(track as RemoteVideoTrack | RemoteAudioTrack);
-          }
-        }
-      } else {
-        // Local publication
-        const localPublication = publication as LocalTrackPublication;
-        console.log('Publication:', localPublication.trackName, localPublication.track);
-        if (localPublication.track) {
-          const track = localPublication.track;
-          if (track.kind === 'video' || track.kind === 'audio') {
-            trackSubscribed(track as LocalVideoTrack | LocalAudioTrack);
-          }
-        }
-      }
-    });
-
-    // Listen for new tracks
-    if (!isLocal) {
-      // Remote participants: use trackSubscribed/trackUnsubscribed
-      participant.on('trackSubscribed', trackSubscribed);
-      participant.on('trackUnsubscribed', trackUnsubscribed);
-    } else {
-      // Local participant: use trackPublished/trackUnpublished
-      participant.on('trackPublished', (publication: LocalTrackPublication) => {
-        if (publication.track && (publication.track.kind === 'video' || publication.track.kind === 'audio')) {
-          trackSubscribed(publication.track as LocalVideoTrack | LocalAudioTrack);
-        }
-      });
-      participant.on('trackUnpublished', (publication: LocalTrackPublication) => {
-        if (publication.track && (publication.track.kind === 'video' || publication.track.kind === 'audio')) {
-          trackUnsubscribed(publication.track as LocalVideoTrack | LocalAudioTrack);
-        }
-      });
-    }
-
-    return () => {
-      // Clean up tracks
-      participant.tracks.forEach((publication) => {
-        if ('isSubscribed' in publication) {
-          // Remote publication
-          const remotePublication = publication as RemoteTrackPublication;
-          if (remotePublication.track) {
-            const track = remotePublication.track;
-            if (track.kind === 'video' || track.kind === 'audio') {
-              trackUnsubscribed(track as RemoteVideoTrack | RemoteAudioTrack);
-            }
-          }
-        } else {
-          // Local publication
-          const localPublication = publication as LocalTrackPublication;
-          if (localPublication.track) {
-            const track = localPublication.track;
-            if (track.kind === 'video' || track.kind === 'audio') {
-              trackUnsubscribed(track as LocalVideoTrack | LocalAudioTrack);
-            }
-          }
-        }
-      });
-    };
-  }, [participant, isLocal]);
+  }, [audioTrackRef, isLocal, participant.identity]);
 
   return (
     <div className={`relative bg-gray-900 overflow-hidden ${isLocal ? 'h-full rounded-lg' : 'h-full w-full'}`}>
-      {videoTrack ? (
+      {videoTrackRef ? (
         <video
           ref={videoRef}
           autoPlay
           playsInline
-          muted={isLocal}
-          className="w-full h-full object-cover"
+          // Siempre muteado: el audio del remoto va por un <audio>/elemento oculto
+          // aparte, así que mutear este <video> NO afecta el sonido y garantiza el
+          // autoplay del video en móvil (que bloquea video no-muteado).
+          muted
+          // Remoto (vista grande): responsivo. En móvil (pantalla vertical) usa
+          // object-cover para LLENAR sin dejar franjas negras; en desktop
+          // (md+, horizontal) usa object-contain para ver el cuadro completo sin
+          // recortar/zoom. Local (PiP pequeño): object-cover siempre.
+          className={`w-full h-full ${isLocal ? 'object-cover' : 'object-cover md:object-contain'}`}
         />
       ) : (
         <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-purple-600">
@@ -173,12 +94,12 @@ export const Participant = ({ participant, isLocal = false }: ParticipantProps) 
             {isLocal ? 'Tú' : participant.identity}
           </span>
           <div className="flex gap-2">
-            {!audioTrack && (
+            {!audioTrackRef && (
               <span className="text-red-400 text-xs sm:text-sm drop-shadow-lg">
                 🔇 Silenciado
               </span>
             )}
-            {!videoTrack && (
+            {!videoTrackRef && (
               <span className="text-red-400 text-xs sm:text-sm drop-shadow-lg">
                 📹 Sin video
               </span>

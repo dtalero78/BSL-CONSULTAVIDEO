@@ -1,12 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import Video, {
-  Room,
-  LocalParticipant,
-  RemoteParticipant,
-  LocalVideoTrack,
-  LocalAudioTrack,
-} from 'twilio-video';
 import apiService from '../services/api.service';
+import type { VideoEngine, NormalizedParticipant, LocalVideoHandle } from '../video/video-engine';
 
 interface UseVideoRoomOptions {
   identity: string;
@@ -18,9 +12,11 @@ interface UseVideoRoomOptions {
 }
 
 interface UseVideoRoomReturn {
-  room: Room | null;
-  localParticipant: LocalParticipant | null;
-  remoteParticipants: Map<string, RemoteParticipant>;
+  /** Provider-agnostic handle (Twilio or Chime engine). Also used directly by
+   *  MedicalHistoryPanel/useConsultationRecorder to source recorder audio. */
+  room: VideoEngine | null;
+  localParticipant: NormalizedParticipant | null;
+  remoteParticipants: Map<string, NormalizedParticipant>;
   isConnecting: boolean;
   isConnected: boolean;
   error: string | null;
@@ -30,7 +26,7 @@ interface UseVideoRoomReturn {
   toggleVideo: () => void;
   isAudioEnabled: boolean;
   isVideoEnabled: boolean;
-  localVideoTrack: LocalVideoTrack | null;
+  localVideoTrack: LocalVideoHandle | null;
 }
 
 // Helper function para reproducir sonido de notificación
@@ -102,9 +98,9 @@ export const useVideoRoom = ({
   medicoCode,
   historiaId,
 }: UseVideoRoomOptions): UseVideoRoomReturn => {
-  const [room, setRoom] = useState<Room | null>(null);
-  const [localParticipant, setLocalParticipant] = useState<LocalParticipant | null>(null);
-  const [remoteParticipants, setRemoteParticipants] = useState<Map<string, RemoteParticipant>>(
+  const [room, setRoom] = useState<VideoEngine | null>(null);
+  const [localParticipant, setLocalParticipant] = useState<NormalizedParticipant | null>(null);
+  const [remoteParticipants, setRemoteParticipants] = useState<Map<string, NormalizedParticipant>>(
     new Map()
   );
   const [isConnecting, setIsConnecting] = useState(false);
@@ -112,36 +108,31 @@ export const useVideoRoom = ({
   const [error, setError] = useState<string | null>(null);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
-  const [localVideoTrack, setLocalVideoTrack] = useState<LocalVideoTrack | null>(null);
+  const [localVideoTrack, setLocalVideoTrack] = useState<LocalVideoHandle | null>(null);
 
   const connectToRoom = useCallback(async () => {
     try {
       setIsConnecting(true);
       setError(null);
 
-      // Obtener token del backend
-      const token = await apiService.getVideoToken(identity, roomName);
+      // El backend decide el provider (Twilio o Chime) vía VIDEO_PROVIDER.
+      const joinInfo = await apiService.getVideoJoinInfo(identity, roomName, role);
 
-      // Conectar a la sala
-      const connectedRoom = await Video.connect(token, {
-        name: roomName,
-        audio: true,
-        video: { width: 640, height: 480 },
-        networkQuality: {
-          local: 1,
-          remote: 1,
-        },
-      });
+      // Cargar el engine correspondiente de forma dinámica: evita empaquetar
+      // amazon-chime-sdk-js (pesado) para despliegues que sólo usan Twilio, y
+      // viceversa.
+      const engine: VideoEngine =
+        joinInfo.provider === 'chime'
+          ? new (await import('../video/chime-engine')).ChimeVideoEngine()
+          : new (await import('../video/twilio-engine')).TwilioVideoEngine();
 
-      setRoom(connectedRoom);
-      setLocalParticipant(connectedRoom.localParticipant);
+      const { localParticipant: lp, remoteParticipants: initialRemotes } = await engine.connect(joinInfo);
+
+      setRoom(engine);
+      setLocalParticipant(lp);
       setIsConnected(true);
-
-      // Guardar referencia al video track local para efectos de fondo
-      const videoTrack = Array.from(connectedRoom.localParticipant.videoTracks.values())[0]?.track as LocalVideoTrack;
-      if (videoTrack) {
-        setLocalVideoTrack(videoTrack);
-      }
+      setLocalVideoTrack(engine.getLocalVideoHandle());
+      setRemoteParticipants(new Map(initialRemotes.map((p) => [p.sid, p])));
 
       // Registrar conexión para reportes (si se proporcionó rol)
       if (role) {
@@ -152,34 +143,28 @@ export const useVideoRoom = ({
         }
       }
 
-      // Agregar participantes remotos existentes
-      connectedRoom.participants.forEach((participant) => {
-        setRemoteParticipants((prev) => new Map(prev).set(participant.sid, participant));
-      });
-
       // Escuchar eventos de participantes
-      connectedRoom.on('participantConnected', (participant: RemoteParticipant) => {
+      engine.onParticipantConnected((participant) => {
         console.log(`Participant connected: ${participant.identity}`);
         setRemoteParticipants((prev) => new Map(prev).set(participant.sid, participant));
 
         // Anunciar con voz cuando un paciente se conecta (solo para doctores)
         if (role === 'doctor') {
-          const participantName = participant.identity;
-          speakText(`Paciente ${participantName} conectado`);
+          speakText(`Paciente ${participant.identity} conectado`);
         }
       });
 
-      connectedRoom.on('participantDisconnected', (participant: RemoteParticipant) => {
-        console.log(`Participant disconnected: ${participant.identity}`);
+      engine.onParticipantDisconnected((sid) => {
+        console.log(`Participant disconnected: ${sid}`);
         setRemoteParticipants((prev) => {
           const newMap = new Map(prev);
-          newMap.delete(participant.sid);
+          newMap.delete(sid);
           return newMap;
         });
       });
 
       // Escuchar desconexión
-      connectedRoom.on('disconnected', () => {
+      engine.onDisconnected(() => {
         console.log('Disconnected from room');
         setIsConnected(false);
         setRoom(null);
@@ -221,34 +206,16 @@ export const useVideoRoom = ({
   }, [room, role, roomName, identity]);
 
   const toggleAudio = useCallback(() => {
-    if (localParticipant) {
-      localParticipant.audioTracks.forEach((publication) => {
-        const track = publication.track as LocalAudioTrack;
-        if (track.isEnabled) {
-          track.disable();
-          setIsAudioEnabled(false);
-        } else {
-          track.enable();
-          setIsAudioEnabled(true);
-        }
-      });
+    if (room) {
+      setIsAudioEnabled(room.toggleAudio());
     }
-  }, [localParticipant]);
+  }, [room]);
 
   const toggleVideo = useCallback(() => {
-    if (localParticipant) {
-      localParticipant.videoTracks.forEach((publication) => {
-        const track = publication.track as LocalVideoTrack;
-        if (track.isEnabled) {
-          track.disable();
-          setIsVideoEnabled(false);
-        } else {
-          track.enable();
-          setIsVideoEnabled(true);
-        }
-      });
+    if (room) {
+      setIsVideoEnabled(room.toggleVideo());
     }
-  }, [localParticipant]);
+  }, [room]);
 
   // Cleanup on unmount or window close
   useEffect(() => {

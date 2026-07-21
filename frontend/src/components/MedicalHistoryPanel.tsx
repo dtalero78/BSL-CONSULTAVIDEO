@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import type { Room } from 'twilio-video';
+import type { VideoEngine } from '../video/video-engine';
 import apiService from '../services/api.service';
 import { PatientHistoryModal } from './PatientHistoryModal';
 import { useConsultationRecorder } from '../hooks/useConsultationRecorder';
@@ -107,7 +107,7 @@ interface MedicalHistoryPanelProps {
   historiaId: string;
   sueltaBase?: SueltaBase; // Datos base cuando la historia aún no existe (consulta suelta)
   onAppendToObservaciones?: (text: string) => void;
-  room?: Room | null;
+  room?: VideoEngine | null;
   patientConnected?: boolean;
 }
 
@@ -171,12 +171,7 @@ export const MedicalHistoryPanel = ({ historiaId, sueltaBase, onAppendToObservac
     let timer: ReturnType<typeof setTimeout>;
     let tries = 0;
 
-    const hasRemoteAudio = (): boolean =>
-      Array.from(room.participants.values()).some((p) =>
-        Array.from(p.audioTracks.values()).some(
-          (pub) => (pub.track as any)?.mediaStreamTrack
-        )
-      );
+    const hasRemoteAudio = (): boolean => room.getRemoteAudioTracks().length > 0;
 
     const tryStart = () => {
       if (cancelled) return;

@@ -1,0 +1,31 @@
+# Copia este archivo a terraform.tfvars y ajusta los valores.
+# terraform.tfvars está en .gitignore (no se versiona).
+
+aws_region = "us-east-1"
+
+# Subdominio de PRUEBAS/PARALELO. No usar el apex de producción (medico-bsl.com).
+domain_name = "aws.medico-bsl.com"
+app_url     = "https://aws.medico-bsl.com"
+
+# Imagen que subiste a ECR con scripts/build-and-push.sh
+image_tag = "latest"
+
+# --- DNS automático vía DigitalOcean (recomendado) ---
+# Requiere un token de DO con permiso de escritura de DNS.
+# Solo agrega registros nuevos para el subdominio; NO toca apex ni www.
+manage_do_dns      = true
+do_domain          = "medico-bsl.com"
+digitalocean_token = "dop_v1_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# Si prefieres manejar el DNS a mano, pon manage_do_dns = false
+# y sigue las instrucciones del README (sección DNS manual).
+
+# --- Dimensionamiento (por defecto = equivalente a basic-xxs de DO) ---
+task_cpu      = 256
+task_memory   = 512
+desired_count = 1
+
+# Arquitectura del contenedor. Debe coincidir con el --platform del build:
+#   X86_64 -> docker build --platform linux/amd64  (por defecto)
+#   ARM64  -> docker build --platform linux/arm64  (más barato en Fargate)
+cpu_architecture = "X86_64"

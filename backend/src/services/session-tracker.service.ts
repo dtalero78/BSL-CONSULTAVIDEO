@@ -1,5 +1,5 @@
 import { Server as SocketIOServer } from 'socket.io';
-import twilioService from './twilio.service';
+import { videoProvider } from './video';
 import postgresService from './postgres.service';
 
 interface SessionParticipant {
@@ -78,6 +78,15 @@ class SessionTrackerService {
 
     console.log(`[SessionTracker] Current participants in ${roomName}: ${session.participants.size}`);
 
+    // Grabación (Chime): arrancar la captura SOLO cuando ambos ya están
+    // conectados. Si el Media Capture Pipeline se une mientras los clientes
+    // establecen su video, satura la señalización y el video no se renderiza.
+    // Idempotente (el servicio verifica que no exista ya una captura).
+    if (session.participants.size >= 2) {
+      videoProvider.startRecording(roomName)
+        .catch((err: any) => console.error(`[SessionTracker] Error arrancando grabación: ${err.message}`));
+    }
+
     // Emitir evento Socket.io cuando un paciente se conecta - SOLO a la Room del médico específico
     if (role === 'patient' && this.io && documento && session.medicoCode) {
       const roomToEmit = `doctor-${session.medicoCode}`;
@@ -122,23 +131,26 @@ class SessionTrackerService {
       const debeGrabar = tipoNorm === 'recomendaciones' || tipoNorm === 'postincapacidad';
       if (debeGrabar) {
         try {
-          const room = await twilioService.getRoom(session.roomName);
-          await twilioService.enableRecording(room.sid);
-          session.recordingEnabled = true;
-          console.log(`[SessionTracker] Recording enabled (${patient.tipoExamen}) in room ${session.roomName}`);
+          const enabled = await videoProvider.enableRecording(session.roomName);
+          session.recordingEnabled = enabled;
+          if (enabled) {
+            console.log(`[SessionTracker] Recording enabled (${patient.tipoExamen}) in room ${session.roomName}`);
+          } else {
+            console.log(`[SessionTracker] Recording solicitado pero no soportado por el provider "${videoProvider.name}" en ${session.roomName}`);
+          }
         } catch (err: any) {
           console.error(`[SessionTracker] Error enabling recording: ${err.message}`);
         }
       }
 
-      // Guardar en video_sessions
-      const roomInfo = await twilioService.getRoom(session.roomName).catch(() => null);
+      // Guardar en video_sessions (room_sid = SID de Twilio o MeetingId de Chime)
+      const roomInfo = await videoProvider.getRoom(session.roomName).catch(() => null);
       await postgresService.query(
         `INSERT INTO video_sessions (room_name, room_sid, historia_id, patient_documento, patient_name, doctor_name, cod_empresa, recording_enabled)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [
           session.roomName,
-          roomInfo?.sid || null,
+          roomInfo?.id || null,
           historiaId,
           patient.numeroId,
           `${patient.primerNombre} ${patient.primerApellido}`.trim(),
@@ -167,6 +179,13 @@ class SessionTrackerService {
 
     const participant = session.participants.get(identity);
     if (participant) {
+      // El cliente puede reportar la desconexión dos veces (colgar + beforeunload).
+      // Sin esta guarda se cerraba la sala, se emitían eventos y se generaba el
+      // reporte por duplicado.
+      if (participant.disconnectedAt) {
+        console.log(`[SessionTracker] Desconexión duplicada de ${identity}, ignorada`);
+        return;
+      }
       participant.disconnectedAt = new Date();
 
       // Si el doctor se desconecta, cerrar la sala en Twilio para que nadie más pueda entrar.
@@ -175,7 +194,7 @@ class SessionTrackerService {
       // composición se crea on-demand desde el módulo de calidad al hacer clic en "Evaluar".
       // Los tracks grabados quedan guardados en Twilio y se pueden componer después.
       if (participant.role === 'doctor') {
-        twilioService.endRoom(roomName, false)
+        videoProvider.endRoom(roomName)
           .then(() => console.log(`[SessionTracker] Room ${roomName} completed (doctor disconnected, sin auto-composición)`))
           .catch((err: any) => console.error(`[SessionTracker] Error ending room ${roomName}:`, err.message));
       }

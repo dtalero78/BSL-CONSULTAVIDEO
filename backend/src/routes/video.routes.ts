@@ -23,6 +23,9 @@ router.post('/events/participant-connected', videoController.trackParticipantCon
 router.post('/events/participant-disconnected', videoController.trackParticipantDisconnected);
 router.get('/events/connected-patients', videoController.getConnectedPatients);
 
+// Grabación: link (presigned URL) del MP4 de una sala (Chime → S3)
+router.get('/recordings/:roomName', videoController.getRecording);
+
 // WhatsApp
 router.post('/whatsapp/send', videoController.sendWhatsApp);
 router.post('/whatsapp/send-suelta', videoController.sendWhatsAppSuelta);

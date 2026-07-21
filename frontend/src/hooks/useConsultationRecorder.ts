@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Room, LocalAudioTrack, RemoteAudioTrack } from 'twilio-video';
+import type { VideoEngine } from '../video/video-engine';
 import apiService from '../services/api.service';
 
 export interface TranscriptionResult {
@@ -23,11 +23,12 @@ interface UseConsultationRecorderReturn {
  * audio completo al backend para transcribirlo (Whisper) y extraer campos
  * clínicos (GPT). Procesa al final, en un solo envío.
  *
- * Requiere una videollamada de Twilio activa (`room`) para tener acceso a
- * los tracks de audio local y remoto.
+ * Requiere una videollamada activa (`room`, el engine de video provider-agnostic
+ * devuelto por `useVideoRoom`) para tener acceso a los tracks de audio local y
+ * remoto — funciona igual con el provider Twilio o Chime.
  */
 export function useConsultationRecorder(
-  room: Room | null,
+  room: VideoEngine | null,
   historiaId?: string
 ): UseConsultationRecorderReturn {
   const [isRecording, setIsRecording] = useState(false);
@@ -43,22 +44,8 @@ export function useConsultationRecorder(
 
   /** Recolecta los MediaStreamTrack de audio (local + remotos) de la sala. */
   const collectAudioTracks = useCallback((): MediaStreamTrack[] => {
-    const tracks: MediaStreamTrack[] = [];
-    if (!room) return tracks;
-
-    room.localParticipant.audioTracks.forEach((pub) => {
-      const t = pub.track as LocalAudioTrack | null;
-      if (t?.mediaStreamTrack) tracks.push(t.mediaStreamTrack);
-    });
-
-    room.participants.forEach((participant) => {
-      participant.audioTracks.forEach((pub) => {
-        const t = pub.track as RemoteAudioTrack | null;
-        if (t?.mediaStreamTrack) tracks.push(t.mediaStreamTrack);
-      });
-    });
-
-    return tracks;
+    if (!room) return [];
+    return [...room.getLocalAudioTracks(), ...room.getRemoteAudioTracks()];
   }, [room]);
 
   const cleanup = useCallback(() => {

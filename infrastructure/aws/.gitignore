@@ -1,0 +1,17 @@
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# Variables con secretos (token de DO, etc.)
+terraform.tfvars
+*.auto.tfvars
+
+# Overrides locales
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json

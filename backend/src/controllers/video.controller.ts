@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
-import twilioService from '../services/twilio.service';
+import { videoProvider, RoomCompletedError } from '../services/video';
+import { chimeRecordingService } from '../services/video/chime-recording.service';
 import { sessionTracker } from '../services/session-tracker.service';
 import whatsappService from '../services/whatsapp.service';
 import medicalHistoryService from '../services/medical-history.service';
@@ -17,7 +18,7 @@ class VideoController {
    */
   async generateToken(req: Request, res: Response): Promise<void> {
     try {
-      const { identity, roomName } = req.body;
+      const { identity, roomName, role } = req.body;
 
       if (!identity || !roomName) {
         res.status(400).json({
@@ -26,37 +27,30 @@ class VideoController {
         return;
       }
 
-      // Verificar si la sala ya fue completada (cerrada por el doctor)
+      // El provider asegura la sala y devuelve las credenciales de ingreso.
+      // Lanza RoomCompletedError si la sala ya finalizó (→ 403, sin reingreso).
+      // El médico está exento: reingresar reabre la sala (ver IVideoProvider.join).
+      let joinInfo;
       try {
-        const existingRoom = await twilioService.getRoom(roomName);
-        if (existingRoom.status === 'completed') {
+        joinInfo = await videoProvider.join({ identity, roomName, role });
+      } catch (err) {
+        if (err instanceof RoomCompletedError) {
+          console.warn(`[Video] Reingreso rechazado: sala ${roomName} finalizada (${identity}, role=${role || 'sin rol'})`);
           res.status(403).json({
             error: 'Room has been completed',
             message: 'Esta videollamada ya finalizó y no se puede volver a ingresar.',
           });
           return;
         }
-        console.log(`Room already exists: ${roomName}`);
-      } catch (error: any) {
-        // Sala no existe, intentar crearla como peer-to-peer
-        try {
-          await twilioService.createRoom(roomName);
-          console.log(`Room created as group (max 2): ${roomName}`);
-        } catch (createError: any) {
-          if (createError.code !== 53113) {
-            console.warn(`Could not create room, will use existing: ${createError.message}`);
-          }
-        }
+        throw err;
       }
 
-      const tokenData = twilioService.generateVideoToken({
-        identity,
-        roomName,
-      });
-
+      // Respuesta con `provider` para que el frontend elija el SDK correcto:
+      //   twilio → { provider, token, identity, roomName }
+      //   chime  → { provider, meeting, attendee, identity, roomName }
       res.status(200).json({
         success: true,
-        data: tokenData,
+        data: joinInfo,
       });
     } catch (error) {
       console.error('Error generating token:', error);
@@ -74,7 +68,7 @@ class VideoController {
    */
   async createRoom(req: Request, res: Response): Promise<void> {
     try {
-      const { roomName, type } = req.body;
+      const { roomName } = req.body;
 
       if (!roomName) {
         res.status(400).json({
@@ -83,7 +77,7 @@ class VideoController {
         return;
       }
 
-      const room = await twilioService.createRoom(roomName, type);
+      const room = await videoProvider.createRoom(roomName);
 
       res.status(201).json({
         success: true,
@@ -106,7 +100,12 @@ class VideoController {
     try {
       const { roomName } = req.params;
 
-      const room = await twilioService.getRoom(roomName);
+      const room = await videoProvider.getRoom(roomName);
+
+      if (!room) {
+        res.status(404).json({ error: 'Room not found' });
+        return;
+      }
 
       res.status(200).json({
         success: true,
@@ -129,7 +128,7 @@ class VideoController {
     try {
       const { roomName } = req.params;
 
-      const room = await twilioService.endRoom(roomName);
+      const room = await videoProvider.endRoom(roomName);
 
       res.status(200).json({
         success: true,
@@ -152,7 +151,7 @@ class VideoController {
     try {
       const { roomName } = req.params;
 
-      const participants = await twilioService.listParticipants(roomName);
+      const participants = await videoProvider.listParticipants(roomName);
 
       res.status(200).json({
         success: true,
@@ -175,7 +174,7 @@ class VideoController {
     try {
       const { roomName, participantSid } = req.params;
 
-      const result = await twilioService.disconnectParticipant(
+      const result = await videoProvider.disconnectParticipant(
         roomName,
         participantSid
       );
@@ -641,6 +640,40 @@ class VideoController {
       res.status(500).json({
         success: false,
         error: 'Failed to transcribe consulta',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  /**
+   * Obtener el link (presigned URL) de la grabación de una sala.
+   * GET /api/video/recordings/:roomName
+   * Devuelve 404 si no hay grabación o aún se está procesando la concatenación.
+   */
+  async getRecording(req: Request, res: Response): Promise<void> {
+    try {
+      const { roomName } = req.params;
+      if (!roomName) {
+        res.status(400).json({ error: 'roomName is required' });
+        return;
+      }
+
+      const rec = await chimeRecordingService.getRecordingUrl(roomName);
+      if (!rec) {
+        res.status(404).json({ success: false, error: 'No hay grabación para esta sala' });
+        return;
+      }
+      if (!rec.url) {
+        // Existe el registro pero el MP4 aún no está listo (concatenación en curso).
+        res.status(202).json({ success: false, status: rec.status, message: 'La grabación se está procesando' });
+        return;
+      }
+
+      res.status(200).json({ success: true, data: rec });
+    } catch (error) {
+      console.error('Error fetching recording:', error);
+      res.status(500).json({
+        error: 'Failed to fetch recording',
         message: error instanceof Error ? error.message : 'Unknown error',
       });
     }
