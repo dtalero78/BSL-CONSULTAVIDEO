@@ -1,7 +1,34 @@
-import express, { Router } from 'express';
+import express, { Router, Request, Response, NextFunction } from 'express';
 import videoController from '../controllers/video.controller';
 
 const router = Router();
+
+/**
+ * Autenticación servicio-a-servicio para endpoints que exponen datos sensibles.
+ *
+ * La grabación de una consulta es historia clínica: sin esto, cualquiera que
+ * adivine o vea un nombre de sala (viajan por WhatsApp y en la URL) obtenía un
+ * link firmado al MP4. Lo consume bsl-plataforma (módulo de Calidad), no el
+ * navegador del paciente, así que un token compartido es suficiente.
+ *
+ * Falla CERRADO: si no hay token configurado, se rechaza. Preferimos que el
+ * módulo de calidad no cargue el video a que las consultas queden expuestas.
+ */
+function requireInternalToken(req: Request, res: Response, next: NextFunction): void {
+  const expected = process.env.INTERNAL_API_TOKEN;
+  if (!expected) {
+    console.error('[Auth] INTERNAL_API_TOKEN no configurado: se rechaza el acceso a la grabación');
+    res.status(503).json({ error: 'Internal token not configured' });
+    return;
+  }
+  const got = req.header('X-Internal-Token');
+  if (got !== expected) {
+    console.warn(`[Auth] Token interno inválido para ${req.method} ${req.originalUrl}`);
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+  next();
+}
 
 // Generar token de acceso
 router.post('/token', videoController.generateToken);
@@ -23,8 +50,9 @@ router.post('/events/participant-connected', videoController.trackParticipantCon
 router.post('/events/participant-disconnected', videoController.trackParticipantDisconnected);
 router.get('/events/connected-patients', videoController.getConnectedPatients);
 
-// Grabación: link (presigned URL) del MP4 de una sala (Chime → S3)
-router.get('/recordings/:roomName', videoController.getRecording);
+// Grabación: link (presigned URL) del MP4 de una sala (Chime → S3).
+// Protegido: es historia clínica y lo consume bsl-plataforma, no el navegador.
+router.get('/recordings/:roomName', requireInternalToken, videoController.getRecording);
 
 // WhatsApp
 router.post('/whatsapp/send', videoController.sendWhatsApp);

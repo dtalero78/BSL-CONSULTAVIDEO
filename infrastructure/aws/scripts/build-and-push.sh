@@ -24,6 +24,10 @@ TAG="${1:-latest}"
 
 command -v docker >/dev/null 2>&1 || { echo "ERROR: falta docker"; exit 1; }
 command -v aws >/dev/null 2>&1    || { echo "ERROR: falta la CLI de aws"; exit 1; }
+# El daemon debe estar CORRIENDO, no sólo instalado: con Docker Desktop apagado,
+# el build falla pero un `apply` encadenado seguía desplegando un tag inexistente
+# (CannotPullContainerError) y el rollout se quedaba pegado.
+docker info >/dev/null 2>&1 || { echo "ERROR: el daemon de Docker no responde (¿Docker Desktop apagado?)"; exit 1; }
 
 # URL del repo ECR (de la variable de entorno o del output de Terraform)
 if [[ -z "${ECR_REPO:-}" ]]; then
