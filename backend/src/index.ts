@@ -125,8 +125,13 @@ app.get('*', (_req: Request, res: Response) => {
   res.sendFile(path.join(frontendPath, 'index.html'));
 });
 
-// Error handler
-app.use((err: Error, _req: Request, res: Response) => {
+// Error handler.
+// OJO con la firma: Express reconoce un manejador de errores SÓLO si la función
+// declara 4 parámetros (mira `fn.length`). Con 3 lo trataba como middleware
+// normal y lo invocaba con (req, res, next), así que `err` era el request y
+// `res` era `next` → "TypeError: res.status is not a function" en cada petición
+// que no casara con el fallback del SPA. No borrar `_next` aunque no se use.
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   console.error('Error:', err);
   res.status(500).json({
     error: 'Internal Server Error',
