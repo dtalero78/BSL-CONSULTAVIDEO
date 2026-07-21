@@ -73,8 +73,12 @@ export interface IVideoProvider {
   /** Crea explícitamente una sala. */
   createRoom(roomName: string): Promise<RoomInfo>;
 
-  /** Finaliza/cierra la sala. */
-  endRoom(roomName: string): Promise<{ id: string; status: string }>;
+  /**
+   * Cierra la sala y su grabación. Con `completed: false` NO se marca como
+   * finalizada, de modo que se pueda volver a entrar con el mismo link: es el
+   * caso de una desconexión cualquiera del médico, frente a colgar a propósito.
+   */
+  endRoom(roomName: string, opts?: { completed?: boolean }): Promise<{ id: string; status: string }>;
 
   /** Lista participantes. */
   listParticipants(roomName: string): Promise<ParticipantInfo[]>;

@@ -62,7 +62,12 @@ export class TwilioVideoProvider implements IVideoProvider {
     return { id: r.sid, name: r.uniqueName, status: r.status, raw: r };
   }
 
-  async endRoom(roomName: string): Promise<{ id: string; status: string }> {
+  async endRoom(roomName: string, opts?: { completed?: boolean }): Promise<{ id: string; status: string }> {
+    // Con `completed: false` (desconexión cualquiera, no colgar) NO se cierra la
+    // sala en Twilio: cerrarla impedía al paciente volver con el mismo link.
+    if (opts?.completed === false) {
+      return { id: roomName, status: 'disconnected' };
+    }
     const r = await twilioService.endRoom(roomName, false);
     return { id: r.sid, status: r.status };
   }

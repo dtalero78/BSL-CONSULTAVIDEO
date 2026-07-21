@@ -193,10 +193,28 @@ class SessionTrackerService {
       // grabada, pero ~99% nunca se evaluaban (413 composiciones/mes vs 2 evaluaciones). La
       // composición se crea on-demand desde el módulo de calidad al hacer clic en "Evaluar".
       // Los tracks grabados quedan guardados en Twilio y se pueden componer después.
+      // OJO: esto es una desconexión, no un "colgar". El médico pudo recargar,
+      // perder la red o cerrar la pestaña sin querer. Se cierra el meeting y se
+      // guarda la grabación, pero `completed: false` deja la sala reutilizable:
+      // marcarla como finalizada aquí dejaba al PACIENTE fuera de su propia
+      // consulta —con el link ya enviado por WhatsApp— y obligaba a crear una
+      // sala nueva. La sala sólo se da por terminada cuando el médico cuelga
+      // (POST /rooms/:roomName/end desde el botón de colgar).
       if (participant.role === 'doctor') {
-        videoProvider.endRoom(roomName)
-          .then(() => console.log(`[SessionTracker] Room ${roomName} completed (doctor disconnected, sin auto-composición)`))
-          .catch((err: any) => console.error(`[SessionTracker] Error ending room ${roomName}:`, err.message));
+        // Si el paciente sigue conectado, NO se toca la reunión: borrarla lo
+        // expulsaba en el acto ("me sale la alarma de que ingresan y cuando yo
+        // entro ya no están"). El médico se reconecta a la MISMA reunión y la
+        // consulta sigue. Sólo se limpia cuando ya no queda nadie.
+        const quedaAlguien = Array.from(session.participants.values()).some(
+          (p) => p.identity !== identity && !p.disconnectedAt
+        );
+        if (quedaAlguien) {
+          console.log(`[SessionTracker] Médico salió de ${roomName} pero queda gente: la sala sigue viva`);
+        } else {
+          videoProvider.endRoom(roomName, { completed: false })
+            .then(() => console.log(`[SessionTracker] Room ${roomName} cerrada, sala vacía (reingreso permitido)`))
+            .catch((err: any) => console.error(`[SessionTracker] Error ending room ${roomName}:`, err.message));
+        }
       }
 
       // Emitir evento Socket.io cuando un paciente se desconecta - SOLO a la Room del médico específico

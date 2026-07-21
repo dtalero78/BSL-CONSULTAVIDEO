@@ -24,6 +24,7 @@ import {
   RoomCompletedError,
 } from './types';
 import { chimeRecordingService } from './chime-recording.service';
+import postgresService from '../postgres.service';
 
 // Región del plano de control de Chime (endpoints regionales limitados).
 const CONTROL_REGION = process.env.CHIME_CONTROL_REGION || 'us-east-1';
@@ -43,6 +44,7 @@ export class ChimeVideoProvider implements IVideoProvider {
   private client = new ChimeSDKMeetingsClient({ region: CONTROL_REGION });
   private meetings = new Map<string, Meeting>(); // roomName -> Meeting
   private ended = new Map<string, number>(); // roomName -> endedAt (ms)
+  private tableReady: Promise<void> | null = null;
 
   private isEnded(roomName: string): boolean {
     const t = this.ended.get(roomName);
@@ -54,16 +56,96 @@ export class ChimeVideoProvider implements IVideoProvider {
     return true;
   }
 
+  /** Devuelve el meeting si sigue vivo en Chime; null si ya no existe. */
+  private async fetchMeeting(meetingId: string): Promise<Meeting | null> {
+    try {
+      const got = await this.client.send(new GetMeetingCommand({ MeetingId: meetingId }));
+      return got.Meeting || null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * El mapa sala → meeting se guarda TAMBIÉN en Postgres. Si vive sólo en
+   * memoria, cada reinicio de la tarea (un despliegue, un crash) lo borra y el
+   * siguiente en entrar crea una reunión NUEVA para la misma sala: el médico
+   * queda en una y el paciente en otra, se ven "solos" y hay que volver a
+   * entrar. Los fallos de BD no rompen el video: se degrada a sólo memoria.
+   */
+  private async ensureMeetingsTable(): Promise<void> {
+    if (!this.tableReady) {
+      this.tableReady = postgresService
+        .query(
+          `CREATE TABLE IF NOT EXISTS chime_meetings (
+             room_name  TEXT PRIMARY KEY,
+             meeting_id TEXT NOT NULL,
+             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+           )`
+        )
+        .then(() => undefined)
+        .catch((err: any) => {
+          this.tableReady = null;
+          throw err;
+        });
+    }
+    return this.tableReady;
+  }
+
+  private async recallMeetingId(roomName: string): Promise<string | null> {
+    try {
+      await this.ensureMeetingsTable();
+      const r = await postgresService.query(
+        `SELECT meeting_id FROM chime_meetings WHERE room_name = $1 LIMIT 1`,
+        [roomName]
+      );
+      return r?.[0]?.meeting_id || null;
+    } catch (err: any) {
+      console.warn(`[Chime] no se pudo leer chime_meetings: ${err?.message}`);
+      return null;
+    }
+  }
+
+  private async rememberMeetingId(roomName: string, meetingId: string): Promise<void> {
+    try {
+      await this.ensureMeetingsTable();
+      await postgresService.query(
+        `INSERT INTO chime_meetings (room_name, meeting_id) VALUES ($1, $2)
+         ON CONFLICT (room_name) DO UPDATE SET meeting_id = EXCLUDED.meeting_id, created_at = NOW()`,
+        [roomName, meetingId]
+      );
+    } catch (err: any) {
+      console.warn(`[Chime] no se pudo guardar chime_meetings: ${err?.message}`);
+    }
+  }
+
+  private async forgetMeetingId(roomName: string): Promise<void> {
+    try {
+      await postgresService.query(`DELETE FROM chime_meetings WHERE room_name = $1`, [roomName]);
+    } catch {
+      /* no crítico */
+    }
+  }
+
   /** Reutiliza el meeting vigente para la sala, o crea uno nuevo. */
   private async ensureMeeting(roomName: string): Promise<Meeting> {
     const cached = this.meetings.get(roomName);
     if (cached?.MeetingId) {
-      try {
-        const got = await this.client.send(new GetMeetingCommand({ MeetingId: cached.MeetingId }));
-        if (got.Meeting) return got.Meeting;
-      } catch {
-        this.meetings.delete(roomName);
+      const live = await this.fetchMeeting(cached.MeetingId);
+      if (live) return live;
+      this.meetings.delete(roomName);
+    }
+
+    // Sobrevive a reinicios: puede haber gente ya conectada a esta reunión.
+    const persistedId = await this.recallMeetingId(roomName);
+    if (persistedId) {
+      const live = await this.fetchMeeting(persistedId);
+      if (live) {
+        this.meetings.set(roomName, live);
+        console.log(`[Chime] Sala ${roomName} reanudada desde BD: meeting ${persistedId}`);
+        return live;
       }
+      await this.forgetMeetingId(roomName);
     }
 
     const created = await this.client.send(
@@ -75,6 +157,7 @@ export class ChimeVideoProvider implements IVideoProvider {
     );
     if (!created.Meeting) throw new Error('Chime CreateMeeting no devolvió Meeting');
     this.meetings.set(roomName, created.Meeting);
+    await this.rememberMeetingId(roomName, created.Meeting.MeetingId!);
     console.log(`[Chime] Meeting creado para sala ${roomName}: ${created.Meeting.MeetingId}`);
 
     // NOTA: la grabación NO se arranca aquí. Si el Media Capture Pipeline se une
@@ -139,16 +222,24 @@ export class ChimeVideoProvider implements IVideoProvider {
     return { id: m.MeetingId!, name: roomName, status: 'in-progress', raw: m };
   }
 
-  async endRoom(roomName: string): Promise<{ id: string; status: string }> {
-    // Idempotente: el cliente puede disparar la desconexión dos veces (colgar +
-    // beforeunload), y sin esta guarda se intentaba concatenar y borrar el mismo
-    // meeting dos veces (de ahí los ConditionalCheckFailed en DeleteMeeting).
-    if (this.isEnded(roomName)) {
-      return { id: this.meetings.get(roomName)?.MeetingId || roomName, status: 'completed' };
-    }
-
+  /**
+   * `completed: false` limpia el meeting y cierra la grabación PERO no marca la
+   * sala como finalizada, así que se puede volver a entrar con el mismo link.
+   * Es lo que corresponde cuando el médico simplemente se desconecta (recarga,
+   * se le cae la red, cierra sin querer): dar por terminada la consulta ahí
+   * dejaba al paciente fuera de su propia cita —con el link ya enviado— y
+   * obligaba a generar una sala nueva. Sólo colgar a propósito la finaliza.
+   */
+  async endRoom(roomName: string, opts?: { completed?: boolean }): Promise<{ id: string; status: string }> {
+    const markCompleted = opts?.completed !== false;
     const cached = this.meetings.get(roomName);
+
+    // Idempotente: se saca del mapa ANTES de los await, para que una segunda
+    // llamada (el cliente reporta colgar + beforeunload) no vuelva a concatenar
+    // ni a borrar el mismo meeting → eran los ConditionalCheckFailed.
     if (cached?.MeetingId) {
+      this.meetings.delete(roomName);
+      await this.forgetMeetingId(roomName);
       // Grabación: detener la captura y arrancar la concatenación → MP4 en S3.
       await chimeRecordingService.stopAndConcatenate(cached.MeetingId);
       try {
@@ -157,9 +248,9 @@ export class ChimeVideoProvider implements IVideoProvider {
         console.warn(`[Chime] endRoom: no se pudo borrar el meeting ${cached.MeetingId}: ${err?.message}`);
       }
     }
-    this.meetings.delete(roomName);
-    this.ended.set(roomName, Date.now());
-    return { id: cached?.MeetingId || roomName, status: 'completed' };
+
+    if (markCompleted) this.ended.set(roomName, Date.now());
+    return { id: cached?.MeetingId || roomName, status: markCompleted ? 'completed' : 'disconnected' };
   }
 
   async listParticipants(roomName: string): Promise<ParticipantInfo[]> {
