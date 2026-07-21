@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { videoProvider, RoomCompletedError } from '../services/video';
 import { chimeRecordingService } from '../services/video/chime-recording.service';
+import { transcribeService } from '../services/video/transcribe.service';
 import { sessionTracker } from '../services/session-tracker.service';
 import whatsappService from '../services/whatsapp.service';
 import medicalHistoryService from '../services/medical-history.service';
@@ -675,6 +676,42 @@ class VideoController {
       res.status(500).json({
         error: 'Failed to fetch recording',
         message: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  /**
+   * Transcripción de la grabación de una sala (Amazon Transcribe).
+   * GET /api/video/transcribe/:roomName  (protegido con token interno)
+   *
+   * Idempotente y por sondeo: la primera llamada arranca el job, las siguientes
+   * informan el avance y, cuando termina, devuelven el transcript. Lo consume el
+   * módulo de calidad de bsl-plataforma.
+   *   200 { status:'completed', transcript }
+   *   202 { status:'in_progress' | 'no_recording' }
+   *   500 { status:'failed', reason }
+   */
+  async getTranscription(req: Request, res: Response): Promise<void> {
+    try {
+      const { roomName } = req.params;
+      if (!roomName) {
+        res.status(400).json({ error: 'roomName is required' });
+        return;
+      }
+      const result = await transcribeService.getOrStartTranscription(roomName);
+      if (result.status === 'completed') {
+        res.status(200).json({ success: true, ...result });
+      } else if (result.status === 'failed') {
+        res.status(500).json({ success: false, ...result });
+      } else {
+        // in_progress | no_recording → seguir sondeando
+        res.status(202).json({ success: false, ...result });
+      }
+    } catch (error) {
+      console.error('Error transcribing:', error);
+      res.status(500).json({
+        status: 'failed',
+        reason: error instanceof Error ? error.message : 'Unknown error',
       });
     }
   }

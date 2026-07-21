@@ -54,6 +54,10 @@ router.get('/events/connected-patients', videoController.getConnectedPatients);
 // Protegido: es historia clínica y lo consume bsl-plataforma, no el navegador.
 router.get('/recordings/:roomName', requireInternalToken, videoController.getRecording);
 
+// Transcripción de la grabación (Amazon Transcribe). Idempotente y por sondeo.
+// Protegido: también es historia clínica y lo consume el módulo de calidad.
+router.get('/transcribe/:roomName', requireInternalToken, videoController.getTranscription);
+
 // WhatsApp
 router.post('/whatsapp/send', videoController.sendWhatsApp);
 router.post('/whatsapp/send-suelta', videoController.sendWhatsAppSuelta);

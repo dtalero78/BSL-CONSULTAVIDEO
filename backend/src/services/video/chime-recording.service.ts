@@ -104,6 +104,26 @@ class ChimeRecordingService {
     }
   }
 
+  /**
+   * meetingId de la grabación que sigue capturando para una sala. Sirve para
+   * concatenar tras un reinicio de la tarea, cuando el mapa en memoria del
+   * provider ya no tiene el meeting pero la captura quedó viva en AWS.
+   */
+  async getCapturingMeetingId(roomName: string): Promise<string | null> {
+    if (!ENABLED) return null;
+    try {
+      await this.ensureTable();
+      const rows = await postgresService.query(
+        `SELECT meeting_id FROM chime_recordings
+         WHERE room_name = $1 AND status = 'capturing' ORDER BY id DESC LIMIT 1`,
+        [roomName]
+      );
+      return rows?.[0]?.meeting_id || null;
+    } catch {
+      return null;
+    }
+  }
+
   /** Detiene la captura y arranca la concatenación → un MP4 único en S3. */
   async stopAndConcatenate(meetingId: string): Promise<void> {
     if (!ENABLED || !meetingId) return;

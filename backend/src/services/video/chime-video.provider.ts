@@ -232,25 +232,35 @@ export class ChimeVideoProvider implements IVideoProvider {
    */
   async endRoom(roomName: string, opts?: { completed?: boolean }): Promise<{ id: string; status: string }> {
     const markCompleted = opts?.completed !== false;
-    const cached = this.meetings.get(roomName);
 
-    // Idempotente: se saca del mapa ANTES de los await, para que una segunda
-    // llamada (el cliente reporta colgar + beforeunload) no vuelva a concatenar
-    // ni a borrar el mismo meeting → eran los ConditionalCheckFailed.
-    if (cached?.MeetingId) {
-      this.meetings.delete(roomName);
-      await this.forgetMeetingId(roomName);
+    // Resolver el meetingId AUNQUE el mapa en memoria se haya perdido en un
+    // reinicio de la tarea (despliegue/crash a mitad de consulta). Si sólo
+    // miráramos `this.meetings`, tras un reinicio `endRoom` no encontraba el
+    // meeting y se saltaba la concatenación → la grabación quedaba atascada en
+    // 'capturing' para siempre y nunca se generaba el MP4. Se recupera desde la
+    // tabla de meetings persistida y, en último caso, desde la grabación viva.
+    let meetingId = this.meetings.get(roomName)?.MeetingId || null;
+    if (!meetingId) meetingId = await this.recallMeetingId(roomName);
+    if (!meetingId) meetingId = await chimeRecordingService.getCapturingMeetingId(roomName);
+
+    // Idempotente: se limpia el estado ANTES de los await, para que una segunda
+    // llamada (el cliente reporta colgar + beforeunload) no repita el trabajo.
+    // La concatenación además tiene su propio claim atómico en BD.
+    this.meetings.delete(roomName);
+    await this.forgetMeetingId(roomName);
+
+    if (meetingId) {
       // Grabación: detener la captura y arrancar la concatenación → MP4 en S3.
-      await chimeRecordingService.stopAndConcatenate(cached.MeetingId);
+      await chimeRecordingService.stopAndConcatenate(meetingId);
       try {
-        await this.client.send(new DeleteMeetingCommand({ MeetingId: cached.MeetingId }));
+        await this.client.send(new DeleteMeetingCommand({ MeetingId: meetingId }));
       } catch (err: any) {
-        console.warn(`[Chime] endRoom: no se pudo borrar el meeting ${cached.MeetingId}: ${err?.message}`);
+        console.warn(`[Chime] endRoom: no se pudo borrar el meeting ${meetingId}: ${err?.message}`);
       }
     }
 
     if (markCompleted) this.ended.set(roomName, Date.now());
-    return { id: cached?.MeetingId || roomName, status: markCompleted ? 'completed' : 'disconnected' };
+    return { id: meetingId || roomName, status: markCompleted ? 'completed' : 'disconnected' };
   }
 
   async listParticipants(roomName: string): Promise<ParticipantInfo[]> {

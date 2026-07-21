@@ -142,6 +142,27 @@ resource "aws_iam_role_policy" "task_recordings" {
   })
 }
 
+# Permisos para Amazon Transcribe (transcripción de la grabación para el módulo
+# de calidad). El input es el MP4 de la sala en nuestro bucket (ya cubierto por
+# la policy de arriba); el output lo maneja Transcribe en un bucket propio y se
+# lee vía URL prefirmada, por eso no se necesitan permisos S3 extra.
+resource "aws_iam_role_policy" "task_transcribe" {
+  name = "${var.project}-transcribe"
+  role = aws_iam_role.task.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "transcribe:StartTranscriptionJob",
+        "transcribe:GetTranscriptionJob"
+      ]
+      Resource = "*"
+    }]
+  })
+}
+
 # Permisos para `aws ecs execute-command` (shell dentro del contenedor, útil
 # para depurar la conexión a Postgres de DO desde la tarea).
 resource "aws_iam_role_policy" "task_exec_command" {
