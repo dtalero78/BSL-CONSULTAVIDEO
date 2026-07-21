@@ -129,6 +129,15 @@ ni las deps de Chime, ni el middleware de redirect. **La migración = re-aplicar
 que ya hicimos en BSL, sobre una app más grande** (~90 archivos backend vs ~35; 17 páginas vs 4).
 Encaje del playbook: **~80-90%**.
 
+> ⚠️ **Copiar la versión CORREGIDA, no la del primer día.** Todo lo de §7-bis (persistir el mapa
+> sala→reunión) y §7-ter (ciclo de vida de la sala) se descubrió *después* del cutover de BSL, con
+> médicos en producción. Si se copia el `services/video/` de BSL tal como quedó hoy, ya viene arreglado;
+> pero **verificar explícitamente** estas cuatro antes de salir a producción, porque son invisibles en
+> pruebas con una sola persona: (1) el mapa sala→reunión se persiste, (2) desconectarse no finaliza la
+> sala, (3) no se borra la reunión si queda alguien dentro, (4) se re-enlaza el video cuando cambia el
+> stream. **La forma de probarlas es con DOS personas**: entrar los dos, que uno recargue, y confirmar
+> que el otro no se cae y que el que recargó vuelve a la MISMA sala.
+
 ### Se copia casi 1:1 (desde BSL)
 - Toda la carpeta **`infrastructure/aws/`** (Terraform) → cambiar `var.project` a `bodytech-consulta`
   (¡evitar colisión de nombres si va en la misma cuenta AWS!), `domain_name`/`app_url` a `aws.bodytech.app`,
@@ -209,9 +218,14 @@ REDIRECT_TO_AWS, REDIRECT_TARGET, APP_URL`).
 5. **Video negro (permiso de cámara).** Pedir `getUserMedia({audio,video})` **ANTES** de listar/elegir
    devices; sin permiso, `enumerateDevices()` devuelve `deviceId` vacíos → `startVideoInput('')` se salta
    → nadie envía video.
-6. **Loop de attach/detach (video negro).** `videoTileDidUpdate` de Chime se dispara muy seguido;
-   recrear el ref del tile en cada evento causa bind/unbind sin fin. Solo recrear cuando el `tileId`
-   realmente cambia.
+6. **Loop de attach/detach (video negro) — y su reverso.** `videoTileDidUpdate` de Chime se dispara muy
+   seguido; recrear el ref del tile en cada evento causa bind/unbind sin fin. Pero **cuidado con pasarse
+   de frenada**: guardar sólo por `tileId` deja un agujero, porque Chime **cambia el stream de un tile
+   SIN cambiar su tileId** (pasa cuando el otro extremo republica su video, p. ej. al activar el fondo
+   virtual) → el `<video>` se queda con el stream muerto y se ve negro. La regla correcta:
+   **comparar también el `boundVideoStream`**; si cambió, re-enlazar EL MISMO elemento (sin recrear el
+   ref ni re-emitir, para no revivir el loop). Síntoma que lo delata: **asimétrico e intermitente** —
+   el médico ve al paciente pero el paciente no lo ve a él, y sólo a algunos.
 7. **`AudioJoinedFromAnotherDevice` (se cae la llamada).** Chime tiene un monitor de conexión agresivo:
    si el hilo principal se bloquea (procesamiento de fondo TFLite/canvas a 720p), cree que se cayó la red
    y **se auto-reconecta** → colisión → cae. Fix: procesar el fondo a **640×360 @ 15fps**
@@ -244,6 +258,76 @@ REDIRECT_TO_AWS, REDIRECT_TARGET, APP_URL`).
 17. **Build en Apple Silicon.** `--platform linux/amd64` (o `cpu_architecture = ARM64` en Fargate).
 18. **Deps nuevas.** Backend: `@aws-sdk/client-chime-sdk-meetings`, `@aws-sdk/client-chime-sdk-media-pipelines`,
     `@aws-sdk/client-s3`, `@aws-sdk/s3-request-presigner`. Frontend: `amazon-chime-sdk-js`.
+19. **Prefijo de SSM.** Los secrets van en `/<proyecto>/aws/CLAVE`, **con el `/aws/`**. Ponerlos un nivel
+    arriba hace que la tarea **ni arranque**: `ResourceInitializationError: … invalid ssm parameters:
+    /<proyecto>/aws/CLAVE`. Confirmar la ruta real con
+    `aws ssm get-parameters-by-path --path /<proyecto> --recursive` (ojo: si luego se hace `sed 's|.*/||'`
+    para ver sólo los nombres, se pierde justo el prefijo que importa).
+20. **Inventario COMPLETO de env vars.** No basta con las del `.do/app.yaml`: la mayoría vive sólo en el
+    dashboard de DO. En BSL se nos escapó todo el bloque `BSL_PLATAFORMA_*` y el chat del panel quedó
+    vacío en producción (`getMensajes error: … no configurados`) sin que nada más fallara. **Comparar
+    conteos**: nº de envs en el spec de DO vs nº de parámetros en SSM + `container_environment`.
+21. **Los SECRET de DO no se pueden leer de vuelta.** En el spec vuelven como `EV[…]`. Los **GENERAL** sí
+    se recuperan en texto plano (así rescatamos URL/TENANT/USER). Para un secret perdido no queda otra que
+    **resetearlo**: generar uno nuevo, actualizar el origen (BD/servicio) y cargarlo en SSM **y** en DO.
+22. **Manejador de errores de Express: 4 parámetros.** Express lo reconoce por `fn.length`; con 3 lo trata
+    como middleware normal y lo llama con `(req, res, next)` → `err` es el request y `res` es `next`, así
+    que revienta con `TypeError: res.status is not a function` y **ningún error se reporta bien**. Firma
+    obligatoria: `(err, req, res, next)`, aunque `next` no se use.
+23. **Fallo del procesador de fondo → quedarse SIN video.** `applyVirtualBackground` primero suelta el
+    device anterior y después crea el procesador; si eso falla (navegador sin soporte, WASM que no carga,
+    equipo lento) el médico queda publicando **nada**, y el `catch` de arriba se lo traga. Siempre
+    **devolver la cámara sin efecto** en el `catch`: perder el fondo es mucho mejor que perder el video.
+
+---
+
+## 7-bis. La trampa grande: el estado en memoria
+
+**Es el error más caro que cometimos, y el que más tarda en aparecer.** Todo lo que el provider de video
+guarda en un `Map` de proceso desaparece en cada reinicio de la tarea (un despliegue, un crash, un
+re-scale). Con `desired_count=1` es fácil creer que "single instance" equivale a "estado seguro". **No lo
+es**: la instancia se reemplaza a cada rato.
+
+Lo que nos pasó, con síntomas que parecían tres bugs distintos:
+
+- **El mapa `sala → meetingId` vivía en memoria.** Tras cada despliegue, el siguiente en entrar no
+  encontraba la reunión y **creaba una NUEVA para la misma sala**. Médico y paciente quedaban en
+  reuniones distintas, cada uno "solo", **sin ningún error en los logs**. Se veía como *"entro y ya no
+  están"*, *"a veces me ven, a veces no"*. En un día llegamos a **7 reuniones para una misma sala**.
+  → **Persistir en Postgres** (tabla `chime_meetings`), consultarla cuando la memoria no tenga la sala, y
+  degradar a sólo-memoria si la BD falla (nunca romper el video por un fallo de BD).
+- **Diagnóstico rápido:** contar reuniones por sala en los logs. Más de una = la sala se partió:
+  `... | grep -oE "Meeting creado para sala [a-z0-9-]+" | awk '{print $NF}' | sort | uniq -c | sort -rn`
+
+Regla para la próxima: **cualquier identificador que dos personas deban compartir para encontrarse va en
+la BD, no en un `Map`.** El estado en memoria sólo sirve como caché.
+
+---
+
+## 7-ter. Ciclo de vida de la sala (lo que más quejas generó)
+
+Tres decisiones de diseño que parecían inofensivas y en producción resultaron dolorosas. **Revisar estas
+tres antes de migrar BODYTECH**, porque el código se copia tal cual.
+
+1. **Desconectarse NO es colgar.** Marcábamos la sala como *finalizada* ante cualquier desconexión del
+   médico. Pero recargar la página, perder la red o cerrar sin querer es lo más normal del mundo. El
+   efecto: el paciente **no podía volver a entrar con el link que ya tenía por WhatsApp** (403 *"Esta
+   videollamada ya finalizó"*) y había que generar sala nueva. Sólo el **colgar explícito** debe
+   finalizar la sala; una desconexión debe dejarla reutilizable (`endRoom(room, { completed: false })`).
+2. **No borrar la reunión si adentro queda alguien.** Al desconectarse el médico borrábamos la reunión
+   aunque el paciente siguiera dentro → lo **expulsaba en el acto** (*"como que el sistema los saca"*).
+   Comprobar si queda algún participante conectado y, si lo hay, dejar la sala viva: el médico se
+   reconecta a la MISMA reunión y la consulta sigue.
+3. **El médico siempre debe poder reingresar** — y al hacerlo, reabrir la sala para su paciente. Bloquear
+   el reingreso sólo tiene sentido para el paciente y sólo después de que el médico colgó.
+4. **Los clientes reportan la desconexión dos veces** (colgar + `beforeunload`). Hace falta idempotencia
+   en dos niveles: ignorar la segunda desconexión del mismo participante, y en `endRoom` sacar la
+   reunión del mapa **antes** de los `await` (si no: doble concatenación del MP4 y `ConditionalCheckFailed`
+   al borrar el meeting).
+
+**Observabilidad que vale oro:** loguear explícitamente cada rechazo de ingreso con el rol
+(`Reingreso rechazado: sala X finalizada (Nombre, role=patient)`). Ese único log convirtió un
+"algo está fallando" en un diagnóstico exacto en dos minutos. Ponerlo **desde el día uno**.
 
 ---
 
@@ -265,9 +349,27 @@ WhatsApp/Voz **siguen en Twilio** (prepago) — ese saldo sí hay que mantenerlo
 
 ---
 
-## 10. Pendientes recomendados post-migración
+## 10. Operación los primeros días (aprendido a golpes)
+
+**Cada despliegue reinicia la tarea y CORTA las consultas en curso.** Con una sola tarea no hay
+solapamiento real: la vieja muere y la nueva arranca. El día del cutover de BSL desplegamos 5 veces en
+horario de consulta y cada despliegue partió las videollamadas activas — buena parte de las quejas de ese
+día las causamos nosotros, no los bugs.
+
+- **Desplegar fuera del horario de consulta.** Si toca en caliente, avisar antes.
+- **Agrupar arreglos en un solo despliegue** en vez de ir soltando uno por uno.
+- Antes de dar por bueno un arreglo, **verificar contra los logs**, no contra la intención: comparar el
+  contador del síntoma antes/después (`grep -c`), y confirmar que el servicio quedó en el `taskdef` nuevo
+  (un rollout puede fallar y dejar la versión ANTERIOR sirviendo con health 200 — pasó con `v14`).
+- **Preguntar el detalle que discrimina** antes de tocar código. Ej.: "¿el paciente sí la sigue
+  escuchando a ella?" separa un problema del elemento de audio del navegador de uno de la conexión.
+  Desplegar a ciegas cuesta otro corte de consultas.
+
+### Pendientes recomendados
 
 - Rotar cualquier credencial expuesta durante el setup (access key AWS, token DO).
 - Pasar el redirect de **302 → 301** cuando esté estable (unos días).
 - (Opcional) Botón "Ver grabación" en la UI; AWS Budget con alerta por email.
-- (Escala) Para >1 tarea: adaptador Socket.io + ElastiCache Redis (el estado hoy es en-memoria, por eso `desired_count=1`).
+- (Escala) Para >1 tarea: adaptador Socket.io + ElastiCache Redis (el estado de sesiones/sockets sigue
+  en-memoria, por eso `desired_count=1`). El mapa sala→reunión ya se persiste (ver §7-bis), pero
+  `session-tracker` y `telemedicine-socket` todavía no.
