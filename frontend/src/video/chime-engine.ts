@@ -85,12 +85,28 @@ class ChimeSharedAudioRef implements NormalizedVideoRef {
 const sharedAudioRef = new ChimeSharedAudioRef();
 
 class ChimeVideoTileRef implements NormalizedVideoRef {
+  private el: HTMLVideoElement | null = null;
+
   constructor(private engine: ChimeVideoEngine, private tileId: number) {}
+
   attach(el: HTMLVideoElement | HTMLAudioElement): void {
-    this.engine.bindTile(this.tileId, el as HTMLVideoElement);
+    this.el = el as HTMLVideoElement;
+    this.engine.bindTile(this.tileId, this.el);
   }
+
   detach(): void {
     this.engine.unbindTile(this.tileId);
+    this.el = null;
+  }
+
+  /**
+   * Vuelve a enlazar EL MISMO elemento cuando Chime cambia el stream por debajo
+   * sin cambiar el tileId. Pasa cuando el otro extremo republica su video —el
+   * caso típico es el médico activando el fondo virtual—: sin esto el <video>
+   * se queda apuntando al stream viejo y el otro lo ve en negro.
+   */
+  rebind(): void {
+    if (this.el) this.engine.bindTile(this.tileId, this.el);
   }
 }
 
@@ -104,6 +120,9 @@ export class ChimeVideoEngine implements VideoEngine, ChimeVideoEngineLike {
   private localAttendeeId = '';
   private participants = new Map<string, NormalizedParticipant>();
   private tileIdByAttendee = new Map<string, number>();
+  // Último stream enlazado por attendee: permite detectar que Chime cambió el
+  // stream de un tile sin cambiar su tileId (ver handleTileUpdate).
+  private streamByAttendee = new Map<string, MediaStream | null>();
 
   private chosenVideoDeviceId: Device | null = null;
   private localAudioStream: MediaStream | null = null;
@@ -189,6 +208,7 @@ export class ChimeVideoEngine implements VideoEngine, ChimeVideoEngineLike {
         } else {
           this.participants.delete(attendeeId);
           this.tileIdByAttendee.delete(attendeeId);
+          this.streamByAttendee.delete(attendeeId);
           this.participantDisconnected.emit(attendeeId);
         }
       }
@@ -287,6 +307,7 @@ export class ChimeVideoEngine implements VideoEngine, ChimeVideoEngineLike {
     this.observer = null;
     this.participants.clear();
     this.tileIdByAttendee.clear();
+    this.streamByAttendee.clear();
     this.localAudioStream = null;
     this.remoteAudioStream = null;
   }
@@ -354,10 +375,20 @@ export class ChimeVideoEngine implements VideoEngine, ChimeVideoEngineLike {
   async applyVirtualBackground(imageUrl: string): Promise<void> {
     if (!this.session) return;
     await this.disposeVideoTransform();
-    const imageBlob = await (await fetch(imageUrl)).blob();
-    const processor = await BackgroundReplacementVideoFrameProcessor.create(undefined, { imageBlob });
-    if (!processor) throw new Error('El fondo virtual no está soportado en este navegador.');
-    await this.startVideoTransform([processor]);
+    try {
+      const imageBlob = await (await fetch(imageUrl)).blob();
+      const processor = await BackgroundReplacementVideoFrameProcessor.create(undefined, { imageBlob });
+      if (!processor) throw new Error('El fondo virtual no está soportado en este navegador.');
+      await this.startVideoTransform([processor]);
+    } catch (err) {
+      // Si el procesador falla (navegador sin soporte, WASM que no carga, equipo
+      // lento), ya soltamos el device anterior: hay que devolver la cámara SIN
+      // efecto. Quedarse sin video publicado es mucho peor que perder el fondo.
+      if (this.chosenVideoDeviceId) {
+        await this.session.audioVideo.startVideoInput(this.chosenVideoDeviceId).catch(() => undefined);
+      }
+      throw err;
+    }
   }
 
   async removeVideoEffect(): Promise<void> {
@@ -434,11 +465,23 @@ export class ChimeVideoEngine implements VideoEngine, ChimeVideoEngineLike {
     // loop de attach/detach (bind/unbind) que impide que se renderice un frame
     // → video en negro. Solo (re)creamos el ref cuando el tile REALMENTE cambia.
     const existingTileId = this.tileIdByAttendee.get(attendeeId);
+    const nextStream = tileState.boundVideoStream ?? null;
+
     if (existingTileId === tileState.tileId && np.videoTrackRef) {
+      // Mismo tile, pero Chime puede haber cambiado el stream por debajo (el
+      // médico activa el fondo virtual → startVideoInput republica su video).
+      // Ahí hay que re-enlazar el elemento —si no, el otro extremo se queda con
+      // el stream muerto y lo ve en negro—, pero SIN recrear el ref ni emitir:
+      // eso reintroduciría el loop de attach/detach descrito arriba.
+      if (this.streamByAttendee.get(attendeeId) !== nextStream) {
+        this.streamByAttendee.set(attendeeId, nextStream);
+        (np.videoTrackRef as ChimeVideoTileRef).rebind();
+      }
       return;
     }
 
     this.tileIdByAttendee.set(attendeeId, tileState.tileId);
+    this.streamByAttendee.set(attendeeId, nextStream);
     np.videoTrackRef = new ChimeVideoTileRef(this, tileState.tileId);
     np.emitTracksChanged();
   }
@@ -447,6 +490,7 @@ export class ChimeVideoEngine implements VideoEngine, ChimeVideoEngineLike {
     for (const [attendeeId, id] of this.tileIdByAttendee.entries()) {
       if (id === tileId) {
         this.tileIdByAttendee.delete(attendeeId);
+        this.streamByAttendee.delete(attendeeId);
         const np = this.participants.get(attendeeId);
         if (np) {
           np.videoTrackRef = null;
