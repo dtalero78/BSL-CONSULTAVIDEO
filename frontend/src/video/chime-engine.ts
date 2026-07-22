@@ -354,6 +354,11 @@ export class ChimeVideoEngine implements VideoEngine, ChimeVideoEngineLike {
     return this.session ? { provider: 'chime', engine: this } : null;
   }
 
+  /** Stream del tile local (el que Chime ya está publicando). Prestado: no detenerlo. */
+  getLocalVideoStream(): MediaStream | null {
+    return this.streamByAttendee.get(this.localAttendeeId) || null;
+  }
+
   getLocalAudioTracks(): MediaStreamTrack[] {
     return this.localAudioStream ? this.localAudioStream.getAudioTracks() : [];
   }

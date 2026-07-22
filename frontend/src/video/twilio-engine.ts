@@ -159,6 +159,17 @@ export class TwilioVideoEngine implements VideoEngine {
     return this.localVideoTrack ? { provider: 'twilio', track: this.localVideoTrack } : null;
   }
 
+  /** Stream de la cámara local que ya publica Twilio. Prestado: no detenerlo. */
+  getLocalVideoStream(): MediaStream | null {
+    if (!this.room) return null;
+    const tracks: MediaStreamTrack[] = [];
+    this.room.localParticipant.videoTracks.forEach((pub) => {
+      const t = pub.track as LocalVideoTrack | null;
+      if (t?.mediaStreamTrack) tracks.push(t.mediaStreamTrack);
+    });
+    return tracks.length ? new MediaStream(tracks) : null;
+  }
+
   getLocalAudioTracks(): MediaStreamTrack[] {
     if (!this.room) return [];
     const tracks: MediaStreamTrack[] = [];

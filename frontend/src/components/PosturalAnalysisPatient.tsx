@@ -4,11 +4,19 @@ import { createPoseLandmarker, calculateMetrics } from '../utils/mediapipe-loade
 interface PosturalAnalysisPatientProps {
   onPoseData: (data: any) => void;
   isActive: boolean;
+  /**
+   * Cámara que YA está publicando la videollamada. Se reusa en vez de pedir
+   * otra con getUserMedia: en móvil la cámara admite un solo stream a la vez,
+   * así que el segundo fallaba con "No se pudo acceder a la cámara" y el
+   * análisis no conectaba. Si no llega, se cae al getUserMedia de siempre.
+   */
+  sharedStream?: MediaStream | null;
 }
 
 export const PosturalAnalysisPatient: React.FC<PosturalAnalysisPatientProps> = ({
   onPoseData,
   isActive,
+  sharedStream,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -17,6 +25,8 @@ export const PosturalAnalysisPatient: React.FC<PosturalAnalysisPatientProps> = (
   const poseLandmarkerRef = useRef<any>(null);
   const animationFrameRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  // El stream de la videollamada es PRESTADO: detenerlo cortaría la llamada.
+  const streamPrestadoRef = useRef(false);
 
   // Initialize camera and MediaPipe
   useEffect(() => {
@@ -28,22 +38,31 @@ export const PosturalAnalysisPatient: React.FC<PosturalAnalysisPatientProps> = (
       try {
         setStatus('Accediendo a cámara...');
 
-        // Get camera stream
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            width: { ideal: 640 },
-            height: { ideal: 480 },
-            facingMode: 'user',
-          },
-          audio: false,
-        });
+        // Preferir la cámara que YA tiene la videollamada. Pedir una segunda con
+        // getUserMedia fallaba en móvil (la cámara admite un solo stream): al
+        // paciente le salía "No se pudo acceder a la cámara" y no conectaba.
+        let stream = sharedStream || null;
+        const prestado = !!stream;
+
+        if (!stream) {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              width: { ideal: 640 },
+              height: { ideal: 480 },
+              facingMode: 'user',
+            },
+            audio: false,
+          });
+        }
 
         if (!isMounted) {
-          stream.getTracks().forEach((track) => track.stop());
+          // Sólo se detiene si es NUESTRO: parar un stream prestado cortaría la videollamada.
+          if (!prestado) stream.getTracks().forEach((track) => track.stop());
           return;
         }
 
         streamRef.current = stream;
+        streamPrestadoRef.current = prestado;
 
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
@@ -201,10 +220,12 @@ export const PosturalAnalysisPatient: React.FC<PosturalAnalysisPatientProps> = (
       cancelAnimationFrame(animationFrameRef.current);
     }
 
-    // Stop camera stream
-    if (streamRef.current) {
+    // Detener la cámara SÓLO si la abrimos nosotros. Si es la de la
+    // videollamada (prestada), pararla dejaría al médico sin ver al paciente.
+    if (streamRef.current && !streamPrestadoRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
     }
+    streamRef.current = null;
 
     // Close pose landmarker
     if (poseLandmarkerRef.current) {
