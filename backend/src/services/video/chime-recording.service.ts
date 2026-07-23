@@ -21,6 +21,10 @@ import postgresService from '../postgres.service';
 const REGION = process.env.CHIME_MEDIA_REGION || process.env.AWS_REGION || 'us-east-1';
 const BUCKET = process.env.RECORDINGS_BUCKET || '';
 const ENABLED = (process.env.RECORDINGS_ENABLED || 'false').toLowerCase() === 'true' && !!BUCKET;
+// Etiqueta de asignación de costos (ver chime-video.provider). La grabación es
+// el grueso del gasto de Chime, así que etiquetar los pipelines es lo que más
+// pesa para separar BSL de BODYTECH en Billing.
+const APP_TAG = process.env.COST_APP_TAG || 'bsl';
 
 interface ChimeMeetingLike {
   MeetingId?: string;
@@ -88,6 +92,7 @@ class ChimeRecordingService {
               },
             },
           },
+          Tags: [{ Key: 'app', Value: APP_TAG }],
         })
       );
 
@@ -193,6 +198,7 @@ class ChimeRecordingService {
               S3BucketSinkConfiguration: { Destination: `arn:aws:s3:::${BUCKET}/${recordingPrefix}` },
             },
           ],
+          Tags: [{ Key: 'app', Value: APP_TAG }],
         })
       );
 

@@ -34,6 +34,9 @@ locals {
     # Grabación de videollamadas → S3 (Chime Media Pipelines).
     { name = "RECORDINGS_BUCKET", value = aws_s3_bucket.recordings.bucket },
     { name = "RECORDINGS_ENABLED", value = "true" },
+    # Etiqueta de asignación de costos: separa el gasto de Chime BSL vs BODYTECH
+    # (misma cuenta AWS). BODYTECH usa "bodytech".
+    { name = "COST_APP_TAG", value = var.project },
     # Chat de WhatsApp del panel médico (se sirve desde bsl-plataforma).
     # La contraseña va aparte, en SSM (ver secret-keys.txt).
     { name = "BSL_PLATAFORMA_URL", value = var.bsl_plataforma_url },
