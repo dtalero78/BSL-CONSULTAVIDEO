@@ -1,5 +1,6 @@
 import twilio from 'twilio';
 import postgresService from './postgres.service';
+import { formatearParaWhatsApp } from '../helpers/phone.helper';
 
 interface TwilioCreds {
   accountSid: string;
@@ -86,15 +87,11 @@ class WhatsAppService {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
+  // Delega en el helper central (E.164 con `+`, que es el formato que documenta Twilio).
+  // Antes devolvía `whatsapp:57XXXXXXXXXX` sin `+` y le pegaba `57` a cualquier número de
+  // 10 dígitos, así que un internacional pasaba sin indicativo o con el de Colombia.
   private formatPhoneNumber(phone: string): string {
-    let cleanPhone = phone.replace(/[\s\(\)\-\+]/g, '');
-    if (cleanPhone.length === 10 && /^\d{10}$/.test(cleanPhone)) {
-      return `whatsapp:57${cleanPhone}`;
-    }
-    if (cleanPhone.startsWith('57') && cleanPhone.length === 12) {
-      return `whatsapp:${cleanPhone}`;
-    }
-    return `whatsapp:${cleanPhone}`;
+    return formatearParaWhatsApp(phone) || `whatsapp:${phone}`;
   }
 
   /**

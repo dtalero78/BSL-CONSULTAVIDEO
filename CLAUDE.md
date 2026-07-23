@@ -253,6 +253,21 @@ Always use the pattern: `consulta-${timestamp36}-${random5}` (see `generarNombre
 ### WhatsApp message sending
 Use `sendTextMessage(phoneWithoutPlus, message)` from Wix backend module, NOT WhatsApp Web links.
 
+### Normalización de teléfonos (E.164)
+
+**Todo número que salga a Twilio Voice, Twilio WhatsApp o WHAPI pasa por un único helper.** No reimplementes la regla localmente.
+
+- Backend: [backend/src/helpers/phone.helper.ts](backend/src/helpers/phone.helper.ts) → `normalizarTelefonoE164` (con `+`), `normalizarTelefonoSinMas` (WHAPI), `formatearParaWhatsApp` (`whatsapp:+...`).
+- Frontend: [frontend/src/utils/phone.ts](frontend/src/utils/phone.ts) → `toE164`, `toE164SinMas`.
+
+Validación con `libphonenumber-js`, país por defecto Colombia. Precedencia: `+` explícito → `57`+10 dígitos → 10 dígitos nacionales CO → internacional sin `+` → fallback `+57`. Un número de 10 dígitos **siempre** se lee como colombiano (300/350/601 también son indicativos de otros países).
+
+Debe mantenerse en sync con `src/helpers/phone.js` de BSL-PLATAFORMA2.
+
+**Historia (jul-2026)**: había cuatro implementaciones distintas y ninguna manejaba internacionales. Con un paciente peruano (`51965423527`): la llamada salía como `To=51965423527` sin `+` (Twilio 21211), y el WhatsApp se derivaba con `phoneWithPlus.substring(1)` — que al no haber `+` cortaba un dígito real y enviaba el link de la consulta a `+571965423527`, el teléfono de un tercero. El helper del backend además estaba roto para Colombia (`3001234567` matcheaba el indicativo de Grecia, `30`), pero no tenía callers.
+
+**Al normalizar para Twilio WhatsApp usar siempre `whatsapp:+<E164>` con el `+`** — es el formato documentado. El código viejo mandaba `whatsapp:573001234567` sin él.
+
 ### Wix Status Indicators
 When performing async operations in Wix, show user feedback:
 ```javascript

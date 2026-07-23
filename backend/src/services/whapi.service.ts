@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { normalizarTelefonoSinMas } from '../helpers/phone.helper';
 
 /**
  * Servicio para enviar mensajes de WhatsApp usando WHAPI API
@@ -38,7 +39,13 @@ class WhapiService {
       return { success: false, error: 'Token de WHAPI no configurado' };
     }
 
-    const cleanPhone = phone.startsWith('+') ? phone.substring(1) : phone;
+    // WHAPI espera E.164 sin `+` (573001234567). Antes solo se quitaba el `+`, así que
+    // un número local sin indicativo salía tal cual y no llegaba a nadie.
+    const cleanPhone = normalizarTelefonoSinMas(phone);
+    if (!cleanPhone) {
+      console.error(`❌ [WHAPI] Número de destino inválido: ${phone}`);
+      return { success: false, error: 'Número de destino inválido' };
+    }
 
     try {
       console.log(`📱 [WHAPI] Enviando WhatsApp a: ${cleanPhone} (intento ${attempt}/${this.maxRetries})`);

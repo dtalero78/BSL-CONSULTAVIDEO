@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
 import medicalPanelService, { Patient, PatientStats } from '../services/medical-panel.service';
+import { toE164, toE164SinMas } from '../utils/phone';
 import apiService from '../services/api.service';
 import { TenantLogo } from '../components/TenantLogo';
 import { useTenant } from '../hooks/useTenant';
@@ -254,36 +255,9 @@ export function MedicalPanelPage() {
     }
   };
 
-  const formatPhoneNumber = (phone: string): string => {
-    // Limpiar espacios, paréntesis, guiones
-    let cleaned = phone.replace(/[\s\(\)\-]/g, '');
-
-    // Si ya tiene +, retornarlo limpio
-    if (cleaned.startsWith('+')) {
-      return cleaned;
-    }
-
-    // Detectar si ya tiene código de país internacional (11+ dígitos)
-    // Códigos comunes: 1 (USA/Canada), 52 (Mexico), 57 (Colombia), 54 (Argentina), 55 (Brazil), 34 (Spain), 44 (UK), 49 (Germany), 33 (France)
-    const hasCountryCode = /^(1|52|57|54|55|34|44|49|33)\d{10,}/.test(cleaned);
-
-    if (hasCountryCode) {
-      // Ya tiene código de país, solo agregar +
-      return `+${cleaned}`;
-    }
-
-    // Detectar si es número local colombiano (10 dígitos que empiezan con 3)
-    const isColombian = /^3\d{9}$/.test(cleaned);
-
-    if (isColombian) {
-      // Es número local colombiano, agregar +57
-      return `+57${cleaned}`;
-    }
-
-    // Si no coincide con ningún patrón, retornar tal cual (con advertencia en consola)
-    console.warn(`⚠️ Número telefónico con formato desconocido: ${cleaned}`);
-    return cleaned;
-  };
+  // Normalización centralizada en utils/phone.ts (validada con libphonenumber-js).
+  // Siempre devuelve E.164 con `+`, así que `phoneWithoutPlus` nunca corta un dígito real.
+  const formatPhoneNumber = (phone: string): string => toE164(phone) || phone;
 
   const handleContactar = async (patient: Patient) => {
     setContactingPatient(patient._id);
@@ -296,7 +270,7 @@ export function MedicalPanelPage() {
       const phoneWithPlus = formatPhoneNumber(patient.celular);
 
       // Formatear teléfono (sin + para WhatsApp API)
-      const phoneWithoutPlus = phoneWithPlus.substring(1);
+      const phoneWithoutPlus = toE164SinMas(phoneWithPlus) || phoneWithPlus.replace(/^\+/, '');
 
       // Construir roomNameWithParams para el template (path completo con query params)
       // Ejemplo: "consulta-abc123?nombre=Juan&apellido=Perez&documento=123&doctor=JUAN"
@@ -374,7 +348,7 @@ export function MedicalPanelPage() {
 
       // 2. Formatear teléfono
       const phoneWithPlus = formatPhoneNumber(celular);
-      const phoneWithoutPlus = phoneWithPlus.substring(1);
+      const phoneWithoutPlus = toE164SinMas(phoneWithPlus) || phoneWithPlus.replace(/^\+/, '');
 
       // 3. Link del paciente (mismos params que el flujo con órdenes + flag suelta)
       const patientParams = new URLSearchParams({

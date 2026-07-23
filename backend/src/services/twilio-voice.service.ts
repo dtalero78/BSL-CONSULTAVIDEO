@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { normalizarTelefonoE164 } from '../helpers/phone.helper';
 
 interface VoiceCallResponse {
   success: boolean;
@@ -31,7 +32,7 @@ class TwilioVoiceService {
 
   /**
    * Realiza una llamada de voz usando Twilio
-   * @param toNumber - Número de teléfono con prefijo +57XXXXXXXXXX
+   * @param toNumber - Número en cualquier formato; se normaliza a E.164 internamente
    * @param nombrePaciente - Nombre del paciente para personalizar el mensaje
    * @returns Resultado de la llamada
    */
@@ -43,8 +44,19 @@ class TwilioVoiceService {
       };
     }
 
+    // El campo `To` de Twilio exige E.164 con `+`. Normalizamos acá (y no solo en el
+    // frontend) porque este es el último punto antes de la API: si el caller manda
+    // un internacional sin `+` (ej: 51965423527), Twilio responde 21211.
+    const destino = normalizarTelefonoE164(toNumber);
+    if (!destino) {
+      return {
+        success: false,
+        error: `Número de destino inválido: ${toNumber}`
+      };
+    }
+
     try {
-      console.log(`📞 Iniciando llamada a: ${toNumber}`);
+      console.log(`📞 Iniciando llamada a: ${destino}${destino !== toNumber ? ` (recibido: ${toNumber})` : ''}`);
       console.log(`📞 Desde número: ${this.twilioPhoneNumber}`);
       console.log(`📞 Using Account SID: ${this.accountSid.substring(0, 8)}...${this.accountSid.substring(this.accountSid.length - 4)}`);
       console.log(`📞 Using Auth Token: ***${this.authToken.substring(this.authToken.length - 4)}`);
@@ -62,7 +74,7 @@ class TwilioVoiceService {
 
       // Parámetros de la llamada
       const params = new URLSearchParams();
-      params.append('To', toNumber);
+      params.append('To', destino);
       params.append('From', this.twilioPhoneNumber);
       params.append('Url', webhookUrl);
 
@@ -73,7 +85,7 @@ class TwilioVoiceService {
         }
       });
 
-      console.log(`✅ Llamada iniciada exitosamente al número: ${toNumber}`);
+      console.log(`✅ Llamada iniciada exitosamente al número: ${destino}`);
       console.log(`📞 Call SID: ${response.data.sid}`);
       console.log(`📞 Status: ${response.data.status}`);
 
@@ -82,7 +94,7 @@ class TwilioVoiceService {
         data: response.data
       };
     } catch (error: any) {
-      console.error(`❌ Error al realizar la llamada al número ${toNumber}:`, error.message);
+      console.error(`❌ Error al realizar la llamada al número ${destino}:`, error.message);
 
       if (error.response) {
         console.error(`📊 Respuesta de Twilio (status ${error.response.status}):`, error.response.data);

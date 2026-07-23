@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
+import { toE164 } from '../utils/phone';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
@@ -145,29 +146,9 @@ class MedicalPanelService {
    * Formatea número telefónico con prefijo internacional
    */
   formatPhoneNumber(phone: string): string {
-    // Eliminar espacios y caracteres especiales
-    let cleaned = phone.replace(/[\s\(\)\+\-]/g, '');
-
-    // Si ya tiene código de país, retornar con +
-    if (cleaned.startsWith('57') && cleaned.length >= 10) {
-      return '+' + cleaned;
-    }
-
-    // Si es número colombiano de 10 dígitos, agregar +57
-    if (cleaned.length === 10 && cleaned.startsWith('3')) {
-      return '+57' + cleaned;
-    }
-
-    // Otros códigos de país
-    const countryCodes = ['1', '52', '54', '55', '34', '44', '49', '33'];
-    for (const code of countryCodes) {
-      if (cleaned.startsWith(code)) {
-        return '+' + cleaned;
-      }
-    }
-
-    // Por defecto, asumir Colombia
-    return '+57' + cleaned;
+    // Normalización centralizada en utils/phone.ts (validada con libphonenumber-js).
+    // La whitelist de 8 indicativos que había acá mandaba un peruano a +5751965423527.
+    return toE164(phone) || phone;
   }
 
   /**
