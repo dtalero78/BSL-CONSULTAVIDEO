@@ -238,6 +238,15 @@ export class ChimeVideoEngine implements VideoEngine, ChimeVideoEngineLike {
     const chosenAudioDeviceId = audioInputs.find((d) => d.deviceId)?.deviceId ?? null;
     if (chosenAudioDeviceId) {
       this.localAudioStream = (await session.audioVideo.startAudioInput(chosenAudioDeviceId)) || null;
+      // El badge "🔇 Silenciado" del participante se muestra cuando audioTrackRef
+      // es null. En Chime el audio es de reunión (no hay track por participante),
+      // así que el LOCAL nunca tendría audioTrackRef → salía "Silenciado" SIEMPRE,
+      // aunque el micrófono funcionara. Le damos un ref no-op mientras tenga mic y
+      // no esté muteado; el attach del audio está guardado por !isLocal, así que
+      // esto solo alimenta el indicador. toggleAudio lo actualiza en vivo.
+      if (this.localAudioStream) {
+        localParticipant.audioTrackRef = sharedAudioRef;
+      }
     }
 
     if (hasVideoPermission) {
@@ -320,6 +329,12 @@ export class ChimeVideoEngine implements VideoEngine, ChimeVideoEngineLike {
       } else {
         this.session.audioVideo.realtimeUnmuteLocalAudio();
         this.audioEnabled = true;
+      }
+      // Reflejar el mute local en el indicador "🔇 Silenciado" del tile propio.
+      const local = this.participants.get(this.localAttendeeId);
+      if (local) {
+        local.audioTrackRef = this.audioEnabled ? sharedAudioRef : null;
+        local.emitTracksChanged();
       }
     }
     return this.audioEnabled;
