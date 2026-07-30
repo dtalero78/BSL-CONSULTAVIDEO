@@ -108,7 +108,10 @@ export const PosturalAnalysisPatient: React.FC<PosturalAnalysisPatientProps> = (
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
+    // willReadFrequently: el análisis lee píxeles (getImageData) en CADA frame;
+    // sin esta bandera el navegador mantiene el canvas en GPU y cada readback es
+    // lentísimo (lo advertía en consola), cargando el hilo principal.
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
     if (!ctx) return;
 
@@ -117,7 +120,13 @@ export const PosturalAnalysisPatient: React.FC<PosturalAnalysisPatientProps> = (
     canvas.height = video.videoHeight || 480;
 
     let lastProcessTime = 0;
-    const processingInterval = 1000 / 15; // 15 FPS
+    // 6 FPS en vez de 15: la detección de pose (TFLite por frame + getImageData)
+    // saturaba el hilo principal del CELULAR del paciente. Con el hilo ahogado,
+    // Chime estrangula el envío (se vio subida a 83 Kbps en la telemetría,
+    // "conexión pobre") y el audio del paciente se corta → el médico "deja de
+    // escuchar" / el paciente deja de oír al médico. Para evaluar postura, que
+    // es casi estática, 6 fps sobra y baja la carga a menos de la mitad.
+    const processingInterval = 1000 / 6;
 
     const detectPose = () => {
       const now = performance.now();

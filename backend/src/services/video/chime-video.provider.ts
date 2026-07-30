@@ -21,7 +21,6 @@ import {
   JoinInfo,
   RoomInfo,
   ParticipantInfo,
-  RoomCompletedError,
 } from './types';
 import { chimeRecordingService } from './chime-recording.service';
 import postgresService from '../postgres.service';
@@ -179,18 +178,17 @@ export class ChimeVideoProvider implements IVideoProvider {
     roomName,
     role,
   }: { identity: string; roomName: string; role?: 'doctor' | 'patient' }): Promise<JoinInfo> {
-    // El médico SIEMPRE puede reingresar, y al hacerlo REABRE la sala (borra la
-    // marca de finalizada) para que su paciente también pueda volver a entrar.
-    // Antes, cualquier desconexión del médico —recargar la página, una caída de
-    // red, cerrar la pestaña por error— marcaba la sala como finalizada y la
-    // dejaba inutilizable durante ENDED_TTL_MS (6h): al volver recibía
-    // "Esta videollamada ya finalizó y no se puede volver a ingresar".
-    if (role === 'doctor') {
-      if (this.ended.delete(roomName)) {
-        console.log(`[Chime] Sala ${roomName} reabierta por el médico (${identity})`);
-      }
-    } else if (this.isEnded(roomName)) {
-      throw new RoomCompletedError();
+    // CUALQUIERA que entre REABRE la sala; no se bloquea el reingreso.
+    //
+    // Bloquearlo (RoomCompletedError → "esta videollamada ya finalizó") causó un
+    // incidente masivo: el médico abre la sala y a los pocos segundos sale
+    // (recarga, cierra la pestaña, o el propio handleLeave al desmontar la
+    // página), lo que llama al endpoint de "colgar" y marcaba la sala como
+    // finalizada. El paciente —que SÍ tiene su link de WhatsApp— quedaba fuera.
+    // Dejar afuera a un paciente legítimo es mucho peor que permitir reentrar a
+    // una sala que de verdad terminó (que a lo sumo es una sala vacía esperando).
+    if (this.ended.delete(roomName)) {
+      console.log(`[Chime] Sala ${roomName} reabierta al reingresar (${identity}, ${role || 'sin rol'})`);
     }
 
     const meeting = await this.ensureMeeting(roomName);
