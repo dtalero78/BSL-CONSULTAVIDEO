@@ -199,6 +199,10 @@ export const MedicalHistoryPanel = ({ historiaId, sueltaBase, onAppendToObservac
     return `${m}:${s}`;
   };
 
+  // SIIGO no usa las sugerencias generadas por IA: se oculta el botón "Generar con IA"
+  // (el textarea sigue disponible para escribirlas a mano).
+  const esSiigo = (data?.codEmpresa || '').trim().toUpperCase() === 'SIIGO';
+
   // Resaltado de los campos que la IA acaba de rellenar.
   const aiRing = (field: string): string =>
     aiFilledFields.has(field) ? ' !border-[#00a884] ring-2 ring-[#00a884]/40' : '';
@@ -1153,35 +1157,41 @@ export const MedicalHistoryPanel = ({ historiaId, sueltaBase, onAppendToObservac
         <div className="border-2 border-blue-500/30 rounded-lg p-3 bg-blue-900/10">
           <div className="flex items-center justify-between mb-2">
             <label className="block text-xs text-blue-400 font-semibold">Sugerencias IA</label>
-            <button
-              onClick={handleGenerateAISuggestions}
-              disabled={isGeneratingAI}
-              className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition disabled:bg-gray-600 disabled:cursor-not-allowed flex items-center gap-1"
-            >
-              {isGeneratingAI ? (
-                <>
-                  <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Generando...
-                </>
-              ) : (
-                <>
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                  Generar con IA
-                </>
-              )}
-            </button>
+            {!esSiigo && (
+              <button
+                onClick={handleGenerateAISuggestions}
+                disabled={isGeneratingAI}
+                className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition disabled:bg-gray-600 disabled:cursor-not-allowed flex items-center gap-1"
+              >
+                {isGeneratingAI ? (
+                  <>
+                    <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Generando...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    Generar con IA
+                  </>
+                )}
+              </button>
+            )}
           </div>
           <textarea
             value={aiSuggestions}
             onChange={(e) => setAiSuggestions(e.target.value)}
             className="w-full bg-[#1f2c34] text-white text-sm px-2 py-2 rounded border border-blue-500/30 focus:border-blue-400 focus:outline-none"
             rows={5}
-            placeholder="Haz clic en 'Generar con IA' para obtener recomendaciones médicas personalizadas basadas en los datos del paciente..."
+            placeholder={
+              esSiigo
+                ? 'Escribe aquí las recomendaciones médicas personalizadas para el paciente...'
+                : "Haz clic en 'Generar con IA' para obtener recomendaciones médicas personalizadas basadas en los datos del paciente..."
+            }
           />
           <p className="text-xs text-blue-400/70 mt-1">
             Estas sugerencias se concatenarán automáticamente con las recomendaciones médicas adicionales al guardar
