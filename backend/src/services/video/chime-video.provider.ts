@@ -11,7 +11,6 @@ import {
   CreateMeetingCommand,
   CreateAttendeeCommand,
   GetMeetingCommand,
-  DeleteMeetingCommand,
   ListAttendeesCommand,
   DeleteAttendeeCommand,
   Meeting,
@@ -227,44 +226,33 @@ export class ChimeVideoProvider implements IVideoProvider {
   }
 
   /**
-   * `completed: false` limpia el meeting y cierra la grabación PERO no marca la
-   * sala como finalizada, así que se puede volver a entrar con el mismo link.
-   * Es lo que corresponde cuando el médico simplemente se desconecta (recarga,
-   * se le cae la red, cierra sin querer): dar por terminada la consulta ahí
-   * dejaba al paciente fuera de su propia cita —con el link ya enviado— y
-   * obligaba a generar una sala nueva. Sólo colgar a propósito la finaliza.
+   * Cierra la GRABACIÓN de la sala, pero NO borra el meeting de Chime ni el
+   * registro en BD.
+   *
+   * Antes se borraba el meeting (DeleteMeeting) y se olvidaba el registro en
+   * cada desconexión/recarga del médico. Eso PARTÍA la sala: el siguiente en
+   * entrar —o el propio médico al volver— ya no encontraba el meeting y creaba
+   * uno NUEVO, mientras el otro seguía en el viejo → "los dos en sala pero no se
+   * ven" (se vieron 2 meetings para la misma sala en los logs). Borrar el
+   * meeting anulaba justo la persistencia que evita el split.
+   *
+   * Ahora NO se toca el meeting: Chime termina solo las reuniones que quedan sin
+   * asistentes, y si eso ocurre `ensureMeeting` recrea y actualiza la BD, así
+   * ambos convergen por el registro persistido. Aquí sólo se cierra la grabación
+   * (con su claim atómico, una sola concatenación aunque se llame varias veces).
    */
-  async endRoom(roomName: string, opts?: { completed?: boolean }): Promise<{ id: string; status: string }> {
-    const markCompleted = opts?.completed !== false;
-
-    // Resolver el meetingId AUNQUE el mapa en memoria se haya perdido en un
-    // reinicio de la tarea (despliegue/crash a mitad de consulta). Si sólo
-    // miráramos `this.meetings`, tras un reinicio `endRoom` no encontraba el
-    // meeting y se saltaba la concatenación → la grabación quedaba atascada en
-    // 'capturing' para siempre y nunca se generaba el MP4. Se recupera desde la
-    // tabla de meetings persistida y, en último caso, desde la grabación viva.
+  async endRoom(roomName: string, _opts?: { completed?: boolean }): Promise<{ id: string; status: string }> {
     let meetingId = this.meetings.get(roomName)?.MeetingId || null;
     if (!meetingId) meetingId = await this.recallMeetingId(roomName);
     if (!meetingId) meetingId = await chimeRecordingService.getCapturingMeetingId(roomName);
 
-    // Idempotente: se limpia el estado ANTES de los await, para que una segunda
-    // llamada (el cliente reporta colgar + beforeunload) no repita el trabajo.
-    // La concatenación además tiene su propio claim atómico en BD.
-    this.meetings.delete(roomName);
-    await this.forgetMeetingId(roomName);
-
     if (meetingId) {
-      // Grabación: detener la captura y arrancar la concatenación → MP4 en S3.
+      // Detener la captura y arrancar la concatenación → MP4 en S3. NO se borra
+      // el meeting: dejarlo vivo es lo que evita que la sala se parta en dos.
       await chimeRecordingService.stopAndConcatenate(meetingId);
-      try {
-        await this.client.send(new DeleteMeetingCommand({ MeetingId: meetingId }));
-      } catch (err: any) {
-        console.warn(`[Chime] endRoom: no se pudo borrar el meeting ${meetingId}: ${err?.message}`);
-      }
     }
 
-    if (markCompleted) this.ended.set(roomName, Date.now());
-    return { id: meetingId || roomName, status: markCompleted ? 'completed' : 'disconnected' };
+    return { id: meetingId || roomName, status: 'disconnected' };
   }
 
   async listParticipants(roomName: string): Promise<ParticipantInfo[]> {
