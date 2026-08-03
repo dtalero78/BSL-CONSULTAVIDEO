@@ -78,14 +78,11 @@ class SessionTrackerService {
 
     console.log(`[SessionTracker] Current participants in ${roomName}: ${session.participants.size}`);
 
-    // Grabación (Chime): arrancar la captura SOLO cuando ambos ya están
-    // conectados. Si el Media Capture Pipeline se une mientras los clientes
-    // establecen su video, satura la señalización y el video no se renderiza.
-    // Idempotente (el servicio verifica que no exista ya una captura).
-    if (session.participants.size >= 2) {
-      videoProvider.startRecording(roomName)
-        .catch((err: any) => console.error(`[SessionTracker] Error arrancando grabación: ${err.message}`));
-    }
+    // Grabación (Chime): arranca SÓLO si la sala es grabable (ver
+    // setupRecordingIfNeeded: RECOMENDACIONES/POST-INCAPACIDAD + SIIGO) y ambos
+    // ya están conectados. Se llama también desde setupRecordingIfNeeded para
+    // cubrir el orden en que el paciente entra antes que el médico.
+    this.maybeStartRecording(session);
 
     // Emitir evento Socket.io cuando un paciente se conecta - SOLO a la Room del médico específico
     if (role === 'patient' && this.io && documento && session.medicoCode) {
@@ -123,25 +120,29 @@ class SessionTrackerService {
       session.codEmpresa = patient.codEmpresa;
       session.patientDocumento = patient.numeroId;
 
-      // Grabar SOLO consultas cuyo tipoExamen sea RECOMENDACIONES o POST-INCAPACIDAD.
-      // Match normalizado (ignora mayúsculas, espacios y guiones) para tolerar las
-      // variantes que existen en la BD: "POST-INCAPACIDAD" / "PostIncapacidad" /
-      // "Post Incapacidad", "RECOMENDACIONES" / "Recomendaciones".
+      // GRABAR sólo si: tipoExamen ∈ {RECOMENDACIONES, POST-INCAPACIDAD} Y la
+      // empresa es SIIGO (codEmpresa === 'SIIGO'). El resto NO se graba.
+      //
+      // Ojo: antes esta decisión llamaba a videoProvider.enableRecording(), que
+      // en Chime es un no-op (devuelve false), y la grabación REAL la disparaba
+      // startRecording() al haber 2 participantes SIN mirar este filtro → se
+      // grababa TODO. Ahora la decisión se guarda en session.recordingEnabled y
+      // maybeStartRecording() la respeta (ver trackParticipantConnected).
+      //
+      // Match de tipo normalizado (ignora mayúsculas, espacios y guiones) para
+      // tolerar variantes: "POST-INCAPACIDAD" / "Post Incapacidad", etc.
       const tipoNorm = String(patient.tipoExamen || '').toLowerCase().replace(/[\s\-_]/g, '');
-      const debeGrabar = tipoNorm === 'recomendaciones' || tipoNorm === 'postincapacidad';
-      if (debeGrabar) {
-        try {
-          const enabled = await videoProvider.enableRecording(session.roomName);
-          session.recordingEnabled = enabled;
-          if (enabled) {
-            console.log(`[SessionTracker] Recording enabled (${patient.tipoExamen}) in room ${session.roomName}`);
-          } else {
-            console.log(`[SessionTracker] Recording solicitado pero no soportado por el provider "${videoProvider.name}" en ${session.roomName}`);
-          }
-        } catch (err: any) {
-          console.error(`[SessionTracker] Error enabling recording: ${err.message}`);
-        }
-      }
+      const esTipoGrabable = tipoNorm === 'recomendaciones' || tipoNorm === 'postincapacidad';
+      const esSiigo = String(patient.codEmpresa || '').trim().toUpperCase() === 'SIIGO';
+      session.recordingEnabled = esTipoGrabable && esSiigo;
+      console.log(
+        `[SessionTracker] Grabación ${session.recordingEnabled ? 'ON' : 'OFF'} en ${session.roomName} — ` +
+          `tipo="${patient.tipoExamen}" empresa="${patient.codEmpresa}"`
+      );
+
+      // El paciente pudo conectarse ANTES que el médico; en ese caso ya hay 2
+      // participantes y hay que arrancar la grabación ahora que ya se decidió.
+      this.maybeStartRecording(session);
 
       // Guardar en video_sessions (room_sid = SID de Twilio o MeetingId de Chime)
       const roomInfo = await videoProvider.getRoom(session.roomName).catch(() => null);
@@ -163,6 +164,22 @@ class SessionTrackerService {
     } catch (error: any) {
       console.error(`[SessionTracker] Error in setupRecordingIfNeeded: ${error.message}`);
     }
+  }
+
+  /**
+   * Arranca la captura SÓLO si la sala quedó marcada como grabable
+   * (setupRecordingIfNeeded) y ya hay 2 participantes. Idempotente: el servicio
+   * de grabación verifica en BD que no exista ya una captura para el meeting, así
+   * que puede llamarse varias veces (desde ambos órdenes de conexión) sin repetir.
+   * Arrancar la captura antes de que ambos tengan el video establecido satura la
+   * señalización, por eso se exige size >= 2.
+   */
+  private maybeStartRecording(session: VideoSession): void {
+    if (!session.recordingEnabled) return;
+    if (session.participants.size < 2) return;
+    videoProvider.startRecording(session.roomName).catch((err: any) =>
+      console.error(`[SessionTracker] Error arrancando grabación: ${err.message}`)
+    );
   }
 
   /**
