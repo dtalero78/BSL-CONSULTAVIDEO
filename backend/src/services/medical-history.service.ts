@@ -2,6 +2,7 @@ import historiaClinicaPostgresService from './historia-clinica-postgres.service'
 import postgresService from './postgres.service';
 import whatsappService from './whatsapp.service';
 import whapiService from './whapi.service';
+import { conceptoRequiereRevisionSst } from '../helpers/concepto-aptitud.helper';
 
 interface AntecedentesPersonales {
   cirugiaOcular?: boolean;
@@ -611,19 +612,23 @@ class MedicalHistoryService {
   }
 
   /**
-   * Envía alerta WhatsApp cuando un paciente OMEGA tiene concepto NO APTO, APLAZADO o APTO CON RECOMENDACIONES
+   * Envía alerta WhatsApp cuando un paciente OMEGA tiene un concepto que requiere revisión de SST.
+   *
+   * "Requiere revisión" = todo lo que NO sea apto pleno (restricciones, con recomendaciones,
+   * no apto/no elegible, incompatibles, pendiente/aplazado), excepto el egreso "no presenta
+   * deterioro". Antes se comparaba contra 3 strings exactos ('NO APTO', 'APLAZADO',
+   * 'APTO CON RECOMENDACIONES') que el dropdown del panel médico ya no emite (usa las redacciones
+   * largas "médico-laborales"), así que la alerta había dejado de dispararse. Ver
+   * helpers/concepto-aptitud.helper.ts (en sync con panel-empresas.html de BSL-PLATAFORMA2).
    */
   private async sendOmegaAlertIfNeeded(
     historiaBase: MedicalHistoryData,
     payload: UpdateMedicalHistoryPayload
   ): Promise<void> {
     try {
-      const conceptosAlerta = ['NO APTO', 'APLAZADO', 'APTO CON RECOMENDACIONES'];
-
       if (
         historiaBase.codEmpresa?.toUpperCase() !== 'OMEGA' ||
-        !payload.mdConceptoFinal ||
-        !conceptosAlerta.includes(payload.mdConceptoFinal.toUpperCase())
+        !conceptoRequiereRevisionSst(payload.mdConceptoFinal)
       ) {
         return;
       }
