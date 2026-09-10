@@ -105,6 +105,7 @@ SELECT COUNT(*) FROM "HistoriaClinica";
 | Archivo | Descripción | Estado |
 |---------|-------------|--------|
 | `001_create_historia_clinica.sql` | Crea tabla HistoriaClinica con 46 campos | ⏳ Pendiente |
+| `003_create_integration_consultas.sql` | Crea tabla integration_consultas (integración Maluwa360: idempotencia, consentimiento y outbox del webhook). Aplicar ANTES de configurar `MALUWA360_API_KEY`. Idempotente. | ⏳ Pendiente |
 
 ## Notas Importantes
 

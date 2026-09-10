@@ -12,7 +12,7 @@
  */
 
 /** Normaliza: sin tildes, MAYÚSCULAS, espacios/saltos colapsados, sin punto(s) final(es). */
-function normalizarConcepto(concepto: string): string {
+export function normalizarConcepto(concepto: string): string {
   return concepto
     .normalize('NFD').replace(/[̀-ͯ]/g, '') // sin tildes
     .toUpperCase()

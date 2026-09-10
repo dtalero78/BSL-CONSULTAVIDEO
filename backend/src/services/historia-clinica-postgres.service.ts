@@ -1,4 +1,23 @@
+import { PoolClient } from 'pg';
 import postgresService from './postgres.service';
+
+/** Datos para crear una historia clínica PENDIENTE (orden agendada, aún sin atender). */
+export interface HistoriaPendienteData {
+  _id: string;
+  numeroId: string;
+  primerNombre: string;
+  segundoNombre?: string | null;
+  primerApellido: string;
+  segundoApellido?: string | null;
+  celular: string;
+  fechaNacimiento: string; // AAAA-MM-DD
+  codEmpresa: string;
+  empresa?: string | null;
+  tipoExamen: string;
+  medico: string;
+  motivoConsulta?: string | null;
+  tenantId: string;
+}
 
 interface HistoriaClinicaData {
   _id: string;
@@ -157,6 +176,60 @@ class HistoriaClinicaPostgresService {
       console.error(`❌ [PostgreSQL] Error guardando historia clínica ${data._id}:`, error);
       return false;
     }
+  }
+
+  /**
+   * Crea una historia clínica PENDIENTE para que aparezca en el panel del médico
+   * asignado (getPendingPatients: medico + fechaAtencion de hoy + fechaConsulta NULL + tenant_id).
+   *
+   * Diferencias con upsert() (que es el guardado de la consulta atendida):
+   *   - fechaConsulta queda NULL: upsert() la fuerza a NOW() al insertar, lo que la
+   *     contaría como atendida y la ocultaría de la lista de pendientes.
+   *   - Escribe tenant_id y fechaNacimiento (upsert() no los escribe).
+   *   - Nunca sobrescribe (ON CONFLICT DO NOTHING).
+   *   - Acepta un PoolClient para correr dentro de una transacción; en ese caso los
+   *     errores se propagan (el caller hace ROLLBACK).
+   *
+   * Devuelve true si insertó la fila.
+   */
+  async crearPendiente(data: HistoriaPendienteData, client?: PoolClient): Promise<boolean> {
+    const query = `
+      INSERT INTO "HistoriaClinica" (
+        "_id", "numeroId", "primerNombre", "segundoNombre", "primerApellido", "segundoApellido",
+        "celular", "fechaNacimiento", "codEmpresa", "empresa", "tipoExamen", "medico",
+        "motivoConsulta", "atendido", "fechaAtencion", "fechaConsulta", "tenant_id"
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6,
+        $7, $8, $9, $10, $11, $12,
+        $13, 'PENDIENTE', NOW(), NULL, $14
+      )
+      ON CONFLICT ("_id") DO NOTHING
+      RETURNING "_id";
+    `;
+    const params = [
+      data._id,
+      data.numeroId,
+      data.primerNombre,
+      data.segundoNombre || null,
+      data.primerApellido,
+      data.segundoApellido || null,
+      data.celular,
+      data.fechaNacimiento,
+      data.codEmpresa,
+      data.empresa || null,
+      data.tipoExamen,
+      data.medico,
+      data.motivoConsulta || null,
+      data.tenantId,
+    ];
+
+    if (client) {
+      const result = await client.query(query, params);
+      return result.rows.length > 0;
+    }
+
+    const rows = await postgresService.query(query, params);
+    return !!rows && rows.length > 0;
   }
 
   /**

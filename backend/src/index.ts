@@ -13,6 +13,8 @@ import twilioVoiceRoutes from './routes/twilio-voice.routes';
 import tenantRoutes from './routes/tenant.routes';
 import webhookRoutes from './routes/webhook.routes';
 import whatsappChatRoutes from './routes/whatsapp-chat.routes';
+import integrationRoutes from './routes/integration.routes';
+import integrationWebhookService from './services/integration-webhook.service';
 import { telemedicineSocketService } from './services/telemedicine-socket.service';
 import { sessionTracker } from './services/session-tracker.service';
 
@@ -115,6 +117,8 @@ app.use('/api/tenant', tenantRoutes);
 app.use('/api/webhook', webhookRoutes);
 // Chat de WhatsApp del panel médico (proxy a bsl-plataforma, tenant 'bsl').
 app.use('/api/whatsapp-chat', whatsappChatRoutes);
+// Integraciones B2B (Maluwa360): exigen X-Integration-Key (falla cerrado).
+app.use('/api/integration', integrationRoutes);
 
 // Servir archivos estaticos del frontend (despues de las rutas API)
 const frontendPath = path.join(__dirname, '..', 'frontend-dist');
@@ -161,5 +165,9 @@ httpServer.listen(PORT, () => {
 ╚═══════════════════════════════════════════════════════════╝
   `);
 });
+
+// Worker de reintentos del webhook de resultado hacia Maluwa360
+// (no-op si MALUWA360_WEBHOOK_URL / MALUWA360_WEBHOOK_SECRET no están configuradas).
+integrationWebhookService.startWorker();
 
 export default app;

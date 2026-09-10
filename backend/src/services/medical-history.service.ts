@@ -3,6 +3,9 @@ import postgresService from './postgres.service';
 import whatsappService from './whatsapp.service';
 import whapiService from './whapi.service';
 import { conceptoRequiereRevisionSst } from '../helpers/concepto-aptitud.helper';
+import { buildCertificadoUrl } from '../helpers/certificado.helper';
+import { MALUWA360_SOURCE } from '../helpers/integracion-maluwa.helper';
+import integrationWebhookService from './integration-webhook.service';
 
 interface AntecedentesPersonales {
   cirugiaOcular?: boolean;
@@ -516,6 +519,10 @@ class MedicalHistoryService {
 
       console.log(`✅ [PostgreSQL] Historia clínica guardada exitosamente para ${payload.historiaId}`);
 
+      // PASO 1.2: Integraciones externas (Maluwa360) → encolar el webhook de resultado.
+      // Fire-and-forget: un fallo aquí NUNCA rompe ni demora el guardado.
+      this.encolarWebhookIntegracion(historiaBase, payload);
+
       // PASO 1.5: Enviar link de certificado por WhatsApp para empresas específicas (PARTICULAR o SANITHELP-JJ)
       if (historiaBase.codEmpresa === 'PARTICULAR' || historiaBase.codEmpresa === 'SANITHELP-JJ') {
         console.log(`📜 [Certificado] Enviando link de certificado para ${payload.historiaId} (${historiaBase.codEmpresa})...`);
@@ -531,7 +538,7 @@ class MedicalHistoryService {
         );
 
         // Construir URL del certificado
-        const certificadoUrl = `https://bsl-utilidades-yp78a.ondigitalocean.app/generar-certificado-desde-wix/${payload.historiaId}`;
+        const certificadoUrl = buildCertificadoUrl(payload.historiaId);
 
         // Formatear número de celular para WhatsApp
         let celularFormateado = historiaBase.celular
@@ -608,6 +615,30 @@ class MedicalHistoryService {
         success: false,
         error: error.message || 'Error al actualizar historia clínica'
       };
+    }
+  }
+
+  /**
+   * Si la historia fue creada por una integración (codEmpresa MALUWA360), encola el
+   * webhook de resultado. Sin await y con try/catch + .catch: ni un error síncrono,
+   * ni una promesa rechazada, ni una lenta afectan al guardado de la historia.
+   */
+  private encolarWebhookIntegracion(
+    historiaBase: MedicalHistoryData,
+    payload: UpdateMedicalHistoryPayload
+  ): void {
+    try {
+      if (historiaBase.codEmpresa !== MALUWA360_SOURCE) return;
+      integrationWebhookService
+        .enqueueResultado(payload.historiaId, payload.mdConceptoFinal)
+        .then((r) => {
+          if (!r.enqueued) console.warn(`⚠️  [Integración] Webhook no encolado para ${payload.historiaId}: ${r.reason}`);
+        })
+        .catch((error: any) => {
+          console.error(`❌ [Integración] Error encolando webhook para ${payload.historiaId}:`, error?.message || error);
+        });
+    } catch (error: any) {
+      console.error(`❌ [Integración] Error encolando webhook para ${payload.historiaId}:`, error?.message || error);
     }
   }
 
