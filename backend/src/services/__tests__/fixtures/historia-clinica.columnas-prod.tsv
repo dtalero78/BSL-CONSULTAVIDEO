@@ -1,0 +1,220 @@
+# Columnas de "HistoriaClinica" en PRODUCCION (information_schema, 2026-09-10; 218 columnas). La tabla la define BSL-PLATAFORMA2; migrations/001 esta desactualizada. Actualizar si cambia el esquema.
+column_name	data_type	is_nullable	column_default
+_id	character varying	NO	
+_createdDate	timestamp with time zone	YES	now()
+_updatedDate	timestamp with time zone	YES	now()
+numeroId	character varying	NO	
+primerNombre	character varying	NO	
+segundoNombre	character varying	YES	
+primerApellido	character varying	NO	
+segundoApellido	character varying	YES	
+celular	character varying	NO	
+email	character varying	YES	
+codEmpresa	character varying	YES	
+empresa	character varying	YES	
+cargo	character varying	YES	
+tipoExamen	character varying	YES	
+mdAntecedentes	text	YES	
+mdObsParaMiDocYa	text	YES	
+mdObservacionesCertificado	text	YES	
+mdRecomendacionesMedicasAdicionales	text	YES	
+mdConceptoFinal	text	YES	
+mdDx1	text	YES	
+mdDx2	text	YES	
+talla	character varying	YES	
+peso	character varying	YES	
+motivoConsulta	text	YES	
+diagnostico	text	YES	
+tratamiento	text	YES	
+fechaAtencion	timestamp with time zone	YES	
+fechaConsulta	timestamp with time zone	YES	
+atendido	character varying	YES	
+pvEstado	character varying	YES	
+medico	character varying	YES	
+ciudad	character varying	YES	
+examenes	text	YES	
+horaAtencion	character varying	YES	
+recordatorioLinkEnviado	boolean	YES	false
+resumenLlamada	text	YES	
+pagado	boolean	YES	false
+fecha_pago	timestamp without time zone	YES	
+recordatorioPagoEnviado	boolean	YES	false
+origen	character varying	YES	'POSTGRES'::character varying
+subempresa	character varying	YES	
+centro_de_costo	character varying	YES	
+aprobacion	character varying	YES	
+linkEnviado	character varying	YES	
+eps	character varying	YES	
+observaciones_siigo	text	YES	
+foto_url	text	YES	
+aprobacion_externa	character varying	YES	
+fecha_aprobacion_externa	timestamp without time zone	YES	
+concepto_aprobado	character varying	YES	
+datosNutricionales	jsonb	YES	
+correo	character varying	YES	
+recordatorio1hEnviado	boolean	YES	false
+tenant_id	character varying	NO	'bsl'::character varying
+datos_pago	jsonb	YES	
+creado_por	integer	YES	
+genero_biologico	character varying	YES	
+identidad_genero	character varying	YES	
+grupo_sanguineo	character varying	YES	
+fecha_nacimiento	date	YES	
+comunidad_etnica	character varying	YES	
+pertenencia_etnica	character varying	YES	
+estado_civil	character varying	YES	
+pais_residencia	character varying	YES	
+municipio	character varying	YES	
+zona_territorial	character varying	YES	
+telefono_residencia	character varying	YES	
+contacto_emergencia_nombre	character varying	YES	
+contacto_emergencia_telefono	character varying	YES	
+contacto_emergencia_parentesco	character varying	YES	
+ocupacion	character varying	YES	
+tipo_vinculacion	character varying	YES	
+entidad_territorial	character varying	YES	
+categoria_discapacidad	character varying	YES	
+objetivo_bodytech	text	YES	
+modalidad	character varying	YES	'Intramural'::character varying
+servicio_atencion	character varying	YES	
+lugar_atencion	character varying	YES	'Institucional'::character varying
+puerta_entrada	character varying	YES	
+causa	character varying	YES	
+tipo_consulta	character varying	YES	
+motivo_consulta_texto	text	YES	
+ant_patologico_flag	boolean	YES	false
+ant_patologico_tipo	character varying	YES	
+ant_patologico_obs	text	YES	
+ant_quirurgico_flag	boolean	YES	false
+ant_quirurgico_tipo	character varying	YES	
+ant_quirurgico_obs	text	YES	
+ant_osteomuscular_flag	boolean	YES	false
+ant_osteomuscular_tipo	character varying	YES	
+ant_osteomuscular_obs	text	YES	
+ant_farmacologico_flag	boolean	YES	false
+ant_farmacologico_tipo	character varying	YES	
+ant_farmacologico_obs	text	YES	
+ant_alergicos_flag	boolean	YES	false
+ant_alergicos_tipo	character varying	YES	
+ant_alergicos_obs	text	YES	
+ant_familiares_flag	boolean	YES	false
+ant_familiares_tipo	character varying	YES	
+ant_familiares_obs	text	YES	
+embarazo_actual	boolean	YES	false
+partos	integer	YES	
+cesareas	integer	YES	
+abortos	integer	YES	
+fum	date	YES	
+planificacion	character varying	YES	
+actividad_frecuencia	character varying	YES	
+actividad_duracion_min	integer	YES	
+actividad_fuerza_semanal	integer	YES	
+downton_caidas	boolean	YES	false
+downton_medicamentos	boolean	YES	false
+downton_deficits_sensoriales	boolean	YES	false
+downton_estado_mental	boolean	YES	false
+downton_deambulacion	boolean	YES	false
+downton_neurologico	boolean	YES	false
+downton_cardiovascular	boolean	YES	false
+downton_visual	boolean	YES	false
+downton_auditivo	boolean	YES	false
+downton_marcha	boolean	YES	false
+downton_riesgo	character varying	YES	
+acsm_edad_hombre	boolean	YES	false
+acsm_edad_mujer	boolean	YES	false
+acsm_familiar_cardiaco	boolean	YES	false
+acsm_tabaquismo	boolean	YES	false
+acsm_sedentarismo	boolean	YES	false
+acsm_obesidad	boolean	YES	false
+acsm_hipertension	boolean	YES	false
+acsm_dislipidemia	boolean	YES	false
+acsm_prediabetes	boolean	YES	false
+acsm_diabetes	boolean	YES	false
+acsm_signos_sintomas	boolean	YES	false
+acsm_enfermedad_conocida	boolean	YES	false
+acsm_riesgo	character varying	YES	
+bt_factor_1	boolean	YES	false
+bt_factor_2	boolean	YES	false
+bt_factor_3	boolean	YES	false
+riesgo_final	character varying	YES	
+cc_peso_anterior	numeric	YES	
+cc_peso_nuevo	numeric	YES	
+cc_estatura_anterior	numeric	YES	
+cc_estatura_nuevo	numeric	YES	
+cc_masa_muscular_anterior	numeric	YES	
+cc_masa_muscular_nuevo	numeric	YES	
+cc_imc_anterior	numeric	YES	
+cc_imc_nuevo	numeric	YES	
+cc_imm_anterior	numeric	YES	
+cc_imm_nuevo	numeric	YES	
+cc_grasa_anterior	numeric	YES	
+cc_grasa_nuevo	numeric	YES	
+cc_perimetro_abdominal_anterior	numeric	YES	
+cc_perimetro_abdominal_nuevo	numeric	YES	
+cc_observacion	text	YES	
+postura_espalda	character varying	YES	
+postura_cad_sup	character varying	YES	
+postura_cad_inf	character varying	YES	
+hallazgos_descripcion	text	YES	
+hallazgos_stretching	text	YES	
+hallazgos_observaciones	text	YES	
+hallazgos_dolor	text	YES	
+mov_tren_superior	character varying	YES	
+fuerza_superior	integer	YES	
+fuerza_abdominal	integer	YES	
+fuerza_inferior	integer	YES	
+tecnica_sentadilla	text	YES	
+estabilidad_plancha	integer	YES	
+fcr	integer	YES	
+fcm	integer	YES	
+tas	integer	YES	
+tad	integer	YES	
+equilibrio_unipodal	character varying	YES	
+riesgo_marcha	character varying	YES	
+marcha_estacionaria	text	YES	
+riesgo_om	character varying	YES	
+intervencion_analisis	text	YES	
+intervencion_tipo_tecnologia	character varying	YES	
+intervencion_educacion_si	boolean	YES	false
+intervencion_educacion_tipo	character varying	YES	
+intervencion_tipo_meta	character varying	YES	
+intervencion_meta_texto	text	YES	
+dx_tecnologia_salud	character varying	YES	
+dx_procedimiento	character varying	YES	
+dx_tipo	character varying	YES	
+aptitud	character varying	YES	
+control_fecha	date	YES	
+exoneracion_programa	boolean	YES	false
+ant_quirurgico_tiempo	character varying	YES	
+planificacion_familiar_flag	boolean	YES	false
+actividad_duracion	character varying	YES	
+actividad_fuerza_semanal_label	character varying	YES	
+downton_med_antiparkinson	boolean	YES	false
+downton_med_antidepresivos	boolean	YES	false
+downton_med_otros	boolean	YES	false
+downton_def_extremidades	boolean	YES	false
+acsm_edad	boolean	YES	false
+acsm_genero	boolean	YES	false
+acsm_enf_pulmonar	boolean	YES	false
+acsm_enf_cardiovascular	boolean	YES	false
+acsm_enf_renal	boolean	YES	false
+hallazgos_stretching_cm	numeric	YES	
+transcription_status	text	YES	
+transcription_text	text	YES	
+composition_sid	text	YES	
+ant_osteomuscular_lateralidad	character varying	YES	
+ant_osteomuscular_evolucion	character varying	YES	
+ant_familiares_consanguinidad	character varying	YES	
+actividad_nivel	character varying	YES	
+postura_descripcion	text	YES	
+equilibrio_unipodal_segundos	integer	YES	
+ant_osteomuscular_lista	text	YES	
+sede_id	character varying	NO	'bsl'::character varying
+deleted_at	timestamp with time zone	YES	
+brs_evaluation_id	integer	YES	
+brs_access_token	text	YES	
+brs_forma	character	YES	
+brs_completado	boolean	YES	false
+brs_completado_at	timestamp with time zone	YES	
+certificadoWaEnviado	boolean	YES	false
+certificadoListoEnviado	boolean	YES	false

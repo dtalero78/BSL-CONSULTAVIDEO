@@ -30,6 +30,8 @@ jest.mock('../../services/whatsapp.service', () => ({
 }));
 
 import express from 'express';
+import fs from 'fs';
+import path from 'path';
 import http from 'http';
 import { AddressInfo } from 'net';
 import integrationRoutes from '../integration.routes';
@@ -216,6 +218,47 @@ describe('POST /api/integration/consultas', () => {
     expect(mockSendContentTemplate).not.toHaveBeenCalled(); // notificar=false por defecto
   });
 
+  it('la historia se inserta ANTES del claim (FK historia_id → HistoriaClinica._id)', async () => {
+    const client = instalarBdFalsa();
+    await post(payload());
+    const orden = client.query.mock.calls.map(([sql]) => String(sql));
+    const iHistoria = orden.findIndex((s) => s.includes('INSERT INTO "HistoriaClinica"'));
+    const iClaim = orden.findIndex((s) => s.includes('INSERT INTO integration_consultas'));
+    expect(iHistoria).toBeGreaterThan(-1);
+    expect(iHistoria).toBeLessThan(iClaim);
+  });
+
+  it('el INSERT en integration_consultas solo usa columnas de la migración 003', async () => {
+    const client = instalarBdFalsa();
+    await post(payload());
+    const [sql] = llamadasSql(client, 'INSERT INTO integration_consultas')[0];
+    const cols = /INSERT INTO integration_consultas\s*\(([\s\S]*?)\)\s*VALUES/
+      .exec(String(sql))?.[1]
+      .split(',')
+      .map((c) => c.trim());
+    const migracion = fs.readFileSync(
+      path.join(__dirname, '..', '..', '..', 'migrations', '003_create_integration_consultas.sql'),
+      'utf8'
+    );
+    const cuerpo = /CREATE TABLE IF NOT EXISTS integration_consultas \(([\s\S]*?)\n\);/.exec(migracion)?.[1] || '';
+    const definidas = new Set(
+      cuerpo
+        .split('\n')
+        .map((l) => /^\s{4}([a-z_]+)\s+[A-Z]/.exec(l)?.[1])
+        .filter((c): c is string => !!c)
+    );
+    expect(cols && cols.length).toBeGreaterThan(0);
+    expect((cols || []).filter((c) => !definidas.has(c))).toEqual([]);
+  });
+
+  it('menor con celular propio → la historia lleva el celular del acudiente', async () => {
+    const client = instalarBdFalsa();
+    const base = payload();
+    const res = await post({ ...base, paciente: { ...base.paciente, celular: '3119998888' } });
+    expect(res.status).toBe(201);
+    expect(llamadasSql(client, 'INSERT INTO "HistoriaClinica"')[0][1][6]).toBe('573001234567');
+  });
+
   it('respeta MALUWA360_TENANT_ID', async () => {
     process.env.MALUWA360_TENANT_ID = 'maluwa';
     const client = instalarBdFalsa();
@@ -251,7 +294,13 @@ describe('POST /api/integration/consultas', () => {
       if (sql.includes('FROM integration_consultas')) return ++lookups === 1 ? [] : [ganadora];
       return [{ '?column?': 1 }];
     });
-    const client = { query: jest.fn(async () => ({ rows: [] })), release: jest.fn() };
+    const client = {
+      query: jest.fn(async (sql: string, params: any[] = []) => {
+        if (sql.includes('INSERT INTO "HistoriaClinica"')) return { rows: [{ _id: params[0] }] };
+        return { rows: [] }; // el claim de integration_consultas no inserta (conflicto)
+      }),
+      release: jest.fn(),
+    };
     mockGetClient.mockResolvedValue(client);
 
     const res = await post(payload());
@@ -262,8 +311,9 @@ describe('POST /api/integration/consultas', () => {
       patientUrl: ganadora.patient_url,
       doctorUrl: ganadora.doctor_url,
     });
+    // Nuestra historia se insertó dentro de la transacción, pero se descarta con el ROLLBACK
     expect(llamadasSql(client, 'ROLLBACK')).toHaveLength(1);
-    expect(llamadasSql(client, 'INSERT INTO "HistoriaClinica"')).toHaveLength(0);
+    expect(llamadasSql(client, 'COMMIT')).toHaveLength(0);
     expect(mockCreateRoom).not.toHaveBeenCalled();
   });
 

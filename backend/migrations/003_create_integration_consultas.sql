@@ -11,12 +11,18 @@
 --      con reintentos y backoff (integration-webhook.service.ts).
 --
 -- Idempotente: se puede ejecutar más de una vez sin error.
+--
+-- historia_id tiene FK a "HistoriaClinica"("_id") (character varying, igual tipo)
+-- con ON DELETE CASCADE, la misma convención de las tablas de BSL-PLATAFORMA2 que
+-- referencian HistoriaClinica: su borrado físico de órdenes no queda bloqueado.
+-- Crear la FK toma un lock breve (SHARE ROW EXCLUSIVE) sobre "HistoriaClinica".
 
 CREATE TABLE IF NOT EXISTS integration_consultas (
     id SERIAL PRIMARY KEY,
     source VARCHAR(50) NOT NULL,                  -- 'MALUWA360'
     external_id VARCHAR(255) NOT NULL,            -- id de la consulta en la plataforma externa
-    historia_id VARCHAR(255) NOT NULL,            -- "HistoriaClinica"."_id"
+    historia_id VARCHAR NOT NULL
+        REFERENCES "HistoriaClinica"("_id") ON DELETE CASCADE,   -- "HistoriaClinica"."_id"
     room_name VARCHAR(128) NOT NULL,
     tenant_id VARCHAR(50) NOT NULL DEFAULT 'bsl',
     patient_url TEXT NOT NULL,

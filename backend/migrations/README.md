@@ -105,7 +105,12 @@ SELECT COUNT(*) FROM "HistoriaClinica";
 | Archivo | Descripción | Estado |
 |---------|-------------|--------|
 | `001_create_historia_clinica.sql` | Crea tabla HistoriaClinica con 46 campos | ⏳ Pendiente |
-| `003_create_integration_consultas.sql` | Crea tabla integration_consultas (integración Maluwa360: idempotencia, consentimiento y outbox del webhook). Aplicar ANTES de configurar `MALUWA360_API_KEY`. Idempotente. | ⏳ Pendiente |
+| `003_create_integration_consultas.sql` | Crea tabla integration_consultas (integración Maluwa360: idempotencia, consentimiento y outbox del webhook; FK `historia_id` → `HistoriaClinica._id` ON DELETE CASCADE). Aplicar ANTES de configurar `MALUWA360_API_KEY`. Idempotente. | ⏳ Pendiente |
+
+> Ojo: `001_create_historia_clinica.sql` está desactualizada. El esquema real de
+> `HistoriaClinica` lo define BSL-PLATAFORMA2 (p. ej. la fecha de nacimiento es
+> `fecha_nacimiento`, no existe `edad`). Copia del esquema de producción usada por
+> los tests: `src/services/__tests__/fixtures/historia-clinica.columnas-prod.tsv`.
 
 ## Notas Importantes
 

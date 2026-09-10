@@ -6,9 +6,12 @@
 //   1) Idempotencia: si (source, externalId) ya existe → 200 con la misma consulta.
 //   2) El código de médico debe existir en el tenant (si no, la consulta nunca
 //      aparecería en ningún panel: es la misma regla del login del panel).
-//   3) En UNA transacción: se reclama el externalId en `integration_consultas` y
-//      se crea la HistoriaClinica PENDIENTE. Si otra petición con el mismo
-//      externalId ganó la carrera, ROLLBACK y se devuelve la suya (200).
+//   3) En UNA transacción: se crea la HistoriaClinica PENDIENTE y luego se reclama
+//      el externalId en `integration_consultas` (en ese orden por la FK
+//      historia_id → HistoriaClinica._id). Si otra petición con el mismo
+//      externalId ganó la carrera (el INSERT espera su commit en el índice único
+//      y no inserta), ROLLBACK —se descarta también nuestra historia— y se
+//      devuelve la suya (200).
 //   4) Best-effort, fuera de la transacción (nunca tumban la respuesta 201):
 //      pre-crear la sala de video y, si notificar=true, enviar el WhatsApp con la
 //      misma plantilla de "consulta suelta" que usa /api/video/whatsapp/send-suelta.
@@ -131,13 +134,36 @@ class IntegrationConsultasService {
       celular: input.celularContacto,
     });
 
-    // 4) Reclamar externalId + crear historia, atómico
+    // 4) Crear historia + reclamar externalId, atómico
     const client = await postgresService.getClient();
     if (!client) return ERROR_BD;
 
     let creada = false;
     try {
       await client.query('BEGIN');
+
+      // Primero la historia: integration_consultas.historia_id tiene FK a HistoriaClinica._id.
+      const insertada = await historiaClinicaPostgresService.crearPendiente(
+        {
+          _id: historiaId,
+          numeroId: input.paciente.documento,
+          primerNombre: input.paciente.primerNombre,
+          segundoNombre: input.paciente.segundoNombre,
+          primerApellido: input.paciente.primerApellido,
+          segundoApellido: input.paciente.segundoApellido,
+          celular: input.celularContacto, // el del acudiente si es menor (validado)
+          fechaNacimiento: input.paciente.fechaNacimiento,
+          codEmpresa: source,
+          empresa: input.institucion?.nombre || source,
+          tipoExamen: TIPO_EXAMEN_POR_TIPO[input.tipo],
+          medico: input.medico,
+          motivoConsulta: construirMotivoConsulta(input),
+          tenantId,
+        },
+        client
+      );
+      if (!insertada) throw new Error(`No se insertó la historia clínica ${historiaId}`);
+
       const claim = await client.query(
         `INSERT INTO integration_consultas (
            source, external_id, historia_id, room_name, tenant_id, patient_url, doctor_url,
@@ -162,29 +188,9 @@ class IntegrationConsultasService {
       );
 
       if (claim.rows.length === 0) {
-        // Otra petición con el mismo externalId se nos adelantó.
+        // Otra petición con el mismo externalId se nos adelantó: descartamos también la historia.
         await client.query('ROLLBACK');
       } else {
-        const insertada = await historiaClinicaPostgresService.crearPendiente(
-          {
-            _id: historiaId,
-            numeroId: input.paciente.documento,
-            primerNombre: input.paciente.primerNombre,
-            segundoNombre: input.paciente.segundoNombre,
-            primerApellido: input.paciente.primerApellido,
-            segundoApellido: input.paciente.segundoApellido,
-            celular: input.celularContacto,
-            fechaNacimiento: input.paciente.fechaNacimiento,
-            codEmpresa: source,
-            empresa: input.institucion?.nombre || source,
-            tipoExamen: TIPO_EXAMEN_POR_TIPO[input.tipo],
-            medico: input.medico,
-            motivoConsulta: construirMotivoConsulta(input),
-            tenantId,
-          },
-          client
-        );
-        if (!insertada) throw new Error(`No se insertó la historia clínica ${historiaId}`);
         await client.query('COMMIT');
         creada = true;
       }

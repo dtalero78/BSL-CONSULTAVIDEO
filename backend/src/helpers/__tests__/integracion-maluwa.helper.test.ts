@@ -70,6 +70,22 @@ describe('validarConsultaIntegracion', () => {
     expect(e).toContain('acudiente.celular es obligatorio porque el paciente es menor de edad (9 años).');
   });
 
+  it('menor con celular propio: el contacto SIEMPRE es el del acudiente', () => {
+    const base = payloadMenor();
+    const r = validarConsultaIntegracion({ ...base, paciente: { ...base.paciente, celular: '3119998888' } }, NOW);
+    expect(r.ok && r.value.celularContacto).toBe('573001234567');
+  });
+
+  it('menor con celular propio pero acudiente SIN celular → error (no usa el del menor)', () => {
+    const base = payloadMenor();
+    const e = errores({
+      ...base,
+      paciente: { ...base.paciente, celular: '3119998888' },
+      acudiente: { ...base.acudiente, celular: null },
+    });
+    expect(e).toContain('acudiente.celular es obligatorio porque el paciente es menor de edad (9 años).');
+  });
+
   it('sin consentimiento → error (siempre obligatorio, también para adultos)', () => {
     expect(errores(payloadMenor({ consentimiento: undefined }))[0]).toMatch(/consentimiento es obligatorio/);
     expect(errores(payloadAdulto({ consentimiento: null }))[0]).toMatch(/consentimiento es obligatorio/);

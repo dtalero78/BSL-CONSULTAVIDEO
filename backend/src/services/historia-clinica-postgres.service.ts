@@ -10,7 +10,7 @@ export interface HistoriaPendienteData {
   primerApellido: string;
   segundoApellido?: string | null;
   celular: string;
-  fechaNacimiento: string; // AAAA-MM-DD
+  fechaNacimiento: string; // AAAA-MM-DD → columna "fecha_nacimiento" (date)
   codEmpresa: string;
   empresa?: string | null;
   tipoExamen: string;
@@ -185,18 +185,37 @@ class HistoriaClinicaPostgresService {
    * Diferencias con upsert() (que es el guardado de la consulta atendida):
    *   - fechaConsulta queda NULL: upsert() la fuerza a NOW() al insertar, lo que la
    *     contaría como atendida y la ocultaría de la lista de pendientes.
-   *   - Escribe tenant_id y fechaNacimiento (upsert() no los escribe).
+   *   - Escribe tenant_id y fecha_nacimiento (upsert() no los escribe).
    *   - Nunca sobrescribe (ON CONFLICT DO NOTHING).
    *   - Acepta un PoolClient para correr dentro de una transacción; en ese caso los
    *     errores se propagan (el caller hace ROLLBACK).
    *
-   * Devuelve true si insertó la fila.
+   * Columnas validadas contra el esquema REAL de producción (lo define BSL-PLATAFORMA2;
+   * migrations/001 está desactualizada): la fecha de nacimiento es `fecha_nacimiento`
+   * (date) y no existe "fechaNacimiento" ni "edad". Test: historia-clinica-postgres.schema.test.ts
+   *
+   * Devuelve true si insertó la fila. Lanza si falta un campo NOT NULL.
    */
   async crearPendiente(data: HistoriaPendienteData, client?: PoolClient): Promise<boolean> {
+    // NOT NULL sin default en producción: fallar antes de ir a la BD con un mensaje claro.
+    const obligatorios: Record<string, string | undefined> = {
+      _id: data._id,
+      numeroId: data.numeroId,
+      primerNombre: data.primerNombre,
+      primerApellido: data.primerApellido,
+      celular: data.celular,
+    };
+    const faltantes = Object.entries(obligatorios)
+      .filter(([, v]) => !v || !String(v).trim())
+      .map(([k]) => k);
+    if (faltantes.length > 0) {
+      throw new Error(`crearPendiente: faltan columnas NOT NULL de HistoriaClinica: ${faltantes.join(', ')}`);
+    }
+
     const query = `
       INSERT INTO "HistoriaClinica" (
         "_id", "numeroId", "primerNombre", "segundoNombre", "primerApellido", "segundoApellido",
-        "celular", "fechaNacimiento", "codEmpresa", "empresa", "tipoExamen", "medico",
+        "celular", "fecha_nacimiento", "codEmpresa", "empresa", "tipoExamen", "medico",
         "motivoConsulta", "atendido", "fechaAtencion", "fechaConsulta", "tenant_id"
       ) VALUES (
         $1, $2, $3, $4, $5, $6,
