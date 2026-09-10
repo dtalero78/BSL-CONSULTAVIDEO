@@ -75,11 +75,11 @@ afterEach(() => {
 });
 
 describe('updateMedicalHistory + webhook de integración', () => {
-  it('historia MALUWA360 → encola el resultado con el concepto guardado', async () => {
+  it('historia MALUWA360 → pide encolar (el servicio lee el estado guardado y deduplica)', async () => {
     instalarHistoria('MALUWA360');
     mockEnqueue.mockResolvedValue({ enqueued: true });
     await expect(guardar()).resolves.toEqual({ success: true });
-    expect(mockEnqueue).toHaveBeenCalledWith(HISTORIA_ID, CONCEPTO);
+    expect(mockEnqueue).toHaveBeenCalledWith(HISTORIA_ID);
   });
 
   it('si encolar RECHAZA la promesa, el guardado igual responde success', async () => {

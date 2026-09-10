@@ -12,15 +12,19 @@
 //      externalId ganó la carrera (el INSERT espera su commit en el índice único
 //      y no inserta), ROLLBACK —se descarta también nuestra historia— y se
 //      devuelve la suya (200).
-//   4) Best-effort, fuera de la transacción (nunca tumban la respuesta 201):
-//      pre-crear la sala de video y, si notificar=true, enviar el WhatsApp con la
-//      misma plantilla de "consulta suelta" que usa /api/video/whatsapp/send-suelta.
+//   4) Best-effort, fuera de la transacción (nunca tumba la respuesta 201): si
+//      notificar=true, enviar el WhatsApp con la misma plantilla de "consulta
+//      suelta" que usa /api/video/whatsapp/send-suelta.
+//
+// La sala de video NO se pre-crea: POST /api/video/token la crea al vuelo en el
+// primer ingreso (Twilio en este backend; Chime en aws.medico-bsl.com, que es
+// por donde entran hoy paciente y médico). Pre-crearla aquí en Twilio solo
+// dejaba salas huérfanas que nadie usa.
 // ============================================================================
 
 import { randomBytes, randomUUID } from 'crypto';
 import postgresService from './postgres.service';
 import historiaClinicaPostgresService from './historia-clinica-postgres.service';
-import twilioService from './twilio.service';
 import whatsappService from './whatsapp.service';
 import {
   ConsultaIntegracionInput,
@@ -230,7 +234,6 @@ class IntegrationConsultasService {
     );
 
     // 5) Best-effort
-    await this.preCrearSala(roomName);
     if (input.notificar) {
       await this.notificarWhatsApp({
         celular: input.celularContacto,
@@ -243,23 +246,6 @@ class IntegrationConsultasService {
     }
 
     return { ok: true, status: 201, consulta: { roomName, historiaId, patientUrl, doctorUrl } };
-  }
-
-  /**
-   * Pre-crea la sala en el proveedor de video. No es fatal: POST /api/video/token
-   * crea la sala al vuelo si no existe cuando entra el primer participante.
-   */
-  private async preCrearSala(roomName: string): Promise<void> {
-    try {
-      await twilioService.createRoom(roomName);
-    } catch (error: any) {
-      if (error?.code !== 53113) {
-        // 53113 = la sala ya existe
-        console.warn(
-          `⚠️  [integration] No se pudo pre-crear la sala ${roomName} (se creará al conectarse): ${error?.message || error}`
-        );
-      }
-    }
   }
 
   /** Misma plantilla y registro en chat que /api/video/whatsapp/send-suelta. */

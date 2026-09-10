@@ -214,7 +214,8 @@ describe('POST /api/integration/consultas', () => {
     expect(llamadasSql(client, 'COMMIT')).toHaveLength(1);
     expect(client.release).toHaveBeenCalled();
 
-    expect(mockCreateRoom).toHaveBeenCalledWith(roomName);
+    // La sala NO se pre-crea en Twilio: /api/video/token (Twilio o Chime) la crea al primer ingreso
+    expect(mockCreateRoom).not.toHaveBeenCalled();
     expect(mockSendContentTemplate).not.toHaveBeenCalled(); // notificar=false por defecto
   });
 
@@ -278,7 +279,7 @@ describe('POST /api/integration/consultas', () => {
 
     expect(llamadasSql(client, 'INSERT INTO "HistoriaClinica"')).toHaveLength(1);
     expect(mockGetClient).toHaveBeenCalledTimes(1);
-    expect(mockCreateRoom).toHaveBeenCalledTimes(1);
+    expect(mockCreateRoom).not.toHaveBeenCalled();
     expect(mockSendContentTemplate).toHaveBeenCalledTimes(1);
   });
 
@@ -330,9 +331,8 @@ describe('POST /api/integration/consultas', () => {
     expect(mockRegistrarMensaje).toHaveBeenCalledWith('+573001234567', expect.any(String), 'SM1', 'Ana Pérez');
   });
 
-  it('si falla el WhatsApp o la pre-creación de la sala, la consulta igual queda creada (201)', async () => {
+  it('si falla el WhatsApp, la consulta igual queda creada (201)', async () => {
     instalarBdFalsa();
-    mockCreateRoom.mockRejectedValue(new Error('Twilio caído'));
     mockSendContentTemplate.mockResolvedValue({ success: false, error: 'boom' });
     const res = await post(payload({ notificar: true }));
     expect(res.status).toBe(201);

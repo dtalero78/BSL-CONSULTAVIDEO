@@ -126,41 +126,58 @@ describe('outbox con reintentos', () => {
   });
 });
 
-describe('enqueueResultado', () => {
+describe('enqueueResultado (hook del guardado en este backend)', () => {
+  const candidata = {
+    id: 7,
+    external_id: 'ext-1',
+    historia_id: 'hc-1',
+    webhook_huella: null as string | null,
+    concepto_final: 'APTO PARA EL CARGO CON RECOMENDACIONES MÉDICO-LABORALES.',
+    huella: '0123456789abcdef0123456789abcdef',
+  };
+
   beforeEach(() => {
     // Sin config, el dispatch inmediato es no-op: aislamos el encolado.
     delete process.env.MALUWA360_WEBHOOK_URL;
   });
 
-  it('historia que no es de una integración → no encola', async () => {
+  it('historia que no aplica (no es integración / no atendida / borrada) → no encola', async () => {
     mockQuery.mockResolvedValue([]);
-    const r = await integrationWebhookService.enqueueResultado('hc-normal', 'APTO');
-    expect(r).toEqual({ enqueued: false, reason: 'NOT_INTEGRATION' });
+    const r = await integrationWebhookService.enqueueResultado('hc-normal');
+    expect(r).toEqual({ enqueued: false, reason: 'NO_APLICA' });
     expect(mockQuery).toHaveBeenCalledTimes(1);
   });
 
-  it('historia de Maluwa360 → guarda el payload del contrato como pending', async () => {
+  it('lee el estado guardado de la BD y encola con UPDATE condicional por huella', async () => {
     mockQuery.mockImplementation(async (sql: string) => {
-      if (sql.startsWith('SELECT id, external_id')) return [{ id: 7, external_id: 'ext-1' }];
+      if (sql.includes('JOIN "HistoriaClinica" h')) return [candidata];
       return [{ id: 7 }];
     });
 
-    const r = await integrationWebhookService.enqueueResultado(
-      'hc-1',
-      'APTO PARA EL CARGO CON RECOMENDACIONES MÉDICO-LABORALES.'
-    );
+    const r = await integrationWebhookService.enqueueResultado('hc-1');
 
     expect(r).toEqual({ enqueued: true });
+    const [selectSql, selectParams] = mockQuery.mock.calls[0];
+    expect(selectSql).toContain('ic.historia_id = $1');
+    expect(selectParams).toEqual(['hc-1']);
     const [sql, params] = mockQuery.mock.calls[1];
     expect(sql).toContain("webhook_status = 'pending'");
-    expect(sql).toContain('webhook_seq = webhook_seq + 1');
+    expect(sql).toContain('webhook_huella IS DISTINCT FROM $2');
     expect(JSON.parse(params[0] as string)).toEqual(PAYLOAD);
-    expect(params[1]).toBe(7);
+    expect(params[1]).toBe(candidata.huella);
+    expect(params[2]).toBe(7);
+  });
+
+  it('misma huella que la última encolada → SIN_CAMBIOS, sin UPDATE', async () => {
+    mockQuery.mockResolvedValue([{ ...candidata, webhook_huella: candidata.huella }]);
+    const r = await integrationWebhookService.enqueueResultado('hc-1');
+    expect(r).toEqual({ enqueued: false, reason: 'SIN_CAMBIOS' });
+    expect(mockQuery).toHaveBeenCalledTimes(1);
   });
 
   it('error de BD → no encola (y no lanza)', async () => {
     mockQuery.mockResolvedValue(null);
-    await expect(integrationWebhookService.enqueueResultado('hc-1', 'APTO')).resolves.toEqual({
+    await expect(integrationWebhookService.enqueueResultado('hc-1')).resolves.toEqual({
       enqueued: false,
       reason: 'DB_ERROR',
     });

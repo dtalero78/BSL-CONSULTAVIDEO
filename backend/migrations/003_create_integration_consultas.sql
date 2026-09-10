@@ -9,6 +9,9 @@
 --   3. Evidencia del consentimiento y del acudiente (pacientes menores).
 --   4. Outbox del webhook de resultado hacia la integración (columnas webhook_*),
 --      con reintentos y backoff (integration-webhook.service.ts).
+--   5. Detector de cambios: webhook_huella = md5(atendido || '|' || mdConceptoFinal)
+--      del último estado encolado. El worker encola cuando la historia (guardada por
+--      CUALQUIER backend que comparta la BD) cambia respecto de esa huella.
 --
 -- Idempotente: se puede ejecutar más de una vez sin error.
 --
@@ -37,6 +40,7 @@ CREATE TABLE IF NOT EXISTS integration_consultas (
     webhook_status VARCHAR(20) NOT NULL DEFAULT 'none',   -- none | pending | sent | dead
     webhook_payload JSONB,
     webhook_seq INTEGER NOT NULL DEFAULT 0,               -- versión del payload encolado
+    webhook_huella VARCHAR(32),                           -- md5(atendido|mdConceptoFinal) del último estado encolado
     attempts INTEGER NOT NULL DEFAULT 0,
     next_attempt_at TIMESTAMP WITH TIME ZONE,
     last_error TEXT,
@@ -57,6 +61,11 @@ CREATE INDEX IF NOT EXISTS idx_integration_consultas_outbox
     ON integration_consultas (next_attempt_at)
     WHERE webhook_status = 'pending';
 
+-- Detector de cambios: solo revisa consultas recientes (ventana de 30 días).
+CREATE INDEX IF NOT EXISTS idx_integration_consultas_created_at
+    ON integration_consultas (created_at);
+
 COMMENT ON TABLE integration_consultas IS 'Consultas creadas por integraciones externas (Maluwa360): idempotencia, consentimiento y outbox del webhook de resultado';
 COMMENT ON COLUMN integration_consultas.external_id IS 'Id de la consulta en la plataforma externa (clave de idempotencia junto con source)';
+COMMENT ON COLUMN integration_consultas.webhook_huella IS 'md5(atendido || ''|'' || mdConceptoFinal) del último estado encolado: deduplica hook y detector';
 COMMENT ON COLUMN integration_consultas.webhook_seq IS 'Se incrementa en cada encolado; evita que un envío viejo en vuelo pise un pending más reciente';

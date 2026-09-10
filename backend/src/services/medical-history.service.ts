@@ -629,10 +629,14 @@ class MedicalHistoryService {
   ): void {
     try {
       if (historiaBase.codEmpresa !== MALUWA360_SOURCE) return;
+      // enqueueResultado lee el estado guardado de la BD y deduplica por huella: si el
+      // detector del worker ya lo encoló o el estado no cambió, no se reenvía.
       integrationWebhookService
-        .enqueueResultado(payload.historiaId, payload.mdConceptoFinal)
+        .enqueueResultado(payload.historiaId)
         .then((r) => {
-          if (!r.enqueued) console.warn(`⚠️  [Integración] Webhook no encolado para ${payload.historiaId}: ${r.reason}`);
+          if (!r.enqueued && r.reason === 'DB_ERROR') {
+            console.warn(`⚠️  [Integración] Webhook no encolado para ${payload.historiaId} (error de BD); lo tomará el detector del worker`);
+          }
         })
         .catch((error: any) => {
           console.error(`❌ [Integración] Error encolando webhook para ${payload.historiaId}:`, error?.message || error);
