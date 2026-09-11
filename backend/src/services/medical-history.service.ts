@@ -608,6 +608,9 @@ class MedicalHistoryService {
       // PASO 2: Enviar alerta WhatsApp para OMEGA con concepto crítico
       this.sendOmegaAlertIfNeeded(historiaBase, payload);
 
+      // PASO 3: Notificar al equipo de SOFTSERVE cuando el médico cierra la HC (PENDIENTE → ATENDIDO)
+      this.sendSoftserveNotificationIfNeeded(historiaBase, payload);
+
       return { success: true };
     } catch (error: any) {
       console.error('❌ Error actualizando historia clínica:', error.message);
@@ -716,6 +719,64 @@ class MedicalHistoryService {
     } catch (error: any) {
       // No bloquear el guardado si falla el envío de alertas
       console.error('❌ Error enviando alerta OMEGA por WhatsApp:', error.message);
+    }
+  }
+
+  /**
+   * Notifica al equipo de SOFTSERVE cuando un médico CIERRA una historia clínica
+   * (transición PENDIENTE → ATENDIDO). Se dispara UNA sola vez: `historiaBase` trae el
+   * estado ANTES del upsert de este guardado, así que si ya estaba ATENDIDO (re-guardado)
+   * no vuelve a notificar. Best-effort: un fallo de envío nunca bloquea el guardado.
+   */
+  private async sendSoftserveNotificationIfNeeded(
+    historiaBase: MedicalHistoryData,
+    payload: UpdateMedicalHistoryPayload
+  ): Promise<void> {
+    try {
+      // Solo SOFTSERVE, y solo en la transición real a ATENDIDO (no en re-guardados).
+      if (
+        historiaBase.codEmpresa?.toUpperCase() !== 'SOFTSERVE' ||
+        historiaBase.atendido === 'ATENDIDO'
+      ) {
+        return;
+      }
+
+      const nombrePaciente = [
+        historiaBase.primerNombre,
+        historiaBase.segundoNombre,
+        historiaBase.primerApellido,
+        historiaBase.segundoApellido,
+      ].filter(Boolean).join(' ');
+
+      const certificadoUrl = `https://bsl-utilidades-yp78a.ondigitalocean.app/generar-certificado-desde-wix/${payload.historiaId}`;
+
+      let mensaje = `✅ *HISTORIA CLÍNICA CERRADA - SOFTSERVE*\n\n`;
+      mensaje += `*Paciente:* ${nombrePaciente}\n`;
+      mensaje += `*Documento:* ${historiaBase.numeroId}\n`;
+      mensaje += `*Cargo:* ${payload.cargo || historiaBase.cargo || 'No especificado'}\n`;
+      mensaje += `*Tipo de examen:* ${historiaBase.tipoExamen || 'No especificado'}\n`;
+      mensaje += `*Concepto Final:* ${payload.mdConceptoFinal || 'No especificado'}\n`;
+      mensaje += `\n*Certificado:*\n${certificadoUrl}\n`;
+
+      const telefonos = ['573148887169', '573007916121', '573207213743'];
+
+      console.log(`📋 Notificando cierre de HC SOFTSERVE para ${nombrePaciente}`);
+
+      const resultados = await Promise.allSettled(
+        telefonos.map(telefono => whapiService.sendTextMessage(telefono, mensaje))
+      );
+
+      resultados.forEach((resultado, i) => {
+        if (resultado.status === 'fulfilled' && resultado.value.success) {
+          console.log(`✅ Notificación SOFTSERVE enviada a ${telefonos[i]}`);
+        } else {
+          const error = resultado.status === 'rejected' ? resultado.reason : resultado.value.error;
+          console.error(`❌ Error enviando notificación SOFTSERVE a ${telefonos[i]}:`, error);
+        }
+      });
+    } catch (error: any) {
+      // No bloquear el guardado si falla el envío de la notificación.
+      console.error('❌ Error enviando notificación SOFTSERVE por WhatsApp:', error.message);
     }
   }
 }
