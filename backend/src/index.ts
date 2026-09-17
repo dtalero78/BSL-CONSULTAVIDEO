@@ -13,6 +13,7 @@ import twilioVoiceRoutes from './routes/twilio-voice.routes';
 import tenantRoutes from './routes/tenant.routes';
 import webhookRoutes from './routes/webhook.routes';
 import whatsappChatRoutes from './routes/whatsapp-chat.routes';
+import { redirigirASalaDeIntegracion } from './middleware/sala-integracion.middleware';
 import { telemedicineSocketService } from './services/telemedicine-socket.service';
 import { sessionTracker } from './services/session-tracker.service';
 
@@ -119,6 +120,11 @@ app.use('/api/whatsapp-chat', whatsappChatRoutes);
 // Servir archivos estaticos del frontend (despues de las rutas API)
 const frontendPath = path.join(__dirname, '..', 'frontend-dist');
 app.use(express.static(frontendPath));
+
+// "Atender" llevaba al médico a una sala vacía cuando la consulta venía de una
+// integración: la sala nace en el servidor y su navegador nunca la vio. El
+// porqué y el fallo abierto están en el middleware.
+app.get('/doctor/:roomName', redirigirASalaDeIntegracion);
 
 // SPA fallback - Todas las rutas no API devuelven index.html
 app.get('*', (_req: Request, res: Response) => {
