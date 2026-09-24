@@ -7,6 +7,22 @@ import { buildCertificadoUrl } from '../helpers/certificado.helper';
 import { MALUWA360_SOURCE } from '../helpers/integracion-maluwa.helper';
 import integrationWebhookService from './integration-webhook.service';
 
+// Destinatarios de la alerta SST de OMEGA (WHAPI).
+const NOTIF_OMEGA_SIEMPRE = '573016862888';       // todos los tipos de examen
+const NOTIF_OMEGA_SOLO_INGRESO = '573202543077';  // SOLO Ingreso / Pre-ingreso
+
+/** ¿El tipo de examen es Ingreso o Pre-ingreso? (tolerante a mayúsculas/tildes/guiones). */
+function esExamenIngreso(tipoExamen?: string | null): boolean {
+  if (!tipoExamen) return false;
+  const t = tipoExamen
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toUpperCase().replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
+  return t === 'INGRESO' || t === 'PRE INGRESO' || t === 'PREINGRESO';
+}
+
+// Guard en memoria: crear la tabla de trazabilidad de alertas OMEGA una sola vez por proceso.
+let tablaAlertasOmegaLista = false;
+
 interface AntecedentesPersonales {
   cirugiaOcular?: boolean;
   cirugiaProgramada?: boolean;
@@ -700,9 +716,11 @@ class MedicalHistoryService {
       mensaje += `✅ *Aprobar:* ${approveUrl}\n`;
       mensaje += `❌ *No Aprobar:* ${rejectUrl}\n`;
 
-      const telefonos = ['573008021701', '573166939639', '573202543077'];
+      // Destinatarios OMEGA: NOTIF_OMEGA_SIEMPRE siempre; NOTIF_OMEGA_SOLO_INGRESO solo si es Ingreso/Pre-ingreso.
+      const telefonos = [NOTIF_OMEGA_SIEMPRE];
+      if (esExamenIngreso(historiaBase.tipoExamen)) telefonos.push(NOTIF_OMEGA_SOLO_INGRESO);
 
-      console.log(`🚨 Enviando alerta OMEGA para ${nombrePaciente} - Concepto: ${payload.mdConceptoFinal}`);
+      console.log(`🚨 Enviando alerta OMEGA para ${nombrePaciente} - Concepto: ${payload.mdConceptoFinal} - tipo: ${historiaBase.tipoExamen || 'N/A'} → ${telefonos.join(', ')}`);
 
       const resultados = await Promise.allSettled(
         telefonos.map(telefono => whapiService.sendTextMessage(telefono, mensaje))
@@ -716,9 +734,72 @@ class MedicalHistoryService {
           console.error(`❌ Error enviando alerta OMEGA a ${telefonos[i]}:`, error);
         }
       });
+
+      // Trazabilidad: registrar el envío (enviada / parcial / fallida) para poder auditar y reintentar.
+      await this.registrarAlertaOmega(historiaBase, payload, telefonos, resultados);
     } catch (error: any) {
       // No bloquear el guardado si falla el envío de alertas
       console.error('❌ Error enviando alerta OMEGA por WhatsApp:', error.message);
+    }
+  }
+
+  /**
+   * Trazabilidad de la alerta SST de OMEGA: guarda una fila por envío con el resultado por
+   * destinatario (enviada / parcial / fallida). La tabla se crea sola la primera vez. Best-effort:
+   * nunca rompe el guardado ni el envío.
+   */
+  private async registrarAlertaOmega(
+    historiaBase: MedicalHistoryData,
+    payload: UpdateMedicalHistoryPayload,
+    telefonos: string[],
+    resultados: PromiseSettledResult<{ success: boolean; error?: string }>[]
+  ): Promise<void> {
+    try {
+      if (!tablaAlertasOmegaLista) {
+        await postgresService.query(`
+          CREATE TABLE IF NOT EXISTS omega_alertas_sst (
+            id            SERIAL PRIMARY KEY,
+            historia_id   TEXT NOT NULL,
+            numero_id     TEXT,
+            tipo_examen   TEXT,
+            concepto      TEXT,
+            destinatarios TEXT[],
+            estado        TEXT,
+            detalle       JSONB,
+            created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          )
+        `);
+        tablaAlertasOmegaLista = true;
+      }
+
+      const detalle = telefonos.map((tel, i) => {
+        const r = resultados[i];
+        const ok = r.status === 'fulfilled' && r.value.success;
+        const error = r.status === 'rejected'
+          ? String(r.reason)
+          : (r.value.success ? null : (r.value.error || 'error desconocido'));
+        return { telefono: tel, ok, error };
+      });
+      const enviados = detalle.filter(d => d.ok).length;
+      const estado = enviados === 0 ? 'fallida' : (enviados === telefonos.length ? 'enviada' : 'parcial');
+
+      await postgresService.query(
+        `INSERT INTO omega_alertas_sst
+           (historia_id, numero_id, tipo_examen, concepto, destinatarios, estado, detalle)
+         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)`,
+        [
+          payload.historiaId,
+          historiaBase.numeroId,
+          historiaBase.tipoExamen || null,
+          payload.mdConceptoFinal || null,
+          telefonos,
+          estado,
+          JSON.stringify(detalle),
+        ]
+      );
+      console.log(`🧾 Trazabilidad alerta OMEGA registrada: ${estado} (${enviados}/${telefonos.length})`);
+    } catch (error: any) {
+      console.error('❌ Error registrando trazabilidad de alerta OMEGA:', error.message);
     }
   }
 
