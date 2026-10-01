@@ -79,7 +79,7 @@ class SessionTrackerService {
     console.log(`[SessionTracker] Current participants in ${roomName}: ${session.participants.size}`);
 
     // Grabación (Chime): arranca SÓLO si la sala es grabable (ver
-    // setupRecordingIfNeeded: RECOMENDACIONES/POST-INCAPACIDAD + SIIGO) y ambos
+    // setupRecordingIfNeeded: SIIGO + valoración ocupacional/incapacidad) y ambos
     // ya están conectados. Se llama también desde setupRecordingIfNeeded para
     // cubrir el orden en que el paciente entra antes que el médico.
     this.maybeStartRecording(session);
@@ -120,8 +120,13 @@ class SessionTrackerService {
       session.codEmpresa = patient.codEmpresa;
       session.patientDocumento = patient.numeroId;
 
-      // GRABAR sólo si: tipoExamen ∈ {RECOMENDACIONES, POST-INCAPACIDAD} Y la
-      // empresa es SIIGO (codEmpresa === 'SIIGO'). El resto NO se graba.
+      // GRABAR (y por lo tanto TRANSCRIBIR) sólo si: la empresa es SIIGO
+      // (codEmpresa === 'SIIGO') Y el tipo de examen es una VALORACIÓN
+      // OCUPACIONAL o POR INCAPACIDAD. El resto NO se graba. La transcripción no
+      // necesita filtro propio: sólo arranca si hay grabación en S3 (ver
+      // transcribe.service.getOrStartTranscription), así que al no grabar, no se
+      // transcribe. Decisión de negocio: sólo esas consultas de SIIGO deben
+      // quedar grabadas.
       //
       // Ojo: antes esta decisión llamaba a videoProvider.enableRecording(), que
       // en Chime es un no-op (devuelve false), y la grabación REAL la disparaba
@@ -129,10 +134,16 @@ class SessionTrackerService {
       // grababa TODO. Ahora la decisión se guarda en session.recordingEnabled y
       // maybeStartRecording() la respeta (ver trackParticipantConnected).
       //
-      // Match de tipo normalizado (ignora mayúsculas, espacios y guiones) para
-      // tolerar variantes: "POST-INCAPACIDAD" / "Post Incapacidad", etc.
-      const tipoNorm = String(patient.tipoExamen || '').toLowerCase().replace(/[\s\-_]/g, '');
-      const esTipoGrabable = tipoNorm === 'recomendaciones' || tipoNorm === 'postincapacidad';
+      // Match normalizado (minúsculas, sin acentos, sin espacios/guiones) y por
+      // SUBCADENA, para tolerar las variantes reales de la base: "Valoración
+      // Ocupacional", "POST-INCAPACIDAD", "Post Incapacidad", "PostIncapacidad",
+      // "Administrativos/Ocupacionales", etc.
+      const tipoNorm = String(patient.tipoExamen || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .replace(/[\s\-_/]/g, '');
+      const esTipoGrabable = tipoNorm.includes('ocupacional') || tipoNorm.includes('incapac');
       const esSiigo = String(patient.codEmpresa || '').trim().toUpperCase() === 'SIIGO';
       session.recordingEnabled = esTipoGrabable && esSiigo;
       console.log(
