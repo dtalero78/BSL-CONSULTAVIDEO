@@ -2,6 +2,7 @@ import historiaClinicaPostgresService from './historia-clinica-postgres.service'
 import postgresService from './postgres.service';
 import whatsappService from './whatsapp.service';
 import whapiService from './whapi.service';
+import { encolarRda } from './rda-cola.service';
 import { conceptoRequiereRevisionSst } from '../helpers/concepto-aptitud.helper';
 import { buildCertificadoUrl } from '../helpers/certificado.helper';
 import { MALUWA360_SOURCE } from '../helpers/integracion-maluwa.helper';
@@ -534,6 +535,14 @@ class MedicalHistoryService {
       }
 
       console.log(`✅ [PostgreSQL] Historia clínica guardada exitosamente para ${payload.historiaId}`);
+
+      // PASO 1.2: Encolar el RDA para el Ministerio (Res. 1888/2025).
+      // Acá es donde se cierra de verdad la consulta cuando la atención fue por video, así
+      // que es el único punto desde el que puede salir. PLATAFORMA2 tiene su propio
+      // enganche en PUT /api/historia-clinica/:id, pero ese no se dispara por este camino.
+      // Solo encola: el cron de PLATAFORMA2 arma el FHIR y lo envía. Fire-and-forget.
+      encolarRda(payload.historiaId, (historiaBase as any).tenant_id || 'bsl')
+        .catch(e => console.error('⚠️  [RDA] encolar:', e?.message || e));
 
       // PASO 1.2: Integraciones externas (Maluwa360) → encolar el webhook de resultado.
       // Fire-and-forget: un fallo aquí NUNCA rompe ni demora el guardado.
