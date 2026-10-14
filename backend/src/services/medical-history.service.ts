@@ -1,6 +1,7 @@
 import historiaClinicaPostgresService from './historia-clinica-postgres.service';
 import postgresService from './postgres.service';
-import whatsappService from './whatsapp.service';
+// whatsappService ya no se importa: el único envío de este servicio era el link
+// del certificado al paciente, eliminado el 2026-10-14 (ver PASO 1.5).
 import whapiService from './whapi.service';
 
 interface AntecedentesPersonales {
@@ -515,87 +516,20 @@ class MedicalHistoryService {
 
       console.log(`✅ [PostgreSQL] Historia clínica guardada exitosamente para ${payload.historiaId}`);
 
-      // PASO 1.5: Enviar link de certificado por WhatsApp para empresas específicas (PARTICULAR o SANITHELP-JJ)
-      if (historiaBase.codEmpresa === 'PARTICULAR' || historiaBase.codEmpresa === 'SANITHELP-JJ') {
-        console.log(`📜 [Certificado] Enviando link de certificado para ${payload.historiaId} (${historiaBase.codEmpresa})...`);
-
-        // Idempotencia: reclamar atómicamente el envío del certificado. Evita duplicados
-        // cuando updateMedicalHistory se llama varias veces al guardar/aprobar la misma orden.
-        // Solo el primer llamado "gana" (rows.length > 0); los demás se saltan el envío.
-        const certClaim = await postgresService.query(
-          `UPDATE "HistoriaClinica" SET "certificadoWaEnviado" = true
-           WHERE "_id" = $1 AND COALESCE("certificadoWaEnviado", false) = false
-           RETURNING "_id"`,
-          [payload.historiaId]
-        );
-
-        // Construir URL del certificado
-        const certificadoUrl = `https://bsl-utilidades-yp78a.ondigitalocean.app/generar-certificado-desde-wix/${payload.historiaId}`;
-
-        // Formatear número de celular para WhatsApp
-        let celularFormateado = historiaBase.celular
-          .replace(/\s+/g, '') // Quitar espacios
-          .replace(/[()+-]/g, ''); // Quitar caracteres especiales
-
-        // Detectar si ya tiene código de país (números internacionales empiezan con 1-9, no con 3)
-        // Colombia: 57 + 10 dígitos (3001234567)
-        // USA/Canada: 1 + 10 dígitos
-        // Otros países: código país + número
-
-        const codigosPais = ['1', '52', '57', '54', '55', '34', '44', '49', '33']; // USA, México, Colombia, Argentina, Brasil, España, UK, Alemania, Francia
-        const tieneCodigo = codigosPais.some(codigo => celularFormateado.startsWith(codigo));
-
-        // Si no tiene código de país y empieza con 3 (celulares colombianos), agregar 57
-        if (!tieneCodigo && celularFormateado.startsWith('3') && celularFormateado.length === 10) {
-          celularFormateado = `57${celularFormateado}`;
-        }
-
-        const nombreCompleto = `${historiaBase.primerNombre} ${historiaBase.primerApellido}`;
-        const tenantIdPaciente = (historiaBase as any).tenant_id || 'bsl';
-        // Template atendido_desde_nubia (CTA): botón con URL base fija + {{2}}=ordenId.
-        // NO usar certificado_listo (HX2bdfa3...): tiene {{2}}=URL completa en body → Meta bloquea con 21656.
-        const certificadoTemplateSid = process.env.TWILIO_TEMPLATE_CERTIFICADO_LISTO || 'HX87de46b685187c21e29fe09e2eaa1845';
-
-        // Free-text fallback (solo funciona si el paciente escribió en las últimas 24h).
-        const mensajeFallback = `Hola ${nombreCompleto}! 👋\n\n` +
-          `Tu certificado médico ya está listo. Puedes descargarlo en el siguiente enlace:\n\n` +
-          `${certificadoUrl}\n\n` +
-          `_Este enlace estará disponible por 30 días._`;
-
-        if (!certClaim || certClaim.length === 0) {
-          console.log(`⏭️  [Certificado] Ya se envió antes para ${payload.historiaId}; no se reenvía.`);
-        } else {
-          whatsappService.sendContentTemplate(
-            celularFormateado,
-            certificadoTemplateSid,
-            { '1': nombreCompleto, '2': payload.historiaId },
-            tenantIdPaciente
-          )
-            .then(async (result) => {
-              if (result.success) {
-                console.log(`✅ [Certificado] Template enviado por WhatsApp a ${celularFormateado}`);
-                return;
-              }
-              console.warn(`⚠️  [Certificado] Template falló (${result.error}); intentando free-text`);
-              const fallback = await whatsappService.sendTextMessage(celularFormateado, mensajeFallback, tenantIdPaciente);
-              if (fallback.success) {
-                console.log(`✅ [Certificado] Free-text enviado por WhatsApp a ${celularFormateado}`);
-              } else {
-                console.error(`⚠️  [Certificado] Error enviando free-text: ${fallback.error}`);
-                // Falló template Y free-text: liberar el guard para reintentar en un próximo guardado.
-                await postgresService.query(`UPDATE "HistoriaClinica" SET "certificadoWaEnviado" = false WHERE "_id" = $1`, [payload.historiaId]);
-              }
-            })
-            .catch(async (error: any) => {
-              console.error(`⚠️  [Certificado] Error inesperado al enviar WhatsApp: ${error.message}`);
-              await postgresService.query(`UPDATE "HistoriaClinica" SET "certificadoWaEnviado" = false WHERE "_id" = $1`, [payload.historiaId]);
-            });
-
-          console.log(`📤 [Certificado] Enviando link por WhatsApp a ${celularFormateado}...`);
-        }
-      } else {
-        console.log(`ℹ️  [Certificado] No se envía certificado para ${historiaBase.codEmpresa || 'N/A'}`);
-      }
+      // PASO 1.5 — ELIMINADO EL 2026-10-14 POR DECISIÓN DE DANIEL.
+      //
+      // Acá se le mandaba al paciente (PARTICULAR y SANITHELP-JJ) un WhatsApp al
+      // cerrar la atención: plantilla con el link al certificado y, si la plantilla
+      // fallaba, un free-text con el texto "Tu certificado médico ya está listo.
+      // Puedes descargarlo en el siguiente enlace" + URL de bsl-utilidades.
+      //
+      // ⛔ ESE MENSAJE NO SE PUEDE ENVIAR NUNCA. No lo reintroduzcas: ni la
+      // plantilla, ni el free-text, ni una variante con otro texto que lleve el
+      // link de descarga. El equivalente en BSL-PLATAFORMA2 también se cortó
+      // (src/services/certificado-listo.js quedó sin callers).
+      //
+      // La columna "certificadoWaEnviado" se deja de escribir; se conserva en la
+      // tabla por histórico. El bloque original quedó en el commit que lo eliminó.
 
       // PASO 2: Enviar alerta WhatsApp para OMEGA con concepto crítico
       this.sendOmegaAlertIfNeeded(historiaBase, payload);
