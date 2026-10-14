@@ -219,6 +219,7 @@ export const VideoRoom = ({ identity, roomName, role, historiaId, documento, med
           style={{ width: '450px', maxWidth: '90vw' }}
         >
           <MedicalHistoryPanel
+            medicoCode={medicoCode}
             historiaId={historiaId}
             sueltaBase={sueltaBase}
             onAppendToObservaciones={(func) => setAppendToObservacionesFunc(() => func)}

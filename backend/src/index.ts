@@ -14,6 +14,7 @@ import tenantRoutes from './routes/tenant.routes';
 import webhookRoutes from './routes/webhook.routes';
 import whatsappChatRoutes from './routes/whatsapp-chat.routes';
 import integrationRoutes from './routes/integration.routes';
+import ihceRoutes from './routes/ihce.routes';
 import integrationWebhookService from './services/integration-webhook.service';
 import { telemedicineSocketService } from './services/telemedicine-socket.service';
 import { sessionTracker } from './services/session-tracker.service';
@@ -119,6 +120,9 @@ app.use('/api/webhook', webhookRoutes);
 app.use('/api/whatsapp-chat', whatsappChatRoutes);
 // Integraciones B2B (Maluwa360): exigen X-Integration-Key (falla cerrado).
 app.use('/api/integration', integrationRoutes);
+// Historia clínica nacional (IHCE): proxy a PLATAFORMA2, que es quien habla con el
+// Ministerio. Ver backend/src/services/ihce.service.ts.
+app.use('/api/ihce', ihceRoutes);
 
 // Servir archivos estaticos del frontend (despues de las rutas API)
 const frontendPath = path.join(__dirname, '..', 'frontend-dist');

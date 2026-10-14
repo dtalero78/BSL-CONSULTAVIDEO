@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import type { Room } from 'twilio-video';
 import apiService from '../services/api.service';
 import { PatientHistoryModal } from './PatientHistoryModal';
+import { NationalHistoryModal } from './NationalHistoryModal';
 import { useConsultationRecorder } from '../hooks/useConsultationRecorder';
 
 interface AntecedentesPersonales {
@@ -105,6 +106,7 @@ interface SueltaBase {
 
 interface MedicalHistoryPanelProps {
   historiaId: string;
+  medicoCode?: string; // para consultar la historia nacional (IHCE)
   sueltaBase?: SueltaBase; // Datos base cuando la historia aún no existe (consulta suelta)
   onAppendToObservaciones?: (text: string) => void;
   room?: Room | null;
@@ -119,7 +121,7 @@ const splitNombre = (full: string): { primerNombre: string; primerApellido: stri
   return { primerNombre: parts[0], primerApellido: parts.slice(1).join(' ') };
 };
 
-export const MedicalHistoryPanel = ({ historiaId, sueltaBase, onAppendToObservaciones, room, patientConnected }: MedicalHistoryPanelProps) => {
+export const MedicalHistoryPanel = ({ historiaId, sueltaBase, onAppendToObservaciones, room, patientConnected, medicoCode}: MedicalHistoryPanelProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -142,6 +144,7 @@ export const MedicalHistoryPanel = ({ historiaId, sueltaBase, onAppendToObservac
   const [aiSuggestions, setAiSuggestions] = useState('');
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [isNationalModalOpen, setIsNationalModalOpen] = useState(false);
   const [transcriptionNotice, setTranscriptionNotice] = useState<string | null>(null);
   const [transcriptText, setTranscriptText] = useState('');
   const [showTranscript, setShowTranscript] = useState(false);
@@ -710,6 +713,16 @@ export const MedicalHistoryPanel = ({ historiaId, sueltaBase, onAppendToObservac
               Certificado
             </button>
             <button
+              onClick={() => setIsNationalModalOpen(true)}
+              className="flex items-center gap-2 px-3 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 transition"
+              title="Ver lo que otros prestadores reportaron de este paciente a la red nacional (IHCE)"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Historia nacional
+            </button>
+            <button
               onClick={() => setIsHistoryModalOpen(true)}
               className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition"
               title="Ver consultas anteriores de este paciente"
@@ -1241,6 +1254,14 @@ export const MedicalHistoryPanel = ({ historiaId, sueltaBase, onAppendToObservac
           )}
         </button>
       </div>
+
+      {/* Historia clínica nacional (IHCE): lo que otros prestadores reportaron */}
+      <NationalHistoryModal
+        isOpen={isNationalModalOpen}
+        onClose={() => setIsNationalModalOpen(false)}
+        historiaId={historiaId}
+        medicoCode={medicoCode}
+      />
 
       {/* Modal de Historial de Consultas */}
       {data?.numeroId && (
