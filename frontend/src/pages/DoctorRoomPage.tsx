@@ -51,6 +51,8 @@ export const DoctorRoomPage = () => {
         roomName={roomName}
         role="doctor"
         historiaId={historiaIdParam || undefined}
+        medicoCode={/* alias del médico ("SIXTA"): lo valida contra la tabla medicos la
+                       consulta de historia clínica nacional */ doctorParam || undefined}
         sueltaBase={sueltaBase}
         onLeave={handleLeaveCall}
       />

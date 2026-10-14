@@ -63,6 +63,13 @@ export const NationalHistoryModal = ({ isOpen, onClose, historiaId, medicoCode }
 
   useEffect(() => {
     if (!isOpen) return;
+    if (!medicoCode) {
+      // Sin el código no se puede validar quién consulta, y la URL quedaría con un hueco
+      // (/api/ihce//orden/...) que ni siquiera llega a la ruta.
+      setError('No se identificó el código del médico en esta sala. Volvé a entrar al paciente desde el panel.');
+      setCargando(false);
+      return;
+    }
     let vivo = true;
     setCargando(true);
     setError(null);
@@ -72,11 +79,15 @@ export const NationalHistoryModal = ({ isOpen, onClose, historiaId, medicoCode }
 
     (async () => {
       try {
-        const r = await fetch(`/api/ihce/${encodeURIComponent(medicoCode || '')}/orden/${encodeURIComponent(historiaId)}`);
+        const r = await fetch(`/api/ihce/${encodeURIComponent(medicoCode)}/orden/${encodeURIComponent(historiaId)}`);
         const j = await r.json().catch(() => null);
         if (!vivo) return;
-        if (!r.ok || !j || j.success === false) {
-          setError((j && j.error) || `El servidor respondió ${r.status}`);
+        if (!j) {
+          // Pasó cuando la ruta no existía y respondía el HTML del panel: decir
+          // "el servidor respondió 200" no ayudaba a nadie a entender qué pasaba.
+          setError(`El servidor respondió ${r.status} con algo que no es una respuesta válida.`);
+        } else if (!r.ok || j.success === false) {
+          setError(j.error || `El servidor respondió ${r.status}`);
         } else {
           setDatos(j);
         }
@@ -108,8 +119,10 @@ export const NationalHistoryModal = ({ isOpen, onClose, historiaId, medicoCode }
         `/api/ihce/${encodeURIComponent(medicoCode || '')}/orden/${encodeURIComponent(historiaId)}/documento/${encodeURIComponent(compositionId)}`
       );
       const j = await r.json().catch(() => null);
-      if (!r.ok || !j || j.success === false || !j.html) {
-        setDocError((j && j.error) || `El servidor respondió ${r.status}`);
+      if (!j) {
+        setDocError(`El servidor respondió ${r.status} con algo que no es una respuesta válida.`);
+      } else if (!r.ok || j.success === false || !j.html) {
+        setDocError(j.error || `El servidor respondió ${r.status}`);
       } else {
         aplicarCss(j.css);
         setDocHtml(j.html);
