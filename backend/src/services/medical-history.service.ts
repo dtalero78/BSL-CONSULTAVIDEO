@@ -848,7 +848,7 @@ class MedicalHistoryService {
       mensaje += `*Concepto Final:* ${payload.mdConceptoFinal || 'No especificado'}\n`;
       mensaje += `\n*Certificado:*\n${certificadoUrl}\n`;
 
-      const telefonos = ['573148887169', '573007916121', '573207213743'];
+      const telefonos = ['573148887169'];
 
       console.log(`📋 Notificando cierre de HC SOFTSERVE para ${nombrePaciente}`);
 
