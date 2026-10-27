@@ -56,14 +56,16 @@ class MedicalPanelService {
   }
 
   /**
-   * Verifica si el código de médico existe en HistoriaClinica para el tenant.
-   * Un código es válido si tiene al menos una historia clínica asociada.
+   * Verifica si el código de médico existe en la tabla `medicos` para el tenant.
+   * Antes validaba contra HistoriaClinica (requería al menos una historia clínica
+   * ya asociada), lo cual bloqueaba el login de cualquier médico recién creado sin
+   * consultas previas. Ahora valida contra el catálogo real de médicos activos.
    */
   async medicoExists(medicoCode: string, tenantId: string = 'bsl'): Promise<boolean> {
     try {
       const result = await postgresService.query(
-        `SELECT 1 FROM "HistoriaClinica"
-         WHERE "medico" = $1 AND tenant_id = $2
+        `SELECT 1 FROM medicos
+         WHERE UPPER(TRIM(alias)) = UPPER(TRIM($1)) AND tenant_id = $2 AND activo = true
          LIMIT 1`,
         [medicoCode, tenantId]
       );
