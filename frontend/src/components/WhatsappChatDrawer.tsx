@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { X, Send, Loader2, MessageCircle } from 'lucide-react';
+import { X, Send, Loader2, MessageCircle, FileText, ExternalLink } from 'lucide-react';
 import apiService, { WaMensaje } from '../services/api.service';
 
 // Socket.io del chat vive en bsl-plataforma (esta app es el tenant 'bsl'). Al
@@ -18,6 +18,84 @@ function fmtHora(iso: string): string {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return '';
   return d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+}
+
+interface Adjunto {
+  url: string;
+  contentType: string;
+}
+
+function parseLista(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  const t = raw.trim();
+  if (t.startsWith('[')) {
+    try {
+      const arr = JSON.parse(t);
+      return Array.isArray(arr) ? arr.map(String) : [];
+    } catch {
+      return [];
+    }
+  }
+  return [t];
+}
+
+// media_url llega en dos formatos desde bsl-plataforma: los entrantes son un JSON
+// array de URLs de Twilio (privadas → van por el proxy del backend) con
+// media_type en otro array paralelo; los salientes (certificados) son una URL
+// pública suelta, sin media_type.
+function adjuntosDe(m: WaMensaje): Adjunto[] {
+  const urls = parseLista(m.mediaUrl);
+  const tipos = parseLista(m.mediaType);
+  return urls.map((u, i) => {
+    let contentType = tipos[i] || '';
+    if (!contentType) {
+      if (/\.pdf($|\?)/i.test(u) || m.tipoMensaje === 'document') contentType = 'application/pdf';
+      else if (/\.(jpe?g|png|webp|gif)($|\?)/i.test(u) || m.tipoMensaje === 'image') contentType = 'image/jpeg';
+    }
+    const url = u.startsWith('https://api.twilio.com/') ? apiService.whatsappMediaUrl(u) : u;
+    return { url, contentType };
+  });
+}
+
+function nombreDoc(contentType: string): string {
+  if (contentType === 'application/pdf') return 'Documento PDF';
+  if (/word/.test(contentType)) return 'Documento Word';
+  if (/sheet|excel/.test(contentType)) return 'Hoja de cálculo';
+  if (/presentation|powerpoint/.test(contentType)) return 'Presentación';
+  return 'Archivo adjunto';
+}
+
+function AdjuntoView({ a }: { a: Adjunto }) {
+  if (a.contentType.startsWith('image/')) {
+    return (
+      <a href={a.url} target="_blank" rel="noopener noreferrer" className="block mb-1">
+        <img
+          src={a.url}
+          alt="Imagen enviada por el paciente"
+          loading="lazy"
+          className="rounded-md max-h-64 w-auto object-contain bg-black/20"
+        />
+      </a>
+    );
+  }
+  if (a.contentType.startsWith('audio/')) {
+    return <audio controls src={a.url} className="mb-1 max-w-full" />;
+  }
+  if (a.contentType.startsWith('video/')) {
+    return <video controls src={a.url} className="mb-1 rounded-md max-h-64 max-w-full" />;
+  }
+  return (
+    <a
+      href={a.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-2 mb-1 px-3 py-2 rounded-md bg-black/20 hover:bg-black/30 transition"
+    >
+      <FileText className="w-6 h-6 shrink-0 text-red-400" />
+      <span className="flex-1 text-sm">{nombreDoc(a.contentType)}</span>
+      <ExternalLink className="w-4 h-4 shrink-0 opacity-70" />
+    </a>
+  );
 }
 
 // Evita duplicar el mensaje cuando llegan por dos vías (append optimista al
@@ -87,6 +165,7 @@ export function WhatsappChatDrawer({ celular, nombre, onClose }: Props) {
         contenido: m?.contenido ?? '',
         tipoMensaje: m?.tipo_mensaje ?? 'text',
         mediaUrl: m?.media_url ?? null,
+        mediaType: m?.media_type ?? null,
         createdAt: m?.timestamp ?? m?.created_at ?? new Date().toISOString(),
       };
       setMensajes((prev) => (esDuplicado(prev, norm) ? prev : [...prev, norm]));
@@ -165,6 +244,7 @@ export function WhatsappChatDrawer({ celular, nombre, onClose }: Props) {
           ) : (
             mensajes.map((m, i) => {
               const out = m.direccion === 'saliente';
+              const adjuntos = adjuntosDe(m);
               return (
                 <div key={m.id || `tmp-${i}`} className={`flex ${out ? 'justify-end' : 'justify-start'}`}>
                   <div
@@ -172,12 +252,13 @@ export function WhatsappChatDrawer({ celular, nombre, onClose }: Props) {
                       out ? 'bg-[#005c4b] text-white' : 'bg-[#202c33] text-gray-100'
                     }`}
                   >
-                    {m.mediaUrl && (
-                      <p className="text-xs italic opacity-70 mb-1">
-                        [{m.tipoMensaje || 'media'}]
-                      </p>
+                    {adjuntos.map((a, j) => (
+                      <AdjuntoView key={j} a={a} />
+                    ))}
+                    {/* "📎 Archivo adjunto" es el relleno de la plataforma cuando no hay texto. */}
+                    {m.contenido && !(adjuntos.length && m.contenido === '📎 Archivo adjunto') && (
+                      <p className="whitespace-pre-wrap break-words">{m.contenido}</p>
                     )}
-                    {m.contenido && <p className="whitespace-pre-wrap break-words">{m.contenido}</p>}
                     <p className="text-[10px] opacity-60 text-right mt-1">{fmtHora(m.createdAt)}</p>
                   </div>
                 </div>

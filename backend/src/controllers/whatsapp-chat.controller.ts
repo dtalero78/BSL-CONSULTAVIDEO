@@ -3,6 +3,7 @@
 //
 //   GET  /api/whatsapp-chat/mensajes?celular=...  → hilo del paciente
 //   POST /api/whatsapp-chat/mensajes { celular, texto } → responder
+//   GET  /api/whatsapp-chat/media?url=...     → adjunto (imagen/PDF) del paciente
 //
 // El inbound de WhatsApp del +573153369631 lo recibe bsl-plataforma (tenant
 // 'bsl'). Estos endpoints son un PROXY a su API `/api/irischat/*` — ver
@@ -11,7 +12,7 @@
 // ============================================================================
 
 import { Request, Response } from 'express';
-import bslPlataformaChatService from '../services/bsl-plataforma-chat.service';
+import bslPlataformaChatService, { esMediaDeTwilio } from '../services/bsl-plataforma-chat.service';
 
 class WhatsappChatController {
   /** GET /mensajes?celular=... → hilo de la conversación. */
@@ -55,6 +56,33 @@ class WhatsappChatController {
       res
         .status(502)
         .json({ success: false, error: 'No se pudo enviar el mensaje por la plataforma.' });
+    }
+  };
+
+  /**
+   * GET /media?url=... → adjunto que el paciente mandó por WhatsApp. Las URLs de
+   * Twilio exigen credenciales, así que se piden al proxy de la plataforma y se
+   * re-emiten en streaming (el JWT de la plataforma nunca llega al navegador).
+   */
+  getMedia = async (req: Request, res: Response): Promise<void> => {
+    const url = typeof req.query.url === 'string' ? req.query.url : '';
+    if (!esMediaDeTwilio(url)) {
+      res.status(400).json({ success: false, error: 'URL de adjunto no válida' });
+      return;
+    }
+    try {
+      const media = await bslPlataformaChatService.getMedia(url);
+      for (const [k, v] of Object.entries(media.headers)) res.setHeader(k, v);
+      // Datos clínicos: solo caché del navegador del médico, nunca compartida.
+      res.setHeader('Cache-Control', 'private, max-age=86400');
+      res.status(media.status);
+      media.body.on('error', () => res.destroy());
+      media.body.pipe(res);
+    } catch (error: any) {
+      console.error('[WA-Chat] getMedia error:', error?.message ?? error);
+      if (!res.headersSent) {
+        res.status(502).json({ success: false, error: 'No se pudo cargar el adjunto.' });
+      }
     }
   };
 }

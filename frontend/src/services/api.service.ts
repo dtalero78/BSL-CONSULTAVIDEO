@@ -31,6 +31,7 @@ export interface WaMensaje {
   contenido: string;
   tipoMensaje?: string;
   mediaUrl?: string | null;
+  mediaType?: string | null;
   createdAt: string;
 }
 
@@ -81,6 +82,11 @@ class ApiService {
   ): Promise<{ success: boolean; mensaje?: WaMensaje; error?: string; hint?: string }> {
     const res = await this.client.post(`/api/whatsapp-chat/mensajes`, { celular, texto });
     return res.data;
+  }
+
+  /** URL (para <img>/<a>) de un adjunto de Twilio servido por el proxy del backend. */
+  whatsappMediaUrl(twilioUrl: string): string {
+    return `${API_BASE_URL}/api/whatsapp-chat/media?url=${encodeURIComponent(twilioUrl)}`;
   }
 
   /**

@@ -8,5 +8,7 @@ const router = Router();
 // Lectura del hilo + responder desde el panel.
 router.get('/mensajes', whatsappChatController.getMensajes);
 router.post('/mensajes', whatsappChatController.sendReply);
+// Adjuntos (imágenes, PDFs) que manda el paciente.
+router.get('/media', whatsappChatController.getMedia);
 
 export default router;

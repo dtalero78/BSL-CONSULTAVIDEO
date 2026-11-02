@@ -13,6 +13,7 @@
 // ============================================================================
 
 import axios, { AxiosInstance } from 'axios';
+import { Readable } from 'stream';
 
 const BASE = (process.env.BSL_PLATAFORMA_URL || 'https://bsl-plataforma.com').replace(/\/+$/, '');
 const TENANT = process.env.BSL_PLATAFORMA_TENANT || 'bsl';
@@ -25,7 +26,19 @@ export interface WaMensaje {
   contenido: string;
   tipoMensaje: string;
   mediaUrl: string | null;
+  /** Content-type(s) del adjunto; para los entrantes de Twilio es un JSON array. */
+  mediaType: string | null;
   createdAt: string;
+}
+
+// Formato exacto de un adjunto de WhatsApp en Twilio (mismo patrón que
+// PATRON_MEDIA_TWILIO en bsl-plataforma). Solo estas URLs pasan por el proxy de
+// media: así no sirve para leer otras rutas de api.twilio.com.
+const PATRON_MEDIA_TWILIO =
+  /^https:\/\/api\.twilio\.com\/2010-04-01\/Accounts\/AC[0-9a-f]{32}\/Messages\/(MM|SM)[0-9a-f]{32}\/Media\/ME[0-9a-f]{32}$/i;
+
+export function esMediaDeTwilio(url: string): boolean {
+  return PATRON_MEDIA_TWILIO.test(url);
 }
 
 function soloDigitos(s: string): string {
@@ -39,6 +52,7 @@ function mapMsg(m: any): WaMensaje {
     contenido: m?.contenido ?? '',
     tipoMensaje: m?.tipo_mensaje ?? m?.tipoMensaje ?? 'text',
     mediaUrl: m?.media_url ?? m?.mediaUrl ?? null,
+    mediaType: m?.media_type ?? m?.mediaType ?? null,
     createdAt: m?.timestamp ?? m?.created_at ?? m?.createdAt ?? new Date().toISOString(),
   };
 }
@@ -136,6 +150,29 @@ class BslPlataformaChatService {
       );
       const m = res.data?.mensaje ?? res.data;
       return mapMsg({ ...m, direccion: 'saliente', contenido: m?.contenido ?? texto });
+    });
+  }
+
+  /**
+   * Descarga un adjunto de Twilio a través del proxy de la plataforma (que tiene
+   * las credenciales de Twilio). Devuelve el stream + headers para re-emitirlos.
+   */
+  async getMedia(
+    url: string
+  ): Promise<{ status: number; headers: Record<string, string>; body: Readable }> {
+    return this.authed(async (headers) => {
+      const res = await this.client.get('/api/irischat/media/proxy', {
+        headers,
+        params: { url },
+        responseType: 'stream',
+        timeout: 60000,
+      });
+      const out: Record<string, string> = {};
+      for (const h of ['content-type', 'content-length', 'last-modified', 'etag']) {
+        const v = res.headers[h];
+        if (v) out[h] = String(v);
+      }
+      return { status: res.status, headers: out, body: res.data as Readable };
     });
   }
 }
