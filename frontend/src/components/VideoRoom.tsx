@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import apiService from '../services/api.service';
 import { useVideoRoom } from '../hooks/useVideoRoom';
 import { useBackgroundEffects } from '../hooks/useBackgroundEffects';
@@ -31,6 +31,11 @@ interface VideoRoomProps {
 export const VideoRoom = ({ identity, roomName, role, historiaId, documento, medicoCode, sueltaBase, onLeave }: VideoRoomProps) => {
   const [isPosturalAnalysisOpen, setIsPosturalAnalysisOpen] = useState(false);
   const [appendToObservacionesFunc, setAppendToObservacionesFunc] = useState<((text: string) => void) | null>(null);
+  // Referencia estable: si fuera una flecha inline, MedicalHistoryPanel re-registraría la función en
+  // cada render, eso cambia este estado y vuelve a renderizar → ciclo infinito de renders.
+  const registerAppendToObservaciones = useCallback((func: (text: string) => void) => {
+    setAppendToObservacionesFunc(() => func);
+  }, []);
 
   const {
     room,
@@ -222,7 +227,7 @@ export const VideoRoom = ({ identity, roomName, role, historiaId, documento, med
             medicoCode={medicoCode}
             historiaId={historiaId}
             sueltaBase={sueltaBase}
-            onAppendToObservaciones={(func) => setAppendToObservacionesFunc(() => func)}
+            onAppendToObservaciones={registerAppendToObservaciones}
             room={room}
             patientConnected={remoteParticipants.size > 0}
           />
