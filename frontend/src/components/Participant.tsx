@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, memo } from 'react';
 import {
   Participant as TwilioParticipant,
   RemoteVideoTrack,
@@ -14,7 +14,7 @@ interface ParticipantProps {
   isLocal?: boolean;
 }
 
-export const Participant = ({ participant, isLocal = false }: ParticipantProps) => {
+const ParticipantInner = ({ participant, isLocal = false }: ParticipantProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [videoTrack, setVideoTrack] = useState<LocalVideoTrack | RemoteVideoTrack | null>(null);
@@ -189,3 +189,6 @@ export const Participant = ({ participant, isLocal = false }: ParticipantProps) 
     </div>
   );
 };
+
+// memo: evita redibujar los videos con cada cuadro del análisis postural.
+export const Participant = memo(ParticipantInner);

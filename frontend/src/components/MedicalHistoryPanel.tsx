@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import type { Room } from 'twilio-video';
 import apiService from '../services/api.service';
 import { PatientHistoryModal } from './PatientHistoryModal';
@@ -108,7 +108,8 @@ interface MedicalHistoryPanelProps {
   historiaId: string;
   medicoCode?: string; // para consultar la historia nacional (IHCE)
   sueltaBase?: SueltaBase; // Datos base cuando la historia aún no existe (consulta suelta)
-  onAppendToObservaciones?: (text: string) => void;
+  // Registra en el padre la función que agrega texto a observaciones (debe ser estable: useCallback)
+  onAppendToObservaciones?: (appendFn: (text: string) => void) => void;
   room?: Room | null;
   patientConnected?: boolean;
 }
@@ -121,7 +122,7 @@ const splitNombre = (full: string): { primerNombre: string; primerApellido: stri
   return { primerNombre: parts[0], primerApellido: parts.slice(1).join(' ') };
 };
 
-export const MedicalHistoryPanel = ({ historiaId, sueltaBase, onAppendToObservaciones, room, patientConnected, medicoCode}: MedicalHistoryPanelProps) => {
+const MedicalHistoryPanelInner = ({ historiaId, sueltaBase, onAppendToObservaciones, room, patientConnected, medicoCode}: MedicalHistoryPanelProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -328,7 +329,7 @@ export const MedicalHistoryPanel = ({ historiaId, sueltaBase, onAppendToObservac
 
       // "Registrar" la función llamándola inmediatamente
       // Esto permite que el padre llame a esta función cuando sea necesario
-      onAppendToObservaciones(appendText as any);
+      onAppendToObservaciones(appendText);
     }
   }, [onAppendToObservaciones]);
 
@@ -1275,3 +1276,7 @@ export const MedicalHistoryPanel = ({ historiaId, sueltaBase, onAppendToObservac
     </div>
   );
 };
+
+// memo: el análisis postural actualiza VideoRoom varias veces por segundo; sin esto el formulario
+// completo se volvía a dibujar con cada cuadro del esqueleto.
+export const MedicalHistoryPanel = memo(MedicalHistoryPanelInner);

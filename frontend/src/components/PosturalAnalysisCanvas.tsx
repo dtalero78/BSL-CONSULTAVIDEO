@@ -18,13 +18,6 @@ export const PosturalAnalysisCanvas: React.FC<PosturalAnalysisCanvasProps> = ({ 
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    console.log('[Canvas] 🎨 Attempting to draw:', {
-      hasCanvas: !!canvasRef.current,
-      hasPoseData: !!poseData,
-      landmarksCount: poseData?.landmarks?.length || 0,
-      timestamp: poseData?.timestamp
-    });
-
     if (!canvasRef.current || !poseData || !poseData.landmarks) {
       console.warn('[Canvas] ⚠️ Missing data for drawing:', {
         canvas: !!canvasRef.current,
@@ -52,7 +45,6 @@ export const PosturalAnalysisCanvas: React.FC<PosturalAnalysisCanvasProps> = ({ 
     // Draw landmarks and skeleton
     drawSkeleton(ctx, poseData.landmarks, canvas.width, canvas.height);
 
-    console.log('[Canvas] ✅ Successfully drew skeleton with', poseData.landmarks.length, 'landmarks');
   }, [poseData]);
 
   const drawSkeleton = (
@@ -130,14 +122,14 @@ export const PosturalAnalysisCanvas: React.FC<PosturalAnalysisCanvasProps> = ({ 
     // Draw timestamp
     ctx.fillStyle = '#00ff00';
     ctx.font = '12px monospace';
-    ctx.fillText(`FPS: ${(1000 / 66.67).toFixed(1)}`, 10, 20);
-    ctx.fillText(`Landmarks: ${landmarks.length}`, 10, 40);
+    ctx.fillText(`Landmarks: ${landmarks.length}`, 10, 20);
   };
 
   return (
     <div className="w-full h-full flex items-center justify-center bg-[#0b141a] rounded-lg">
       <canvas
         ref={canvasRef}
+        data-postural-canvas
         width={640}
         height={480}
         className="max-w-full max-h-full border border-gray-700 rounded-lg"
