@@ -65,7 +65,7 @@ export const PosturalAnalysisModal: React.FC<PosturalAnalysisModalProps> = ({
     }
 
     // Capturar imagen del canvas
-    const canvas = document.querySelector('canvas') as HTMLCanvasElement;
+    const canvas = document.querySelector('canvas[data-postural-canvas]') as HTMLCanvasElement | null;
     const canvasImage = canvas ? canvas.toDataURL('image/png') : undefined;
 
     const snapshot: CapturedSnapshot = {
@@ -82,7 +82,7 @@ export const PosturalAnalysisModal: React.FC<PosturalAnalysisModalProps> = ({
     }
 
     setCapturedSnapshots((prev) => [...prev, snapshot]);
-    console.log('[Capture] Snapshot captured:', snapshot);
+    console.log('[Capture] Snapshot captured:', snapshot.description);
     setShowCaptureDialog(false);
     setSnapshotDescription('');
   };

@@ -205,8 +205,10 @@ class TelemedicineSocketService {
       return;
     }
 
-    // Reenviar datos solo al médico (doctor socket)
-    socket.to(roomName).emit('pose-data-update', poseData);
+    // Reenviar datos solo al médico (doctor socket).
+    // volatile: si la conexión del médico está ocupada, el cuadro se descarta en vez de encolarse.
+    // Son datos en vivo; un cuadro viejo no sirve y la cola hacía que el cierre tardara minutos.
+    socket.to(roomName).volatile.emit('pose-data-update', poseData);
   }
 
   private handleEndSession(_socket: Socket, data: { roomName: string }) {
