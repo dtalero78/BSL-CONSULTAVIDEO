@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { VideoRoom } from '../components/VideoRoom';
 import { TenantLogo } from '../components/TenantLogo';
+import { primeRemoteAudio } from '../video/remote-audio';
 
 export const DoctorRoomPage = () => {
   const { roomName } = useParams<{ roomName: string }>();
@@ -36,6 +37,8 @@ export const DoctorRoomPage = () => {
 
   const handleJoinCall = () => {
     if (doctorName.trim()) {
+      // Desbloquear el audio dentro de este clic (ver video/remote-audio.ts).
+      primeRemoteAudio();
       setIsInCall(true);
     }
   };

@@ -100,7 +100,13 @@ class ApiService {
    */
   reportClientDiag(
     roomName: string,
-    evento: 'session-info' | 'connection-poor' | 'background-applied' | 'background-disabled',
+    evento:
+      | 'session-info'
+      | 'connection-poor'
+      | 'background-applied'
+      | 'background-disabled'
+      | 'audio-blocked'
+      | 'audio-unlocked',
     datos?: Record<string, string | number | boolean>,
     identity?: string,
     role?: 'doctor' | 'patient'

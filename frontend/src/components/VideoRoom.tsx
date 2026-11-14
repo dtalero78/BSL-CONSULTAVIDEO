@@ -51,6 +51,8 @@ export const VideoRoom = ({ identity, roomName, role, historiaId, documento, med
     isAudioEnabled,
     isVideoEnabled,
     localVideoTrack,
+    isRemoteAudioBlocked,
+    resumeRemoteAudio,
   } = useVideoRoom({ identity, roomName, role, documento, medicoCode, historiaId });
 
   const {
@@ -220,6 +222,18 @@ export const VideoRoom = ({ identity, roomName, role, historiaId, documento, med
 
   return (
     <div className="min-h-screen bg-[#0b141a] flex">
+      {/* El navegador bloqueó el sonido del otro lado (navegador de WhatsApp en
+          Android, iPhone). Sin esto el paciente ve al médico pero no lo oye y
+          nadie se entera. Cualquier toque lo desbloquea; el botón lo hace obvio. */}
+      {isRemoteAudioBlocked && (
+        <button
+          type="button"
+          onClick={resumeRemoteAudio}
+          className="fixed top-4 left-1/2 -translate-x-1/2 z-[70] w-[calc(100%-2rem)] max-w-md bg-[#00a884] hover:bg-[#008f6f] text-white font-semibold text-lg px-6 py-4 rounded-2xl shadow-2xl animate-pulse"
+        >
+          🔊 Toca aquí para escuchar {role === 'patient' ? 'al médico' : 'al paciente'}
+        </button>
+      )}
       {/* Panel lateral de Historia Clínica - Siempre visible para doctores */}
       {role === 'doctor' && historiaId && (
         <div

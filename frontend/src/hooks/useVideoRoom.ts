@@ -27,6 +27,10 @@ interface UseVideoRoomReturn {
   isAudioEnabled: boolean;
   isVideoEnabled: boolean;
   localVideoTrack: LocalVideoHandle | null;
+  /** El navegador bloqueó el audio del otro lado: mostrar "Toca para escuchar". */
+  isRemoteAudioBlocked: boolean;
+  /** Llamar SINCRÓNICAMENTE desde el onClick del botón "Toca para escuchar". */
+  resumeRemoteAudio: () => void;
 }
 
 // Helper function para reproducir sonido de notificación
@@ -109,6 +113,7 @@ export const useVideoRoom = ({
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [localVideoTrack, setLocalVideoTrack] = useState<LocalVideoHandle | null>(null);
+  const [isRemoteAudioBlocked, setIsRemoteAudioBlocked] = useState(false);
 
   const connectToRoom = useCallback(async () => {
     try {
@@ -136,6 +141,10 @@ export const useVideoRoom = ({
       setIsConnected(true);
       setLocalVideoTrack(engine.getLocalVideoHandle());
       setRemoteParticipants(new Map(initialRemotes.map((p) => [p.sid, p])));
+
+      // Audio del otro lado bloqueado por el navegador (WebView de WhatsApp, iPhone).
+      setIsRemoteAudioBlocked(engine.isRemoteAudioBlocked?.() ?? false);
+      engine.onRemoteAudioBlockedChanged?.((blocked) => setIsRemoteAudioBlocked(blocked));
 
       // Registrar conexión para reportes (si se proporcionó rol)
       if (role) {
@@ -214,6 +223,10 @@ export const useVideoRoom = ({
     }
   }, [room]);
 
+  const resumeRemoteAudio = useCallback(() => {
+    room?.resumeRemoteAudio?.();
+  }, [room]);
+
   const toggleVideo = useCallback(() => {
     if (room) {
       setIsVideoEnabled(room.toggleVideo());
@@ -270,5 +283,7 @@ export const useVideoRoom = ({
     isAudioEnabled,
     isVideoEnabled,
     localVideoTrack,
+    isRemoteAudioBlocked,
+    resumeRemoteAudio,
   };
 };

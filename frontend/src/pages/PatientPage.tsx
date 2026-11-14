@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { VideoRoom } from '../components/VideoRoom';
 import { TenantLogo } from '../components/TenantLogo';
+import { primeRemoteAudio } from '../video/remote-audio';
 
 export const PatientPage = () => {
   const { roomName } = useParams<{ roomName: string }>();
@@ -26,6 +27,9 @@ export const PatientPage = () => {
 
   const handleJoinCall = () => {
     if (patientName.trim()) {
+      // Desbloquear el audio DENTRO de este toque: si no, en el navegador de
+      // WhatsApp (Android) y en iPhone el paciente ve al médico pero no lo oye.
+      primeRemoteAudio();
       setIsInCall(true);
     }
   };

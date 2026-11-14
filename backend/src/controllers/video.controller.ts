@@ -278,7 +278,14 @@ class VideoController {
    */
   async trackClientDiag(req: Request, res: Response): Promise<void> {
     try {
-      const EVENTOS = ['session-info', 'connection-poor', 'background-applied', 'background-disabled'];
+      const EVENTOS = [
+        'session-info',
+        'connection-poor',
+        'background-applied',
+        'background-disabled',
+        'audio-blocked',
+        'audio-unlocked',
+      ];
       const { roomName, identity, role, evento, datos } = req.body || {};
       if (typeof roomName === 'string' && roomName && EVENTOS.includes(evento)) {
         const detalle =

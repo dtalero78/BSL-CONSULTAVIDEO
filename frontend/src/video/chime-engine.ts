@@ -58,6 +58,7 @@ import {
   ChimeVideoEngineLike,
   createEmitter,
 } from './video-engine';
+import { getRemoteAudioElement } from './remote-audio';
 
 /**
  * El pipeline de GRABACIÓN (Media Capture Pipeline) se une al meeting como un
@@ -89,6 +90,9 @@ function infoDelEquipo(): Record<string, string | number> {
     ramGb: nav.deviceMemory ?? 0,
     pantalla: `${window.screen?.width ?? 0}x${window.screen?.height ?? 0}`,
     navegador: (navigator.userAgent || '').slice(0, 120),
+    // Navegador interno de una app (WhatsApp/Facebook en Android = WebView). Ahí
+    // el audio solo suena si se desbloquea con un toque (ver remote-audio.ts).
+    webview: /; wv\)|Version\/4\.0 Chrome/.test(navigator.userAgent || '') ? 1 : 0,
   };
   const con = nav.connection;
   if (con) {
@@ -167,6 +171,12 @@ export class ChimeVideoEngine implements VideoEngine, ChimeVideoEngineLike {
   private diagRole: 'doctor' | 'patient' | undefined;
   private ultimasMetricas: Record<string, number> = {};
   private ultimoAvisoConexion = 0;
+
+  // Audio remoto bloqueado por el navegador (ver remote-audio.ts).
+  private remoteAudioBlocked = false;
+  private remoteAudioBlockedChanged = createEmitter<[boolean]>();
+  private audioCheckTimer: ReturnType<typeof setInterval> | null = null;
+  private removeUnlockListeners: (() => void) | null = null;
 
   private participantConnected = createEmitter<[NormalizedParticipant]>();
   private participantDisconnected = createEmitter<[string]>();
@@ -324,13 +334,16 @@ export class ChimeVideoEngine implements VideoEngine, ChimeVideoEngineLike {
       session.audioVideo.startLocalVideoTile();
     }
 
-    // Bind the meeting's mixed remote audio ONCE, to a hidden element owned by
-    // this engine (decoupled from whichever <Participant> components mount).
-    this.hiddenAudioEl = document.createElement('audio');
-    this.hiddenAudioEl.autoplay = true;
-    this.hiddenAudioEl.style.display = 'none';
-    document.body.appendChild(this.hiddenAudioEl);
+    // Bind the meeting's mixed remote audio ONCE, to a hidden element
+    // (decoupled from whichever <Participant> components mount). Es el elemento
+    // compartido que la página ya desbloqueó en el clic de "Unirse".
+    this.hiddenAudioEl = getRemoteAudioElement();
     await session.audioVideo.bindAudioElement(this.hiddenAudioEl);
+    // El SDK solo pone autoplay=true y NUNCA verifica si el navegador lo dejó
+    // sonar. Lo verificamos nosotros: al enlazar y luego periódicamente (el
+    // stream remoto llega unos segundos después, cuando entra el otro).
+    void this.ensureRemoteAudioPlaying();
+    this.audioCheckTimer = setInterval(() => void this.ensureRemoteAudioPlaying(), 3000);
 
     session.audioVideo
       .getCurrentMeetingAudioStream()
@@ -356,9 +369,17 @@ export class ChimeVideoEngine implements VideoEngine, ChimeVideoEngineLike {
   }
 
   disconnect(): void {
+    if (this.audioCheckTimer) {
+      clearInterval(this.audioCheckTimer);
+      this.audioCheckTimer = null;
+    }
+    this.removeUnlockListeners?.();
+    this.removeUnlockListeners = null;
+    this.setRemoteAudioBlocked(false);
     if (this.session) {
       try {
         if (this.observer) this.session.audioVideo.removeObserver(this.observer);
+        this.session.audioVideo.unbindAudioElement();
         this.session.audioVideo.stop();
       } catch {
         /* noop */
@@ -369,7 +390,10 @@ export class ChimeVideoEngine implements VideoEngine, ChimeVideoEngineLike {
       this.currentVideoTransformDevice = null;
     }
     if (this.hiddenAudioEl) {
-      this.hiddenAudioEl.remove();
+      // NO se quita del DOM: es el elemento compartido ya desbloqueado; si la
+      // persona vuelve a entrar, se reutiliza y sigue sonando.
+      this.hiddenAudioEl.pause();
+      this.hiddenAudioEl.srcObject = null;
       this.hiddenAudioEl = null;
     }
     this.session = null;
@@ -514,13 +538,97 @@ export class ChimeVideoEngine implements VideoEngine, ChimeVideoEngineLike {
     }
   }
 
+  // ---- Audio remoto bloqueado por el navegador ----
+
+  isRemoteAudioBlocked(): boolean {
+    return this.remoteAudioBlocked;
+  }
+
+  onRemoteAudioBlockedChanged(cb: (blocked: boolean) => void): () => void {
+    return this.remoteAudioBlockedChanged.subscribe(cb);
+  }
+
+  /**
+   * Reintenta sonar el audio remoto. Para que funcione hay que llamarlo
+   * SINCRÓNICAMENTE desde un onClick (el botón "Toca para escuchar").
+   */
+  resumeRemoteAudio(): void {
+    const el = this.hiddenAudioEl;
+    if (!el) return;
+    try {
+      el.muted = false;
+      el.play()
+        .then(() => this.setRemoteAudioBlocked(false))
+        .catch(() => undefined);
+    } catch {
+      /* noop */
+    }
+  }
+
+  private setRemoteAudioBlocked(blocked: boolean): void {
+    if (this.remoteAudioBlocked === blocked) return;
+    this.remoteAudioBlocked = blocked;
+    this.remoteAudioBlockedChanged.emit(blocked);
+    if (this.session) {
+      this.reportar(blocked ? 'audio-blocked' : 'audio-unlocked', {
+        navegador: (navigator.userAgent || '').slice(0, 160),
+      });
+    }
+  }
+
+  /** Si hay audio remoto enlazado pero el elemento está en pausa, intenta sonarlo. */
+  private async ensureRemoteAudioPlaying(): Promise<void> {
+    const el = this.hiddenAudioEl;
+    if (!el || !el.srcObject) return; // aún no llegó el audio del otro lado
+    if (!el.paused) {
+      this.setRemoteAudioBlocked(false);
+      return;
+    }
+    try {
+      await el.play();
+      this.setRemoteAudioBlocked(false);
+    } catch (err) {
+      if ((err as DOMException)?.name === 'NotAllowedError') {
+        this.setRemoteAudioBlocked(true);
+        this.armUnlockOnAnyTouch();
+      }
+    }
+  }
+
+  /** Cualquier toque/tecla en la página desbloquea el audio (sin buscar el botón). */
+  private armUnlockOnAnyTouch(): void {
+    if (this.removeUnlockListeners) return;
+    const eventos = ['pointerdown', 'touchend', 'click', 'keydown'] as const;
+    const handler = () => {
+      const el = this.hiddenAudioEl;
+      if (!el) return;
+      // play() debe llamarse aquí mismo, dentro del gesto, sin await previo.
+      el.play()
+        .then(() => {
+          this.setRemoteAudioBlocked(false);
+          this.removeUnlockListeners?.();
+          this.removeUnlockListeners = null;
+        })
+        .catch(() => undefined);
+    };
+    eventos.forEach((e) => document.addEventListener(e, handler, true));
+    this.removeUnlockListeners = () =>
+      eventos.forEach((e) => document.removeEventListener(e, handler, true));
+  }
+
   // ---- Telemetría de diagnóstico ----
   // Cuando un médico dice "se ve mal" / "no me escuchan", esto deja en el log del
   // servidor con qué equipo y red entró cada quien, y cuándo Chime reportó la
   // conexión como pobre. Nunca rompe la llamada (todo va en fire-and-forget).
 
   private reportar(
-    evento: 'session-info' | 'connection-poor' | 'background-applied' | 'background-disabled',
+    evento:
+      | 'session-info'
+      | 'connection-poor'
+      | 'background-applied'
+      | 'background-disabled'
+      | 'audio-blocked'
+      | 'audio-unlocked',
     datos: Record<string, string | number | boolean>
   ): void {
     if (!this.diagRoom) return;

@@ -168,4 +168,13 @@ export interface VideoEngine {
   getLocalAudioTracks(): MediaStreamTrack[];
   /** Raw remote audio track(s) (all participants), for the consultation recorder. */
   getRemoteAudioTracks(): MediaStreamTrack[];
+
+  /**
+   * Opcionales (solo Chime): el navegador bloqueó el audio del otro lado (pasa
+   * en el navegador interno de WhatsApp en Android y en iPhone). La UI muestra
+   * "Toca para escuchar" y llama `resumeRemoteAudio()` desde el onClick.
+   */
+  isRemoteAudioBlocked?(): boolean;
+  onRemoteAudioBlockedChanged?(cb: (blocked: boolean) => void): () => void;
+  resumeRemoteAudio?(): void;
 }
