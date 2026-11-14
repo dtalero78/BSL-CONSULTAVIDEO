@@ -9,6 +9,7 @@ import { PosturalAnalysisModal } from './PosturalAnalysisModal';
 import { PosturalAnalysisPatient } from './PosturalAnalysisPatient';
 import { MedicalHistoryPanel } from './MedicalHistoryPanel';
 import { TenantLogo } from './TenantLogo';
+import { primeRemoteAudio } from '../video/remote-audio';
 
 interface SueltaBase {
   nombre: string;
@@ -150,7 +151,11 @@ export const VideoRoom = ({ identity, roomName, role, historiaId, documento, med
             <h2 className="text-2xl font-semibold text-white mb-3">Error de Conexión</h2>
             <p className="text-gray-400 mb-8">{error}</p>
             <button
-              onClick={connectToRoom}
+              onClick={() => {
+                // Desbloquear el audio dentro de ESTE clic (es el que conecta).
+                primeRemoteAudio();
+                void connectToRoom();
+              }}
               className="w-full bg-[#00a884] text-white px-6 py-3 rounded-xl hover:bg-[#008f6f] transition font-semibold"
             >
               Reintentar
@@ -186,7 +191,11 @@ export const VideoRoom = ({ identity, roomName, role, historiaId, documento, med
 
             {/* Botón de unirse */}
             <button
-              onClick={connectToRoom}
+              onClick={() => {
+                // Desbloquear el audio dentro de ESTE clic (es el que conecta).
+                primeRemoteAudio();
+                void connectToRoom();
+              }}
               disabled={isConnecting}
               className="w-full bg-[#00a884] text-white px-6 py-3.5 rounded-xl hover:bg-[#008f6f] transition disabled:bg-gray-600 disabled:cursor-not-allowed font-semibold shadow-lg"
             >

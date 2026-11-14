@@ -375,7 +375,11 @@ export class ChimeVideoEngine implements VideoEngine, ChimeVideoEngineLike {
     }
     this.removeUnlockListeners?.();
     this.removeUnlockListeners = null;
-    this.setRemoteAudioBlocked(false);
+    // Al salir no es un "desbloqueo": resetear sin reportar telemetría.
+    if (this.remoteAudioBlocked) {
+      this.remoteAudioBlocked = false;
+      this.remoteAudioBlockedChanged.emit(false);
+    }
     if (this.session) {
       try {
         if (this.observer) this.session.audioVideo.removeObserver(this.observer);
@@ -569,6 +573,10 @@ export class ChimeVideoEngine implements VideoEngine, ChimeVideoEngineLike {
     if (this.remoteAudioBlocked === blocked) return;
     this.remoteAudioBlocked = blocked;
     this.remoteAudioBlockedChanged.emit(blocked);
+    if (!blocked) {
+      this.removeUnlockListeners?.();
+      this.removeUnlockListeners = null;
+    }
     if (this.session) {
       this.reportar(blocked ? 'audio-blocked' : 'audio-unlocked', {
         navegador: (navigator.userAgent || '').slice(0, 160),
@@ -604,11 +612,7 @@ export class ChimeVideoEngine implements VideoEngine, ChimeVideoEngineLike {
       if (!el) return;
       // play() debe llamarse aquí mismo, dentro del gesto, sin await previo.
       el.play()
-        .then(() => {
-          this.setRemoteAudioBlocked(false);
-          this.removeUnlockListeners?.();
-          this.removeUnlockListeners = null;
-        })
+        .then(() => this.setRemoteAudioBlocked(false))
         .catch(() => undefined);
     };
     eventos.forEach((e) => document.addEventListener(e, handler, true));
