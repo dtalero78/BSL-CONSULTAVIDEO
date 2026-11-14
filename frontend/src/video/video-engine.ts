@@ -32,7 +32,9 @@ import type { VideoJoinInfo } from '../services/api.service';
 export type VideoProviderName = 'twilio' | 'chime';
 
 /** Credentials needed to join a call. Re-exported under a more "engine"-shaped name. */
-export type VideoJoinConfig = VideoJoinInfo;
+// `role` no viene del backend; lo añade el cliente para la telemetría (saber si
+// un problema es del médico o del paciente cambia el diagnóstico).
+export type VideoJoinConfig = VideoJoinInfo & { role?: 'doctor' | 'patient' };
 
 /**
  * Uniform way to bind/unbind a video or audio track to a DOM element,

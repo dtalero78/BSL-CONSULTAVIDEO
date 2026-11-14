@@ -50,6 +50,10 @@ router.post('/events/participant-connected', videoController.trackParticipantCon
 router.post('/events/participant-disconnected', videoController.trackParticipantDisconnected);
 router.get('/events/connected-patients', videoController.getConnectedPatients);
 
+// Telemetría del cliente (navegador) → log del servidor. Público (lo llama el
+// navegador del paciente), best-effort, nunca falla hacia el cliente.
+router.post('/events/client-diag', videoController.trackClientDiag);
+
 // Grabación: link (presigned URL) del MP4 de una sala (Chime → S3).
 // Protegido: es historia clínica y lo consume bsl-plataforma, no el navegador.
 router.get('/recordings/:roomName', requireInternalToken, videoController.getRecording);

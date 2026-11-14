@@ -94,6 +94,26 @@ class ApiService {
    * según decida el backend). Úsala en vez de `getVideoToken` para poder
    * leer `provider` y elegir el motor de video correcto.
    */
+  /**
+   * Telemetría de diagnóstico del cliente → log del servidor. Nunca await, nunca
+   * lanza: un problema de telemetría jamás debe afectar la videollamada.
+   */
+  reportClientDiag(
+    roomName: string,
+    evento: 'session-info' | 'connection-poor' | 'background-applied' | 'background-disabled',
+    datos?: Record<string, string | number | boolean>,
+    identity?: string,
+    role?: 'doctor' | 'patient'
+  ): void {
+    try {
+      void this.client
+        .post('/api/video/events/client-diag', { roomName, identity, role, evento, datos })
+        .catch(() => undefined);
+    } catch {
+      /* jamás romper la llamada por telemetría */
+    }
+  }
+
   async getVideoJoinInfo(
     identity: string,
     roomName: string,

@@ -165,6 +165,34 @@ export function MedicalPanelPage() {
     }
   }, [currentPage]);
 
+  // Recarga silenciosa cada 15 s: una orden nueva (p. ej. las que remite MediConecta/ORIONT)
+  // aparece sin pulsar «Actualizar». Sin spinner ni mensaje de error: si falla, se reintenta
+  // en la próxima vuelta. Solo con la pestaña visible.
+  useEffect(() => {
+    if (!isLoggedIn || !medicoCode) return;
+    // Al cambiar de página se limpia: una respuesta vieja no pisa la página nueva.
+    let vigente = true;
+    const id = window.setInterval(async () => {
+      if (document.visibilityState !== 'visible') return;
+      try {
+        const [statsData, patientsData] = await Promise.all([
+          medicalPanelService.getDailyStats(medicoCode),
+          medicalPanelService.getPendingPatients(medicoCode, currentPage, pageSize),
+        ]);
+        if (!vigente) return;
+        setStats(statsData);
+        setPatients(patientsData.patients);
+        setTotalPages(patientsData.totalPages);
+      } catch (err) {
+        console.warn('[MedicalPanel] Recarga automática falló:', err);
+      }
+    }, 15000);
+    return () => {
+      vigente = false;
+      window.clearInterval(id);
+    };
+  }, [isLoggedIn, medicoCode, currentPage]);
+
   // Socket.io para notificaciones en tiempo real de pacientes conectados
   useEffect(() => {
     if (!isLoggedIn) return;

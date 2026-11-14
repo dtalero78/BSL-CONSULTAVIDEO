@@ -71,6 +71,35 @@ function isRecorderAttendee(externalUserId?: string | null): boolean {
 }
 
 /**
+ * Foto del equipo y la conexión de quien entra a la llamada.
+ *
+ * Cuando un médico reporta "se ve mal" o "no me escuchan", lo primero que hace
+ * falta es saber CON QUÉ está atendiendo. Esto viaja una vez al conectar y queda
+ * en el log del servidor, así el diagnóstico no depende de que la persona sepa
+ * describir su equipo. `navigator.connection` es la estimación del navegador
+ * (solo Chrome); la medida real la da Chime durante la llamada (ver connection-poor).
+ */
+function infoDelEquipo(): Record<string, string | number> {
+  const nav = navigator as Navigator & {
+    deviceMemory?: number;
+    connection?: { effectiveType?: string; downlink?: number; rtt?: number };
+  };
+  const out: Record<string, string | number> = {
+    nucleos: nav.hardwareConcurrency ?? 0,
+    ramGb: nav.deviceMemory ?? 0,
+    pantalla: `${window.screen?.width ?? 0}x${window.screen?.height ?? 0}`,
+    navegador: (navigator.userAgent || '').slice(0, 120),
+  };
+  const con = nav.connection;
+  if (con) {
+    if (con.effectiveType) out.red = String(con.effectiveType);
+    if (typeof con.downlink === 'number') out.downlinkMbps = con.downlink;
+    if (typeof con.rtt === 'number') out.rttMs = con.rtt;
+  }
+  return out;
+}
+
+/**
  * Bound once per meeting (see class docblock). `attach()`/`detach()` are
  * no-ops beyond existing — the real binding happens once in `connect()`.
  */
@@ -132,6 +161,13 @@ export class ChimeVideoEngine implements VideoEngine, ChimeVideoEngineLike {
   private audioEnabled = true;
   private videoEnabled = true;
 
+  // Telemetría de diagnóstico (ver reportar / reportarConexionPobre).
+  private diagRoom = '';
+  private diagIdentity = '';
+  private diagRole: 'doctor' | 'patient' | undefined;
+  private ultimasMetricas: Record<string, number> = {};
+  private ultimoAvisoConexion = 0;
+
   private participantConnected = createEmitter<[NormalizedParticipant]>();
   private participantDisconnected = createEmitter<[string]>();
   private disconnected = createEmitter<[]>();
@@ -165,6 +201,11 @@ export class ChimeVideoEngine implements VideoEngine, ChimeVideoEngineLike {
     const attendee = config.attendee as { AttendeeId?: string };
     this.localAttendeeId = attendee.AttendeeId || config.identity;
 
+    // Datos para la telemetría de diagnóstico.
+    this.diagRoom = config.roomName;
+    this.diagIdentity = config.identity;
+    this.diagRole = config.role;
+
     const localParticipant = new NormalizedParticipant(this.localAttendeeId, config.identity, true);
     this.participants.set(this.localAttendeeId, localParticipant);
 
@@ -174,6 +215,14 @@ export class ChimeVideoEngine implements VideoEngine, ChimeVideoEngineLike {
       videoTileDidUpdate: (tileState: VideoTileState) => this.handleTileUpdate(tileState),
       videoTileWasRemoved: (tileId: number) => this.handleTileRemoved(tileId),
       audioVideoDidStop: () => this.disconnected.emit(),
+      // Telemetría: Chime avisa cuando la conexión se degrada. Guardamos las
+      // últimas métricas para adjuntar bitrate/rtt reales al reporte.
+      metricsDidReceive: (report: { getObservableMetrics?: () => Record<string, number> }) => {
+        this.ultimasMetricas = report.getObservableMetrics?.() || {};
+      },
+      connectionDidBecomePoor: () => this.reportarConexionPobre('conexión pobre'),
+      connectionDidSuggestStopVideo: () =>
+        this.reportarConexionPobre('Chime sugiere apagar el video'),
     };
     session.audioVideo.addObserver(observer);
     this.observer = observer;
@@ -250,6 +299,15 @@ export class ChimeVideoEngine implements VideoEngine, ChimeVideoEngineLike {
     }
 
     if (hasVideoPermission) {
+      // Fijar la calidad de captura a 640x360@15 CON LA API DEL SDK y ANTES de
+      // abrir la cámara. Las constraints del device NO sirven: Chime arma su
+      // propio getUserMedia a su default (960x540) y, si se pide después, reusa
+      // ese stream en vez de re-adquirirlo → el tope no se aplicaba (la
+      // telemetría lo delató: "Fondo corriendo a 960x540@15"). A 960x540 el
+      // filtro de fondo procesa ~2.25x más píxeles, satura el hilo principal y
+      // el médico deja de renderizar el tile del paciente ("se conecta pero no
+      // se ve"). A 640x360 la carga baja a ~la mitad y el video del otro se pinta.
+      session.audioVideo.chooseVideoInputQuality(640, 360, 15);
       const videoInputs = await session.audioVideo.listVideoInputDevices();
       const chosenVideoDeviceId = videoInputs.find((d) => d.deviceId)?.deviceId ?? null;
       if (chosenVideoDeviceId) {
@@ -259,6 +317,8 @@ export class ChimeVideoEngine implements VideoEngine, ChimeVideoEngineLike {
     }
 
     session.audioVideo.start();
+    // Telemetría: con qué equipo/red entró esta persona (una vez, al conectar).
+    this.reportar('session-info', infoDelEquipo());
     // Solo iniciar el tile local si efectivamente hay entrada de video.
     if (this.chosenVideoDeviceId) {
       session.audioVideo.startLocalVideoTile();
@@ -400,6 +460,8 @@ export class ChimeVideoEngine implements VideoEngine, ChimeVideoEngineLike {
       const processor = await BackgroundReplacementVideoFrameProcessor.create(undefined, { imageBlob });
       if (!processor) throw new Error('El fondo virtual no está soportado en este navegador.');
       await this.startVideoTransform([processor]);
+      // Telemetría: a qué resolución REAL quedó corriendo el fondo (¿el tope funcionó?).
+      this.reportarResolucionFondo();
     } catch (err) {
       // Si el procesador falla (navegador sin soporte, WASM que no carga, equipo
       // lento), ya soltamos el device anterior: hay que devolver la cámara SIN
@@ -407,6 +469,11 @@ export class ChimeVideoEngine implements VideoEngine, ChimeVideoEngineLike {
       if (this.chosenVideoDeviceId) {
         await this.session.audioVideo.startVideoInput(this.chosenVideoDeviceId).catch(() => undefined);
       }
+      this.reportar('background-disabled', {
+        motivo: (err as Error)?.message || 'error aplicando el fondo',
+        nucleos: navigator.hardwareConcurrency ?? 0,
+        navegador: (navigator.userAgent || '').slice(0, 120),
+      });
       throw err;
     }
   }
@@ -445,6 +512,65 @@ export class ChimeVideoEngine implements VideoEngine, ChimeVideoEngineLike {
       await this.currentVideoTransformDevice.stop();
       this.currentVideoTransformDevice = null;
     }
+  }
+
+  // ---- Telemetría de diagnóstico ----
+  // Cuando un médico dice "se ve mal" / "no me escuchan", esto deja en el log del
+  // servidor con qué equipo y red entró cada quien, y cuándo Chime reportó la
+  // conexión como pobre. Nunca rompe la llamada (todo va en fire-and-forget).
+
+  private reportar(
+    evento: 'session-info' | 'connection-poor' | 'background-applied' | 'background-disabled',
+    datos: Record<string, string | number | boolean>
+  ): void {
+    if (!this.diagRoom) return;
+    void import('../services/api.service')
+      .then((m) => m.default.reportClientDiag(this.diagRoom, evento, datos, this.diagIdentity, this.diagRole))
+      .catch(() => undefined);
+  }
+
+  private reportarConexionPobre(motivo: string): void {
+    const ahora = Date.now();
+    // No spamear: Chime puede disparar el evento muy seguido.
+    if (ahora - this.ultimoAvisoConexion < 30_000) return;
+    this.ultimoAvisoConexion = ahora;
+    const m = this.ultimasMetricas || {};
+    const datos: Record<string, string | number> = { motivo };
+    if (typeof m.availableOutgoingBitrate === 'number')
+      datos.subidaKbps = Math.round(m.availableOutgoingBitrate / 1000);
+    if (typeof m.availableIncomingBitrate === 'number')
+      datos.bajadaKbps = Math.round(m.availableIncomingBitrate / 1000);
+    if (typeof m.currentRoundTripTime === 'number')
+      datos.rttMs = Math.round(m.currentRoundTripTime * 1000);
+    if (typeof m.nackCount === 'number') datos.nack = Math.round(m.nackCount);
+    console.warn(`[Chime] Conexión degradada: ${motivo}`);
+    this.reportar('connection-poor', datos);
+  }
+
+  /**
+   * Reporta la resolución REAL a la que quedó corriendo el fondo, leída del track
+   * publicado (no del texto del SDK, que cambia entre versiones). Responde a
+   * "¿el tope de 640x360 funcionó?". Se lee con un respiro para dar tiempo al
+   * tile a asentarse.
+   */
+  private reportarResolucionFondo(): void {
+    setTimeout(() => {
+      try {
+        const track = this.streamByAttendee.get(this.localAttendeeId)?.getVideoTracks()?.[0];
+        const s = track?.getSettings?.();
+        if (!s) return;
+        console.log(`[Chime] Fondo corriendo a ${s.width}x${s.height}@${Math.round(s.frameRate ?? 0)}`);
+        this.reportar('background-applied', {
+          ancho: s.width ?? 0,
+          alto: s.height ?? 0,
+          fps: Math.round(s.frameRate ?? 0),
+          nucleos: navigator.hardwareConcurrency ?? 0,
+          navegador: (navigator.userAgent || '').slice(0, 120),
+        });
+      } catch {
+        /* telemetría, nunca crítico */
+      }
+    }, 4000);
   }
 
   // ---- Internal: video tile <-> participant wiring ----

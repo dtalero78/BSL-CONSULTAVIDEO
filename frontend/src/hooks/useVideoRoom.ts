@@ -126,7 +126,10 @@ export const useVideoRoom = ({
           ? new (await import('../video/chime-engine')).ChimeVideoEngine()
           : new (await import('../video/twilio-engine')).TwilioVideoEngine();
 
-      const { localParticipant: lp, remoteParticipants: initialRemotes } = await engine.connect(joinInfo);
+      const { localParticipant: lp, remoteParticipants: initialRemotes } = await engine.connect({
+        ...joinInfo,
+        role, // para la telemetría (diagnóstico por rol)
+      });
 
       setRoom(engine);
       setLocalParticipant(lp);

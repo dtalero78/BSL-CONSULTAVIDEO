@@ -263,6 +263,41 @@ class VideoController {
   }
 
   /**
+   * Telemetría del cliente (navegador) → log del servidor.
+   * POST /api/video/events/client-diag
+   *
+   * Los médicos no son técnicos: no se les puede pedir que abran la consola. Esto
+   * trae las señales que importan al log de la app (CloudWatch), donde se buscan
+   * con `aws logs ... | grep ClientDiag`:
+   *   [ClientDiag] sala=... role=doctor session-info nucleos=8 ramGb=8 red=4g ...
+   *   [ClientDiag] sala=... role=doctor connection-poor subidaKbps=120 rttMs=380
+   *   [ClientDiag] sala=... role=doctor background-applied 640x360@15
+   *
+   * Nunca falla hacia el cliente: responde 204 pase lo que pase — un problema de
+   * telemetría jamás debe romper una videollamada.
+   */
+  async trackClientDiag(req: Request, res: Response): Promise<void> {
+    try {
+      const EVENTOS = ['session-info', 'connection-poor', 'background-applied', 'background-disabled'];
+      const { roomName, identity, role, evento, datos } = req.body || {};
+      if (typeof roomName === 'string' && roomName && EVENTOS.includes(evento)) {
+        const detalle =
+          datos && typeof datos === 'object'
+            ? Object.entries(datos)
+                .map(([k, v]) => `${k}=${v}`)
+                .join(' ')
+            : '';
+        console.log(
+          `[ClientDiag] sala=${roomName} role=${role ?? '?'} identity=${identity ?? '?'} ${evento} ${detalle}`.trim()
+        );
+      }
+    } catch {
+      /* la telemetría nunca rompe nada */
+    }
+    res.status(204).end();
+  }
+
+  /**
    * Enviar mensaje de WhatsApp usando template aprobado
    * POST /api/video/whatsapp/send
    * Body: { phone: string, roomNameWithParams: string, patientName: string, doctorCode: string }
