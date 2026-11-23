@@ -338,6 +338,8 @@ export function validarCierre(consulta: ConsultaValidada): void {
   const obligatorios: Array<[CampoTexto, string]> = [
     ['motivo_consulta', 'el motivo de consulta'],
     ['enfermedad_actual', 'la enfermedad actual'],
+    ['antecedentes', 'los antecedentes'],
+    ['revision_sistemas', 'la revisión por sistemas'],
     ['examen_fisico', 'el examen físico'],
     ['plan_manejo', 'el plan de manejo'],
   ];

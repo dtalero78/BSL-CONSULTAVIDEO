@@ -95,6 +95,7 @@ interface MedicalHistoryData {
   peso?: string;
   transcriptionText?: string;
   voximetria?: VoximetriaData;
+  medico?: string; // alias del médico asignado (lo usa el ingreso con PIN de medicina general)
 }
 
 interface SueltaBase {
@@ -648,7 +649,7 @@ const MedicalHistoryPanelInner = ({ historiaId, sueltaBase, onAppendToObservacio
   // Orden de medicina general (Grupo MOK / ORIONT): otro formulario y otra tabla.
   // Todo lo demás de este panel es solo para salud ocupacional.
   if (esOrdenMedicinaGeneral(data.tipoExamen)) {
-    return <MedicinaGeneralPanel historiaId={data.historiaId} />;
+    return <MedicinaGeneralPanel historiaId={data.historiaId} medicoAsignado={data.medico} />;
   }
 
   return (

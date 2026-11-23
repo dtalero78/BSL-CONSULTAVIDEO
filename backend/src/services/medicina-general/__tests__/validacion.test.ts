@@ -29,6 +29,8 @@ const dxRelacionado = { codigo: 'r509', tipo: 'relacionado', clase: 'confirmado_
 const consultaCompleta = {
   motivo_consulta: 'Dolor de garganta',
   enfermedad_actual: 'Tres días de odinofagia',
+  antecedentes: 'Niega alergias',
+  revision_sistemas: 'Sin otros síntomas',
   examen_fisico: 'Faringe eritematosa (reportado por video)',
   plan_manejo: 'Manejo sintomático',
   diagnosticos: [dxPrincipal, dxRelacionado],
@@ -99,7 +101,7 @@ describe('validarConsulta', () => {
     expect(c.temperatura).toBe(37.2);
     expect(c.ta_sistolica).toBeNull();
     expect(c.medico).toBe('SIXTA');
-    expect(c.antecedentes).toBeNull();
+    expect(c.analisis).toBeNull();
     expect(c.formula).toEqual([]);
     expect(c.incapacidad).toBeNull();
     expect(c).not.toHaveProperty('extra');
@@ -204,8 +206,8 @@ describe('validarCierre', () => {
   it('pasa con lo mínimo obligatorio', () => {
     expect(() => validarCierre(validarConsulta(consultaCompleta))).not.toThrow();
   });
-  it('exige motivo, enfermedad actual, examen físico y plan', () => {
-    for (const campo of ['motivo_consulta', 'enfermedad_actual', 'examen_fisico', 'plan_manejo']) {
+  it('exige motivo, enfermedad actual, antecedentes, revisión por sistemas, examen físico y plan', () => {
+    for (const campo of ['motivo_consulta', 'enfermedad_actual', 'antecedentes', 'revision_sistemas', 'examen_fisico', 'plan_manejo']) {
       const c = validarConsulta({ ...consultaCompleta, [campo]: '  ' });
       expect(campoDelError(() => validarCierre(c))).toBe(campo);
     }

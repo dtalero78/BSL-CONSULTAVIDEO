@@ -21,6 +21,45 @@ import apiService, {
 
 interface Props {
   historiaId: string;
+  /** Alias del médico asignado a la orden (lo sabe MedicalHistoryPanel). Si falta, se escribe. */
+  medicoAsignado?: string;
+}
+
+// --- Sesión con PIN: el token se guarda por médico en sessionStorage (muere al cerrar la pestaña) ---
+interface SesionGuardada {
+  token: string;
+  medico: string;
+  expira_at: string;
+}
+
+const claveSesion = (alias: string) => `mg-sesion:${alias.trim().toUpperCase()}`;
+
+function leerSesion(alias: string | undefined): SesionGuardada | null {
+  if (!alias || !alias.trim()) return null;
+  try {
+    const s = JSON.parse(sessionStorage.getItem(claveSesion(alias)) || 'null') as SesionGuardada | null;
+    // Margen de un minuto para no mandar un token a punto de vencer.
+    return s?.token && new Date(s.expira_at).getTime() > Date.now() + 60000 ? s : null;
+  } catch {
+    return null;
+  }
+}
+
+function guardarSesion(s: SesionGuardada): void {
+  try {
+    sessionStorage.setItem(claveSesion(s.medico), JSON.stringify(s));
+  } catch {
+    /* sin almacenamiento: la sesión vive solo en memoria */
+  }
+}
+
+function borrarSesion(alias: string | undefined): void {
+  if (!alias) return;
+  try {
+    sessionStorage.removeItem(claveSesion(alias));
+  } catch {
+    /* nada que borrar */
+  }
 }
 
 interface FilaFormula {
@@ -336,7 +375,7 @@ function leerError(
   err: any,
   porDefecto: string,
   mapa: MapaFilas = { formula: [], ordenes: [] }
-): { mensaje: string; campo?: string; status?: number } {
+): { mensaje: string; campo?: string; status?: number; sinSesion: boolean } {
   const data = err?.response?.data;
   const crudo: string = (data && typeof data.error === 'string' && data.error) || porDefecto;
   const campoServidor: string | undefined = typeof data?.campo === 'string' ? data.campo : undefined;
@@ -348,10 +387,14 @@ function leerError(
         : crudo,
     campo,
     status: err?.response?.status,
+    // La sesión no existe o venció: hay que volver a pedir el PIN.
+    sinSesion: err?.response?.status === 401 && data?.codigo === 'SESION_REQUERIDA',
   };
 }
 
-export const MedicinaGeneralPanel = ({ historiaId }: Props) => {
+export const MedicinaGeneralPanel = ({ historiaId, medicoAsignado }: Props) => {
+  const [sesion, setSesion] = useState<SesionGuardada | null>(() => leerSesion(medicoAsignado));
+  const tokenRef = useRef<string | null>(sesion?.token ?? null);
   const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
   const [orden, setOrden] = useState<OrdenMedicinaGeneral | null>(null);
@@ -372,12 +415,14 @@ export const MedicinaGeneralPanel = ({ historiaId }: Props) => {
   // Mientras se cierra, el formulario no acepta cambios: lo escrito después no iría en el cierre.
   const cerrandoRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sesionRef = useRef<SesionGuardada | null>(sesion);
 
   const cargar = useCallback(async () => {
     try {
       setCargando(true);
       setErrorCarga(null);
-      const { orden: o, consulta } = await apiService.getMedicinaGeneral(historiaId);
+      if (!tokenRef.current) return;
+      const { orden: o, consulta } = await apiService.getMedicinaGeneral(historiaId, tokenRef.current);
       setOrden(o);
       ordenRef.current = o;
       const f = formDesde(o, consulta);
@@ -387,16 +432,27 @@ export const MedicinaGeneralPanel = ({ historiaId }: Props) => {
       cerradaRef.current = Boolean(consulta?.cerrada_at);
       setConsultaCerrada(consulta?.cerrada_at ? consulta : null);
     } catch (err) {
-      setErrorCarga(leerError(err, 'No se pudo cargar la consulta de medicina general').mensaje);
+      const e = leerError(err, 'No se pudo cargar la consulta de medicina general');
+      if (e.sinSesion) perderSesion();
+      else setErrorCarga(e.mensaje);
     } finally {
       setCargando(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [historiaId]);
+
+  /** El token ya no sirve: se pide el PIN otra vez. Lo escrito sigue en memoria (formRef). */
+  function perderSesion() {
+    borrarSesion(sesionRef.current?.medico);
+    tokenRef.current = null;
+    sesionRef.current = null;
+    setSesion(null);
+  }
 
   const guardar = useCallback(async () => {
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = null;
-    if (!sucioRef.current || cerradaRef.current || cerrandoRef.current || !formRef.current) return;
+    if (!sucioRef.current || cerradaRef.current || cerrandoRef.current || !formRef.current || !tokenRef.current) return;
     if (guardandoRef.current) {
       pendienteRef.current = true;
       return;
@@ -406,11 +462,17 @@ export const MedicinaGeneralPanel = ({ historiaId }: Props) => {
     setEstado({ tipo: 'guardando' });
     const { payload, mapa } = construirPayload(formRef.current, ordenRef.current?.medico ?? null, false);
     try {
-      await apiService.guardarMedicinaGeneral(historiaId, payload);
+      await apiService.guardarMedicinaGeneral(historiaId, payload, tokenRef.current);
       setEstado({ tipo: 'guardado', hora: horaColombia() });
     } catch (err) {
       sucioRef.current = true;
       const e = leerError(err, 'No se pudo guardar el borrador', mapa);
+      if (e.sinSesion) {
+        // Se guarda apenas el médico vuelva a ingresar el PIN (sucioRef sigue en true).
+        setEstado({ tipo: 'error', mensaje: 'La sesión venció: ingresa tu PIN para seguir guardando' });
+        perderSesion();
+        return;
+      }
       setEstado({ tipo: 'error', mensaje: e.mensaje, campo: e.campo });
       // 409: la consulta ya quedó cerrada (otra pestaña): se recarga en solo lectura.
       if (e.status === 409) {
@@ -426,9 +488,24 @@ export const MedicinaGeneralPanel = ({ historiaId }: Props) => {
     }
   }, [historiaId, cargar]);
 
+  // Sin sesión no se carga nada: se muestra el ingreso con PIN.
   useEffect(() => {
-    void cargar();
+    if (tokenRef.current) void cargar();
+    else setCargando(false);
   }, [cargar]);
+
+  /** Tras ingresar el PIN: si la consulta ya estaba en pantalla se reintenta lo pendiente; si no, se carga. */
+  const alIniciarSesion = (s: SesionGuardada) => {
+    guardarSesion(s);
+    tokenRef.current = s.token;
+    sesionRef.current = s;
+    setSesion(s);
+    if (formRef.current) {
+      if (sucioRef.current) void guardar();
+    } else {
+      void cargar();
+    }
+  };
 
   // Al desmontar (fin de la llamada, cambio de paciente) se guarda lo pendiente.
   useEffect(
@@ -455,7 +532,7 @@ export const MedicinaGeneralPanel = ({ historiaId }: Props) => {
   };
 
   const cerrarConsulta = async () => {
-    if (!formRef.current || cerrandoRef.current) return;
+    if (!formRef.current || cerrandoRef.current || !tokenRef.current) return;
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = null;
     cerrandoRef.current = true;
@@ -470,7 +547,7 @@ export const MedicinaGeneralPanel = ({ historiaId }: Props) => {
     sucioRef.current = false;
     const { payload, mapa } = construirPayload(formRef.current, ordenRef.current?.medico ?? null, true);
     try {
-      const consulta = await apiService.cerrarMedicinaGeneral(historiaId, payload);
+      const consulta = await apiService.cerrarMedicinaGeneral(historiaId, payload, tokenRef.current);
       cerradaRef.current = true;
       sucioRef.current = false;
       setConsultaCerrada(consulta);
@@ -478,6 +555,12 @@ export const MedicinaGeneralPanel = ({ historiaId }: Props) => {
     } catch (err) {
       const e = leerError(err, 'No se pudo cerrar la consulta', mapa);
       sucioRef.current = true; // no se cerró: lo escrito sigue pendiente de guardar
+      if (e.sinSesion) {
+        setErrorCierre({ mensaje: 'La sesión venció. Ingresa tu PIN y vuelve a cerrar la consulta.' });
+        setConfirmandoCierre(false);
+        perderSesion();
+        return;
+      }
       setErrorCierre({ mensaje: e.mensaje, campo: e.campo });
       setConfirmandoCierre(false);
       if (e.status === 409) void cargar();
@@ -488,6 +571,16 @@ export const MedicinaGeneralPanel = ({ historiaId }: Props) => {
   };
 
   // ---------------------------------------------------------------------------
+  if (!sesion) {
+    return (
+      <IngresoPin
+        medicoAsignado={medicoAsignado || orden?.medico || undefined}
+        aviso={formRef.current ? 'Tu sesión venció. Lo que escribiste sigue aquí y se guarda al ingresar.' : undefined}
+        onIngreso={alIniciarSesion}
+      />
+    );
+  }
+
   if (cargando) {
     return (
       <div className="bg-[#1f2c34] rounded-xl p-6 text-white">
@@ -505,12 +598,23 @@ export const MedicinaGeneralPanel = ({ historiaId }: Props) => {
         <h2 className="text-xl font-bold text-red-400 mb-4">Error al cargar la consulta</h2>
         <div className="bg-[#2a3942] rounded-lg p-4">
           <p className="text-red-400 mb-3">{errorCarga || 'No se encontró la orden'}</p>
-          <button
-            onClick={() => void cargar()}
-            className="px-3 py-2 bg-[#00a884] text-white text-sm rounded-lg hover:bg-[#008f6f] transition"
-          >
-            Reintentar
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => void cargar()}
+              className="px-3 py-2 bg-[#00a884] text-white text-sm rounded-lg hover:bg-[#008f6f] transition"
+            >
+              Reintentar
+            </button>
+            <button
+              onClick={() => {
+                setErrorCarga(null);
+                perderSesion();
+              }}
+              className="px-3 py-2 bg-[#1f2c34] text-gray-200 text-sm rounded-lg hover:bg-[#33444f] transition"
+            >
+              Ingresar con otro médico
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -599,8 +703,8 @@ export const MedicinaGeneralPanel = ({ historiaId }: Props) => {
       <div className="flex-1 overflow-y-auto p-4 space-y-3" onBlur={alSalirDeCampo}>
         {areaTexto('motivo_consulta', 'Motivo de consulta', { obligatorio: true, filas: 2 })}
         {areaTexto('enfermedad_actual', 'Enfermedad actual', { obligatorio: true, filas: 4 })}
-        {areaTexto('antecedentes', 'Antecedentes', { placeholder: 'Personales, familiares, alergias, medicamentos...' })}
-        {areaTexto('revision_sistemas', 'Revisión por sistemas')}
+        {areaTexto('antecedentes', 'Antecedentes', { obligatorio: true, placeholder: 'Personales, familiares, alergias, medicamentos...' })}
+        {areaTexto('revision_sistemas', 'Revisión por sistemas', { obligatorio: true })}
 
         {/* Signos vitales */}
         <div className={seccionCls}>
@@ -988,6 +1092,95 @@ export const MedicinaGeneralPanel = ({ historiaId }: Props) => {
     </div>
   );
 };
+
+// ----------------------------------------------------------------------------
+// Ingreso del médico con su PIN de 6 dígitos (sesión de 12 horas).
+// ----------------------------------------------------------------------------
+function IngresoPin({
+  medicoAsignado,
+  aviso,
+  onIngreso,
+}: {
+  medicoAsignado?: string;
+  aviso?: string;
+  onIngreso: (s: SesionGuardada) => void;
+}) {
+  const [medico, setMedico] = useState(medicoAsignado?.trim() || '');
+  const [pin, setPin] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const ingresar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!medico.trim() || !/^\d{6}$/.test(pin) || enviando) return;
+    setEnviando(true);
+    setError(null);
+    try {
+      const s = await apiService.iniciarSesionMedicinaGeneral(medico.trim(), pin);
+      onIngreso(s);
+    } catch (err: any) {
+      const status = err?.response?.status;
+      setError(
+        status === 429
+          ? 'PIN bloqueado 15 minutos por intentos fallidos. Intenta más tarde.'
+          : status === 401
+            ? 'Médico o PIN incorrectos'
+            : err?.response?.data?.error || 'No se pudo ingresar. Revisa la conexión e intenta de nuevo.'
+      );
+      setPin('');
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  return (
+    <div className="h-full flex flex-col bg-[#1f2c34] text-white">
+      <div className="p-4 border-b border-gray-700">
+        <h2 className="text-lg font-bold text-[#00a884]">Medicina General</h2>
+        <p className="text-xs text-gray-400">Ingresa con tu PIN para ver y firmar la consulta.</p>
+      </div>
+      <form onSubmit={ingresar} className="p-4 space-y-3">
+        {aviso && (
+          <div className="bg-amber-500/10 border border-amber-500/50 rounded-lg p-2 text-amber-200 text-xs">{aviso}</div>
+        )}
+        <div>
+          <label className={labelCls}>Médico</label>
+          <input
+            value={medico}
+            onChange={(e) => setMedico(e.target.value)}
+            readOnly={Boolean(medicoAsignado?.trim())}
+            placeholder="Tu código de médico"
+            autoComplete="username"
+            className={inputCls + (medicoAsignado?.trim() ? ' bg-[#2a3942] text-gray-300 cursor-not-allowed' : '')}
+          />
+        </div>
+        <div>
+          <label className={labelCls}>PIN (6 dígitos)</label>
+          <input
+            type="password"
+            inputMode="numeric"
+            autoComplete="current-password"
+            maxLength={6}
+            value={pin}
+            onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            autoFocus
+            className={inputCls + ' tracking-[0.5em] text-center text-lg'}
+          />
+        </div>
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-2 text-red-300 text-xs">{error}</div>
+        )}
+        <button
+          type="submit"
+          disabled={enviando || !medico.trim() || pin.length !== 6}
+          className="w-full bg-[#00a884] text-white px-4 py-2.5 rounded-lg hover:bg-[#008f6f] transition font-semibold disabled:bg-gray-600 disabled:cursor-not-allowed"
+        >
+          {enviando ? 'Ingresando…' : 'Ingresar'}
+        </button>
+      </form>
+    </div>
+  );
+}
 
 // ----------------------------------------------------------------------------
 // Typeahead CIE-10 (250 ms de espera tras la última tecla).

@@ -15,7 +15,18 @@
 // ============================================================================
 
 import type { PoolClient } from 'pg';
+import bcrypt from 'bcryptjs';
 import postgresService from './postgres.service';
+import {
+  HORAS_SESION,
+  MINUTOS_BLOQUEO,
+  estaBloqueado,
+  generarToken,
+  hashToken,
+  ipValida,
+  normalizarAlias,
+  registrarFallo,
+} from './medicina-general/sesion';
 import {
   ConsultaValidada,
   Diagnostico,
@@ -26,9 +37,13 @@ import {
   validarConsulta,
 } from './medicina-general/validacion';
 
-/** Error con código HTTP (400/404/409). El controlador lo traduce a la respuesta. */
+/** Error con código HTTP. El controlador lo traduce a la respuesta (nunca 502/503/504). */
 export class ErrorHttp extends Error {
-  constructor(public readonly status: 400 | 404 | 409 | 422 | 500, mensaje: string, public readonly campo?: string) {
+  constructor(
+    public readonly status: 400 | 401 | 403 | 404 | 409 | 422 | 429 | 500,
+    mensaje: string,
+    public readonly campo?: string
+  ) {
     super(mensaje);
     this.name = 'ErrorHttp';
   }
@@ -56,11 +71,28 @@ export interface OrdenMedicinaGeneral {
   fechaAtencion: Date | null;
 }
 
+export interface MetaSesion {
+  ip?: string | null;
+  userAgent?: string | null;
+}
+
+export interface SesionCreada {
+  token: string;
+  medico: string;
+  expira_at: Date;
+}
+
+const ERROR_CREDENCIALES = 'Médico o PIN incorrectos';
+
+// Hash bcrypt de relleno: cuando el médico no existe o no tiene PIN se compara igual contra
+// algo, para que el tiempo de respuesta no delate cuáles alias existen.
+const HASH_RELLENO = bcrypt.hashSync('relleno-sin-uso', 10);
+
 export interface MetaCierre {
   /** Para audit_log: la ruta que cerró la consulta. */
   endpoint?: string;
   metodo?: string;
-  /** Para audit_log: desde dónde se cerró (estas rutas no tienen sesión). */
+  /** Para audit_log: desde dónde se cerró. */
   ip?: string | null;
   userAgent?: string | null;
 }
@@ -117,6 +149,13 @@ const COLUMNAS_JSON = new Set(['diagnosticos', 'formula', 'ordenes', 'incapacida
 /** El trigger de la migración lanza esto si la consulta ya estaba cerrada (carrera entre dos guardados). */
 function esErrorConsultaCerrada(error: any): boolean {
   return error?.code === 'P0001' && /ya está cerrada|no se borra/.test(String(error?.message));
+}
+
+/** 403 si la orden está asignada a otro médico que el de la sesión. */
+function verificarMedicoAsignado(medicoOrden: unknown, medicoSesion: string): void {
+  if (!medicoSesion || normalizarAlias(medicoOrden) !== normalizarAlias(medicoSesion)) {
+    throw new ErrorHttp(403, 'Esta consulta está asignada a otro médico');
+  }
 }
 
 export class MedicinaGeneralService {
@@ -188,10 +227,11 @@ export class MedicinaGeneralService {
   }
 
   /** GET /:historiaId → la orden y la consulta (o null si aún no se ha guardado nada). */
-  async obtener(historiaId: string, tenantId: string) {
+  async obtener(historiaId: string, tenantId: string, medicoSesion: string) {
     return this.conCliente(async (cliente) => {
       const orden = await this.leerOrden(cliente, historiaId, tenantId);
       if (!orden) throw new ErrorHttp(404, 'No se encontró la orden');
+      verificarMedicoAsignado(orden.medico, medicoSesion);
       const consulta = await this.leerConsulta(cliente, historiaId, tenantId);
       return { orden, consulta };
     });
@@ -222,7 +262,8 @@ export class MedicinaGeneralService {
     historiaId: string,
     tenantId: string,
     consulta: ConsultaValidada,
-    cerrar: boolean
+    cerrar: boolean,
+    medicoSesion: string
   ) {
     // FOR UPDATE: dos cierres simultáneos de la misma orden quedan en fila.
     const ordenR = await cliente.query(
@@ -248,6 +289,8 @@ export class MedicinaGeneralService {
       // recargar; lo escrito se queda en pantalla.
       throw new ErrorHttp(422, 'La orden no tiene un médico asignado que pueda firmar (o fue cancelada)');
     }
+    // Solo el médico asignado (el de la sesión con PIN) guarda y firma su consulta.
+    verificarMedicoAsignado(medico, medicoSesion);
 
     const diagnosticos = await this.completarDiagnosticos(cliente, consulta);
     const valores: Record<string, unknown> = { ...consulta, medico, diagnosticos };
@@ -283,10 +326,10 @@ export class MedicinaGeneralService {
   }
 
   /** PUT /:historiaId → guarda el borrador (upsert). */
-  async guardarBorrador(historiaId: string, tenantId: string, cuerpo: unknown) {
+  async guardarBorrador(historiaId: string, tenantId: string, cuerpo: unknown, medicoSesion: string) {
     const consulta = this.validar(cuerpo, false);
     return this.enTransaccion(async (cliente) => {
-      await this.guardarEnTransaccion(cliente, historiaId, tenantId, consulta, false);
+      await this.guardarEnTransaccion(cliente, historiaId, tenantId, consulta, false, medicoSesion);
       return this.leerConsulta(cliente, historiaId, tenantId);
     });
   }
@@ -300,10 +343,17 @@ export class MedicinaGeneralService {
    * rama de producción de esta app; cuando llegue, se llama aquí después del COMMIT, sin
    * hacer fallar la respuesta.
    */
-  async cerrar(historiaId: string, tenantId: string, cuerpo: unknown, meta: MetaCierre = {}) {
+  async cerrar(historiaId: string, tenantId: string, cuerpo: unknown, medicoSesion: string, meta: MetaCierre = {}) {
     const consulta = this.validar(cuerpo, true);
     return this.enTransaccion(async (cliente) => {
-      const { diagnosticos, medico } = await this.guardarEnTransaccion(cliente, historiaId, tenantId, consulta, true);
+      const { diagnosticos, medico } = await this.guardarEnTransaccion(
+        cliente,
+        historiaId,
+        tenantId,
+        consulta,
+        true,
+        medicoSesion
+      );
 
       const principal = diagnosticos.find((d) => d.tipo === 'principal');
       const relacionado = diagnosticos.find((d) => d.tipo === 'relacionado');
@@ -331,12 +381,107 @@ export class MedicinaGeneralService {
           JSON.stringify({ cerrada: true, diagnosticos: diagnosticos.map((d) => d.codigo) }),
           meta.endpoint ? meta.endpoint.slice(0, 300) : null,
           meta.metodo ? meta.metodo.slice(0, 10) : null,
-          meta.ip && /^[0-9a-fA-F.:]{3,45}$/.test(String(meta.ip)) ? String(meta.ip) : null,
+          ipValida(meta.ip),
           meta.userAgent ? String(meta.userAgent).slice(0, 500) : null,
         ]
       );
 
       return this.leerConsulta(cliente, historiaId, tenantId);
+    });
+  }
+
+  /**
+   * POST /sesion → abre la sesión del médico con su PIN de 6 dígitos.
+   *
+   * Todo bajo SELECT … FOR UPDATE de su fila en medicos_pin, para que dos intentos al tiempo
+   * no se salten el contador. A los MAX_INTENTOS fallidos queda bloqueado MINUTOS_BLOQUEO
+   * (429). Un fallo responde 401 genérico: nunca dice si el que falló fue el médico o el PIN.
+   * El intento fallido se guarda (COMMIT) antes de responder el error.
+   */
+  async iniciarSesion(tenantId: string, alias: unknown, pin: unknown, meta: MetaSesion = {}): Promise<SesionCreada> {
+    if (typeof alias !== 'string' || !alias.trim() || alias.length > 200) {
+      throw new ErrorHttp(400, 'Falta el médico', 'medico');
+    }
+    if (typeof pin !== 'string' || !pin || pin.length > 20) throw new ErrorHttp(400, 'Falta el PIN', 'pin');
+
+    type Resultado = { ok: SesionCreada } | { error: ErrorHttp };
+    const resultado = await this.enTransaccion<Resultado>(async (cliente) => {
+      // Limpieza de paso: sesiones vencidas de esta IPS.
+      await cliente.query('DELETE FROM medicos_sesiones WHERE tenant_id = $1 AND expira_at < NOW()', [tenantId]);
+
+      const medicos = await cliente.query(
+        `SELECT id, TRIM(alias) AS alias FROM medicos
+          WHERE tenant_id = $1 AND activo = TRUE AND UPPER(TRIM(alias)) = $2
+          LIMIT 2`,
+        [tenantId, normalizarAlias(alias)]
+      );
+      const medico = medicos.rows.length === 1 ? medicos.rows[0] : null;
+      const pinR = medico
+        ? await cliente.query(
+            `SELECT pin_hash, intentos_fallidos, bloqueado_hasta, NOW() AS ahora
+               FROM medicos_pin
+              WHERE tenant_id = $1 AND medico_id = $2
+              FOR UPDATE`,
+            [tenantId, medico.id]
+          )
+        : null;
+      const fila = pinR?.rows[0];
+      if (!medico || !fila) {
+        await bcrypt.compare(pin, HASH_RELLENO);
+        return { error: new ErrorHttp(401, ERROR_CREDENCIALES) };
+      }
+      if (estaBloqueado(fila.bloqueado_hasta, fila.ahora)) {
+        return { error: new ErrorHttp(429, `PIN bloqueado por ${MINUTOS_BLOQUEO} minutos tras varios intentos fallidos`) };
+      }
+
+      if (!(await bcrypt.compare(pin, fila.pin_hash))) {
+        const fallo = registrarFallo(Number(fila.intentos_fallidos) || 0);
+        await cliente.query(
+          `UPDATE medicos_pin
+              SET intentos_fallidos = $3,
+                  bloqueado_hasta = CASE WHEN $4 THEN NOW() + make_interval(mins => $5) ELSE bloqueado_hasta END,
+                  actualizado_at = NOW()
+            WHERE tenant_id = $1 AND medico_id = $2`,
+          [tenantId, medico.id, fallo.intentos, fallo.bloquear, MINUTOS_BLOQUEO]
+        );
+        return { error: new ErrorHttp(401, ERROR_CREDENCIALES) };
+      }
+
+      await cliente.query(
+        `UPDATE medicos_pin
+            SET intentos_fallidos = 0, bloqueado_hasta = NULL, actualizado_at = NOW()
+          WHERE tenant_id = $1 AND medico_id = $2`,
+        [tenantId, medico.id]
+      );
+      const token = generarToken();
+      const sesion = await cliente.query(
+        `INSERT INTO medicos_sesiones (token_hash, tenant_id, medico_alias, expira_at, ip_address, user_agent)
+         VALUES ($1, $2, $3, NOW() + make_interval(hours => $4), $5, $6)
+         RETURNING expira_at`,
+        [
+          hashToken(token),
+          tenantId,
+          medico.alias,
+          HORAS_SESION,
+          ipValida(meta.ip),
+          meta.userAgent ? String(meta.userAgent).slice(0, 500) : null,
+        ]
+      );
+      return { ok: { token, medico: medico.alias, expira_at: sesion.rows[0].expira_at } };
+    });
+    if ('error' in resultado) throw resultado.error;
+    return resultado.ok;
+  }
+
+  /** Alias del médico dueño de una sesión vigente de esta IPS, o null. */
+  async medicoDeSesion(tenantId: string, token: string): Promise<string | null> {
+    return this.conCliente(async (cliente) => {
+      const r = await cliente.query(
+        `SELECT medico_alias FROM medicos_sesiones
+          WHERE token_hash = $1 AND tenant_id = $2 AND expira_at > NOW()`,
+        [hashToken(token), tenantId]
+      );
+      return r.rows[0]?.medico_alias ?? null;
     });
   }
 

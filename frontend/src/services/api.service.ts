@@ -31,6 +31,15 @@ export interface PatientHistoryRecord {
 export const esOrdenMedicinaGeneral = (tipoExamen?: string | null): boolean =>
   (tipoExamen || '').trim().toLowerCase() === 'medicina general';
 
+/** Sesión del médico abierta con su PIN (rutas de medicina general). */
+export interface SesionMedicinaGeneral {
+  token: string;
+  medico: string;
+  expira_at: string;
+}
+
+const cabeceraSesion = (token: string) => ({ Authorization: `Bearer ${token}` });
+
 export interface Cie10 {
   codigo: string;
   descripcion: string;
@@ -442,31 +451,48 @@ class ApiService {
     return res.data;
   }
 
-  /** La orden y la consulta guardada (null si aún no hay borrador). */
+  /**
+   * Ingreso del médico con su PIN de 6 dígitos → token de sesión (12 h).
+   * 401 = médico o PIN incorrectos; 429 = bloqueado 15 minutos por intentos fallidos.
+   */
+  async iniciarSesionMedicinaGeneral(medico: string, pin: string): Promise<SesionMedicinaGeneral> {
+    const res = await this.client.post('/api/video/medicina-general/sesion', { medico, pin });
+    return res.data;
+  }
+
+  /** La orden y la consulta guardada (null si aún no hay borrador). 401 SESION_REQUERIDA sin sesión. */
   async getMedicinaGeneral(
-    historiaId: string
+    historiaId: string,
+    token: string
   ): Promise<{ orden: OrdenMedicinaGeneral; consulta: ConsultaMedicinaGeneral | null }> {
-    const res = await this.client.get(`/api/video/medicina-general/${encodeURIComponent(historiaId)}`);
+    const res = await this.client.get(`/api/video/medicina-general/${encodeURIComponent(historiaId)}`, {
+      headers: cabeceraSesion(token),
+    });
     return res.data;
   }
 
   /** Guarda el borrador (upsert). Error 400 trae { error, campo }; 409 si ya está cerrada. */
   async guardarMedicinaGeneral(
     historiaId: string,
-    payload: ConsultaMedicinaGeneralPayload
+    payload: ConsultaMedicinaGeneralPayload,
+    token: string
   ): Promise<ConsultaMedicinaGeneral> {
-    const res = await this.client.put(`/api/video/medicina-general/${encodeURIComponent(historiaId)}`, payload);
+    const res = await this.client.put(`/api/video/medicina-general/${encodeURIComponent(historiaId)}`, payload, {
+      headers: cabeceraSesion(token),
+    });
     return res.data.consulta;
   }
 
   /** Cierra (firma) la consulta: después ya no se puede modificar. */
   async cerrarMedicinaGeneral(
     historiaId: string,
-    payload: ConsultaMedicinaGeneralPayload
+    payload: ConsultaMedicinaGeneralPayload,
+    token: string
   ): Promise<ConsultaMedicinaGeneral> {
     const res = await this.client.post(
       `/api/video/medicina-general/${encodeURIComponent(historiaId)}/cerrar`,
-      payload
+      payload,
+      { headers: cabeceraSesion(token) }
     );
     return res.data.consulta;
   }
