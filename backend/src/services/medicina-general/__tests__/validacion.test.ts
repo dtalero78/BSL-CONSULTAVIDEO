@@ -1,4 +1,5 @@
 import {
+  hoyColombia,
   ErrorValidacion,
   calcularHasta,
   esMedicinaGeneral,
@@ -171,10 +172,19 @@ describe('validarConsulta', () => {
   });
 
   describe('incapacidad', () => {
-    const base = { dias: 3, desde: '2026-11-23', origen: 'enfermedad_general', diagnostico: 'j02.9' };
+    // Desde hoy en Colombia: la regla de fechas exige que empiece cerca de hoy.
+    const hoy = hoyColombia();
+    const base = { dias: 3, desde: hoy, origen: 'enfermedad_general', diagnostico: 'j02.9' };
     it('calcula hasta en el servidor e ignora el del cliente', () => {
       const c = validarConsulta({ diagnosticos: [dxPrincipal], incapacidad: { ...base, hasta: '2030-01-01' } });
-      expect(c.incapacidad).toEqual({ dias: 3, desde: '2026-11-23', hasta: '2026-11-25', origen: 'enfermedad_general', diagnostico: 'J029' });
+      expect(c.incapacidad).toEqual({ dias: 3, desde: hoy, hasta: calcularHasta(hoy, 3), origen: 'enfermedad_general', diagnostico: 'J029' });
+    });
+    it('no se expide con retroactividad de más de 3 días ni a más de 30 días', () => {
+      const dx = [dxPrincipal];
+      const dias = (n: number) => calcularHasta(hoy, n + 1); // hoy + n días
+      expect(campoDelError(() => validarConsulta({ diagnosticos: dx, incapacidad: { ...base, desde: calcularHasta(hoy, -3) } }))).toBe('incapacidad.desde');
+      expect(campoDelError(() => validarConsulta({ diagnosticos: dx, incapacidad: { ...base, desde: dias(31) } }))).toBe('incapacidad.desde');
+      expect(validarConsulta({ diagnosticos: dx, incapacidad: { ...base, desde: dias(30) } }).incapacidad?.desde).toBe(dias(30));
     });
     it('null la quita', () => {
       expect(validarConsulta({ incapacidad: null }).incapacidad).toBeNull();

@@ -60,7 +60,18 @@ export interface MetaCierre {
   /** Para audit_log: la ruta que cerró la consulta. */
   endpoint?: string;
   metodo?: string;
+  /** Para audit_log: desde dónde se cerró (estas rutas no tienen sesión). */
+  ip?: string | null;
+  userAgent?: string | null;
 }
+
+/**
+ * Valores de "medico" que no son una persona que pueda firmar: la cita cancelada por el aliado
+ * (BSL-PLATAFORMA2, teleconsulta-aliados) y las colas internas de la plataforma.
+ */
+const MEDICOS_QUE_NO_FIRMAN = new Set([
+  'CANCELADA POR ALIADO', 'RESERVA', 'PENDIENTE DE PRUEBAS', 'PENDIENTE DE REAGENDAR', 'ADMINISTRADOR', 'PRESENCIAL',
+]);
 
 const COLUMNAS_ORDEN = `
   "_id", "numeroId", "tipoDocumento", "primerNombre", "segundoNombre", "primerApellido",
@@ -229,8 +240,12 @@ export class MedicinaGeneralService {
     const existente = await this.leerConsulta(cliente, historiaId, tenantId, true);
     if (existente?.cerrada_at) throw new ErrorHttp(409, 'La consulta ya está cerrada y no se puede modificar');
 
-    const medico = consulta.medico || (orden.medico ? String(orden.medico).trim() : '') || null;
-    if (!medico) throw new ErrorHttp(400, 'Falta el médico de la consulta', 'medico');
+    // El médico es SIEMPRE el asignado a la orden, leído aquí bajo el FOR UPDATE: nunca el que
+    // manda el navegador (estas rutas no tienen sesión y la consulta cerrada no se corrige).
+    const medico = orden.medico ? String(orden.medico).trim() : '';
+    if (!medico || MEDICOS_QUE_NO_FIRMAN.has(medico.toUpperCase())) {
+      throw new ErrorHttp(409, 'La orden no tiene un médico asignado que pueda firmar (o fue cancelada)');
+    }
 
     const diagnosticos = await this.completarDiagnosticos(cliente, consulta);
     const valores: Record<string, unknown> = { ...consulta, medico, diagnosticos };
@@ -296,7 +311,7 @@ export class MedicinaGeneralService {
                 "fechaConsulta" = COALESCE("fechaConsulta", NOW()),
                 "mdDx1" = $3,
                 "mdDx2" = $4,
-                "motivoConsulta" = $5,
+                "motivoConsulta" = COALESCE(NULLIF(TRIM("motivoConsulta"), ''), $5),
                 "_updatedDate" = NOW()
           WHERE "_id" = $1 AND tenant_id = $2 AND deleted_at IS NULL`,
         [historiaId, tenantId, principal?.descripcion ?? null, relacionado?.descripcion ?? null, consulta.motivo_consulta]
@@ -305,8 +320,8 @@ export class MedicinaGeneralService {
 
       // Auditoría normativa: solo hechos, nada de texto clínico libre.
       await cliente.query(
-        `INSERT INTO audit_log (tenant_id, usuario_email, accion, tabla, registro_id, datos_nuevos, endpoint, metodo)
-         VALUES ($1, $2, 'UPDATE', 'consultas_medicina_general', $3, $4::jsonb, $5, $6)`,
+        `INSERT INTO audit_log (tenant_id, usuario_email, accion, tabla, registro_id, datos_nuevos, endpoint, metodo, ip_address, user_agent)
+         VALUES ($1, $2, 'UPDATE', 'consultas_medicina_general', $3, $4::jsonb, $5, $6, $7, $8)`,
         [
           tenantId,
           medico.slice(0, 200),
@@ -314,6 +329,8 @@ export class MedicinaGeneralService {
           JSON.stringify({ cerrada: true, diagnosticos: diagnosticos.map((d) => d.codigo) }),
           meta.endpoint ? meta.endpoint.slice(0, 300) : null,
           meta.metodo ? meta.metodo.slice(0, 10) : null,
+          meta.ip ? String(meta.ip).slice(0, 100) : null,
+          meta.userAgent ? String(meta.userAgent).slice(0, 500) : null,
         ]
       );
 

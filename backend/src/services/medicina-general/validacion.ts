@@ -265,6 +265,13 @@ function fechaIsoUtc(valor: unknown): number | null {
   return ms;
 }
 
+const DIA_MS = 24 * 60 * 60 * 1000;
+
+/** Hoy en Colombia como 'YYYY-MM-DD' (producción corre en UTC). */
+export function hoyColombia(ahora: Date = new Date()): string {
+  return ahora.toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
+}
+
 /** Último día de la incapacidad: desde + dias - 1 (aritmética en UTC, sin zona horaria). */
 export function calcularHasta(desde: string, dias: number): string {
   const ms = fechaIsoUtc(desde);
@@ -280,6 +287,13 @@ export function validarIncapacidad(valor: unknown, diagnosticos: DiagnosticoEntr
     throw new ErrorValidacion('Fecha de inicio inválida (formato AAAA-MM-DD)', 'incapacidad.desde');
   }
   const desde = valor.desde as string;
+  // Decreto 1427/2022: la incapacidad no se expide con retroactividad (salvo urgencias, hasta 3
+  // días). Margen: de 3 días antes a 30 días después de hoy en Colombia.
+  const hoy = fechaIsoUtc(hoyColombia());
+  const inicio = fechaIsoUtc(desde) as number;
+  if (hoy !== null && (inicio < hoy - 3 * DIA_MS || inicio > hoy + 30 * DIA_MS)) {
+    throw new ErrorValidacion('La incapacidad debe empezar entre 3 días antes y 30 días después de hoy', 'incapacidad.desde');
+  }
   const origen = enumeracion(valor.origen, ORIGENES, 'incapacidad.origen');
   const diagnostico = normalizarCodigoCie10(valor.diagnostico);
   if (!diagnosticos.some((d) => d.codigo === diagnostico)) {

@@ -369,6 +369,8 @@ export const MedicinaGeneralPanel = ({ historiaId }: Props) => {
   const guardandoRef = useRef(false);
   const pendienteRef = useRef(false);
   const cerradaRef = useRef(false);
+  // Mientras se cierra, el formulario no acepta cambios: lo escrito después no iría en el cierre.
+  const cerrandoRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const cargar = useCallback(async () => {
@@ -438,7 +440,7 @@ export const MedicinaGeneralPanel = ({ historiaId }: Props) => {
 
   /** Toda edición pasa por aquí: actualiza el formulario y programa el autoguardado. */
   const editar = (fn: (f: Form) => Form) => {
-    if (cerradaRef.current || !formRef.current) return;
+    if (cerradaRef.current || cerrandoRef.current || !formRef.current) return;
     const nuevo = fn(formRef.current);
     formRef.current = nuevo;
     setForm(nuevo);
@@ -453,11 +455,19 @@ export const MedicinaGeneralPanel = ({ historiaId }: Props) => {
   };
 
   const cerrarConsulta = async () => {
-    if (!formRef.current) return;
+    if (!formRef.current || cerrandoRef.current) return;
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = null;
+    cerrandoRef.current = true;
     setCerrando(true);
     setErrorCierre(null);
+    // Si hay un borrador en camino, se espera a que termine (hasta 10 s): así no llega después del
+    // cierre con un "ya está cerrada" que confunde. El cierre manda todo el formulario de todos modos.
+    pendienteRef.current = false;
+    for (let i = 0; i < 50 && guardandoRef.current; i++) {
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    sucioRef.current = false;
     const { payload, mapa } = construirPayload(formRef.current, ordenRef.current?.medico ?? null, true);
     try {
       const consulta = await apiService.cerrarMedicinaGeneral(historiaId, payload);
@@ -467,10 +477,12 @@ export const MedicinaGeneralPanel = ({ historiaId }: Props) => {
       setConfirmandoCierre(false);
     } catch (err) {
       const e = leerError(err, 'No se pudo cerrar la consulta', mapa);
+      sucioRef.current = true; // no se cerró: lo escrito sigue pendiente de guardar
       setErrorCierre({ mensaje: e.mensaje, campo: e.campo });
       setConfirmandoCierre(false);
       if (e.status === 409) void cargar();
     } finally {
+      cerrandoRef.current = false;
       setCerrando(false);
     }
   };
