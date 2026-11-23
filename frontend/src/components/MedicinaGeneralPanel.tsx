@@ -396,7 +396,7 @@ export const MedicinaGeneralPanel = ({ historiaId }: Props) => {
   const guardar = useCallback(async () => {
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = null;
-    if (!sucioRef.current || cerradaRef.current || !formRef.current) return;
+    if (!sucioRef.current || cerradaRef.current || cerrandoRef.current || !formRef.current) return;
     if (guardandoRef.current) {
       pendienteRef.current = true;
       return;

@@ -71,7 +71,10 @@ export function crearControladorMedicinaGeneral(
         const consulta = await servicio.cerrar(req.params.historiaId, tenantId, req.body, {
           endpoint: req.originalUrl,
           metodo: req.method,
-          ip: String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket?.remoteAddress || null,
+          // Solo para el registro, sin garantía (la cabecera la pone quien llama): el servicio
+          // descarta lo que no parezca una IP para que nunca tumbe el cierre.
+          ip: String(req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || '').split(',')[0].trim()
+            || req.socket?.remoteAddress || null,
           userAgent: req.headers['user-agent'] || null,
         });
         console.log(`✅ [MedicinaGeneral] Consulta cerrada: ${tenantId}/${req.params.historiaId}`);

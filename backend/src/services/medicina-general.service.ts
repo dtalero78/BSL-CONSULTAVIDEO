@@ -28,7 +28,7 @@ import {
 
 /** Error con código HTTP (400/404/409). El controlador lo traduce a la respuesta. */
 export class ErrorHttp extends Error {
-  constructor(public readonly status: 400 | 404 | 409 | 500, mensaje: string, public readonly campo?: string) {
+  constructor(public readonly status: 400 | 404 | 409 | 422 | 500, mensaje: string, public readonly campo?: string) {
     super(mensaje);
     this.name = 'ErrorHttp';
   }
@@ -244,7 +244,9 @@ export class MedicinaGeneralService {
     // manda el navegador (estas rutas no tienen sesión y la consulta cerrada no se corrige).
     const medico = orden.medico ? String(orden.medico).trim() : '';
     if (!medico || MEDICOS_QUE_NO_FIRMAN.has(medico.toUpperCase())) {
-      throw new ErrorHttp(409, 'La orden no tiene un médico asignado que pueda firmar (o fue cancelada)');
+      // 422, no 409: el panel recarga ante un 409 ("ya está cerrada"), y aquí no hay nada que
+      // recargar; lo escrito se queda en pantalla.
+      throw new ErrorHttp(422, 'La orden no tiene un médico asignado que pueda firmar (o fue cancelada)');
     }
 
     const diagnosticos = await this.completarDiagnosticos(cliente, consulta);
@@ -329,7 +331,7 @@ export class MedicinaGeneralService {
           JSON.stringify({ cerrada: true, diagnosticos: diagnosticos.map((d) => d.codigo) }),
           meta.endpoint ? meta.endpoint.slice(0, 300) : null,
           meta.metodo ? meta.metodo.slice(0, 10) : null,
-          meta.ip ? String(meta.ip).slice(0, 100) : null,
+          meta.ip && /^[0-9a-fA-F.:]{3,45}$/.test(String(meta.ip)) ? String(meta.ip) : null,
           meta.userAgent ? String(meta.userAgent).slice(0, 500) : null,
         ]
       );
