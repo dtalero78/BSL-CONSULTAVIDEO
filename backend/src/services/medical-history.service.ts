@@ -1,5 +1,6 @@
 import historiaClinicaPostgresService from './historia-clinica-postgres.service';
 import postgresService from './postgres.service';
+import { esMedicinaGeneral } from './medicina-general/validacion';
 // whatsappService ya no se importa: el único envío de este servicio era el link
 // del certificado al paciente, eliminado el 2026-10-14 (ver PASO 1.5).
 import whapiService from './whapi.service';
@@ -425,7 +426,7 @@ class MedicalHistoryService {
     }
   }
 
-  async updateMedicalHistory(payload: UpdateMedicalHistoryPayload): Promise<{ success: boolean; error?: string }> {
+  async updateMedicalHistory(payload: UpdateMedicalHistoryPayload): Promise<{ success: boolean; error?: string; conflicto?: boolean }> {
     try {
       console.log(`💾 Actualizando historia clínica para ID: ${payload.historiaId}`);
 
@@ -471,6 +472,13 @@ class MedicalHistoryService {
         } else {
           return { success: false, error: 'No se encontró historia clínica' };
         }
+      }
+
+      // Una orden de medicina general se guarda y firma solo por /api/video/medicina-general, con el
+      // PIN del médico. Esta ruta (la ocupacional, sin sesión) no la puede tocar: la marcaría
+      // ATENDIDO sin consulta firmada y sin auditoría.
+      if (esMedicinaGeneral(historiaBase.tipoExamen) || esMedicinaGeneral(payload.tipoExamen)) {
+        return { success: false, conflicto: true, error: 'Esta orden es de medicina general: se guarda desde su propio panel, con el PIN del médico' };
       }
 
       // PASO 1: Guardar en PostgreSQL PRIMERO (fuente principal - OBLIGATORIO)

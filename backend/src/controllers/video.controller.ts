@@ -590,7 +590,7 @@ class VideoController {
           message: 'Medical history updated successfully',
         });
       } else {
-        res.status(500).json({
+        res.status(result.conflicto ? 409 : 500).json({
           success: false,
           error: result.error || 'Failed to update medical history',
         });
