@@ -39,7 +39,7 @@ export async function redirigirASalaDeIntegracion(
       `SELECT room_name FROM integration_consultas WHERE historia_id = $1
        UNION ALL
        SELECT sala AS room_name FROM teleconsulta_citas
-        WHERE orden_id = $1 AND estado IN ('agendada', 'en_curso')
+        WHERE tenant_id = 'bsl' AND orden_id = $1 AND estado IN ('agendada', 'en_curso')
        LIMIT 1`,
       [historiaId]
     );

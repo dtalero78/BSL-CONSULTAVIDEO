@@ -434,6 +434,7 @@ export function MedicalPanelPage() {
   };
 
   const handleRellamar = async (patient: Patient) => {
+    if (esDeAliado(patient)) return;
     setRecallingPatient(patient._id);
     try {
       // Formatear teléfono con código de país internacional
@@ -811,7 +812,8 @@ export function MedicalPanelPage() {
 
                       <button
                         onClick={() => handleRellamar(patient)}
-                        disabled={recallingPatient === patient._id}
+                        disabled={recallingPatient === patient._id || esDeAliado(patient)}
+                        title={esDeAliado(patient) ? 'Paciente de ORIONT: no se llama desde BSL' : undefined}
                         className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       >
                         {recallingPatient === patient._id ? (
@@ -834,12 +836,12 @@ export function MedicalPanelPage() {
 
                       <button
                         onClick={() =>
-                          setChatPatient({
+                          !esDeAliado(patient) && setChatPatient({
                             celular: patient.celular,
                             nombre: patient.nombres || 'Paciente',
                           })
                         }
-                        disabled={!patient.celular}
+                        disabled={!patient.celular || esDeAliado(patient)}
                         className="bg-[#075e54] text-white px-4 py-2 rounded-lg hover:bg-[#0a7a6c] transition text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
                         title={patient.celular ? 'Ver chat de WhatsApp' : 'Sin celular'}
                       >
@@ -1024,7 +1026,8 @@ export function MedicalPanelPage() {
 
                           <button
                             onClick={() => handleRellamar(patient)}
-                            disabled={recallingPatient === patient._id}
+                            disabled={recallingPatient === patient._id || esDeAliado(patient)}
+                            title={esDeAliado(patient) ? 'Paciente de ORIONT: no se llama desde BSL' : undefined}
                             className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                           >
                             {recallingPatient === patient._id ? (
@@ -1047,12 +1050,12 @@ export function MedicalPanelPage() {
 
                           <button
                             onClick={() =>
-                              setChatPatient({
+                              !esDeAliado(patient) && setChatPatient({
                                 celular: patient.celular,
                                 nombre: patient.nombres || 'Paciente',
                               })
                             }
-                            disabled={!patient.celular}
+                            disabled={!patient.celular || esDeAliado(patient)}
                             className="bg-[#075e54] text-white px-4 py-2 rounded-lg hover:bg-[#0a7a6c] transition text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
                             title={patient.celular ? 'Ver chat de WhatsApp' : 'Sin celular'}
                           >
