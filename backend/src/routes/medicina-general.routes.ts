@@ -14,10 +14,8 @@ const VENTANA_MS = 15 * 60 * 1000;
 const MAX_INTENTOS_POR_IP = 20;
 const intentosPorIp = new Map<string, { desde: number; n: number }>();
 
-/** La IP del cliente: la que pone Cloudflare, o la última que agregó el balanceador. */
+/** La IP del cliente: la última de x-forwarded-for (la agrega el balanceador de AWS; no hay Cloudflare). */
 function ipDelCliente(req: Request): string {
-  const cf = req.headers['cf-connecting-ip'];
-  if (typeof cf === 'string' && cf) return cf.trim();
   const xff = String(req.headers['x-forwarded-for'] || '').split(',').map((v) => v.trim()).filter(Boolean);
   return xff[xff.length - 1] || req.socket?.remoteAddress || 'desconocida';
 }
@@ -26,6 +24,8 @@ export function limitarIntentosDePin(req: Request, res: Response, next: NextFunc
   const ahora = Date.now();
   if (intentosPorIp.size > 5000) {
     for (const [ip, v] of intentosPorIp) if (ahora - v.desde > VENTANA_MS) intentosPorIp.delete(ip);
+    // Tope de memoria: si aun así sigue lleno, se vacía (el bloqueo por médico sigue protegiendo).
+    if (intentosPorIp.size > 5000) intentosPorIp.clear();
   }
   const ip = ipDelCliente(req);
   const actual = intentosPorIp.get(ip);

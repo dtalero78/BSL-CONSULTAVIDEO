@@ -2,7 +2,7 @@
 import { limitarIntentosDePin } from '../medicina-general.routes';
 
 function pedido(ip: string) {
-  return { headers: { 'cf-connecting-ip': ip }, socket: {} } as any;
+  return { headers: { 'x-forwarded-for': `1.2.3.4, ${ip}` }, socket: {} } as any;
 }
 
 function respuesta() {
@@ -22,6 +22,17 @@ describe('limitarIntentosDePin', () => {
       if (res.codigo === 429) frenado++;
     }
     expect([pasaron, frenado]).toEqual([20, 1]);
+  });
+
+  it('una IP inventada al principio de x-forwarded-for no salta el tope', () => {
+    let frenado = 0;
+    for (let i = 0; i < 25; i++) {
+      const res = respuesta();
+      const req = { headers: { 'x-forwarded-for': `10.0.0.${i}, 198.51.100.9`, 'cf-connecting-ip': `9.9.9.${i}` }, socket: {} } as any;
+      limitarIntentosDePin(req, res, () => {});
+      if (res.codigo === 429) frenado++;
+    }
+    expect(frenado).toBe(5);
   });
 
   it('cada conexión lleva su propia cuenta', () => {

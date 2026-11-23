@@ -31,13 +31,14 @@ declare global {
 
 export type ResolverTenant = (req: Request) => Promise<string>;
 
-/** IP de quien llama (para el registro; el servicio descarta lo que no parezca una IP). */
-function ipDe(req: Request): string | null {
-  return (
-    String(req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
-    req.socket?.remoteAddress ||
-    null
-  );
+/**
+ * IP de quien llama (para el registro; el servicio descarta lo que no parezca una IP).
+ * aws.medico-bsl.com va directo al balanceador de AWS (sin Cloudflare): la IP real es la ÚLTIMA de
+ * x-forwarded-for, la que agrega el balanceador. Las anteriores las puede inventar el cliente.
+ */
+export function ipDe(req: Request): string | null {
+  const xff = String(req.headers['x-forwarded-for'] || '').split(',').map((v) => v.trim()).filter(Boolean);
+  return xff[xff.length - 1] || req.socket?.remoteAddress || null;
 }
 
 const tenantPorHostname: ResolverTenant = async (req) => {
