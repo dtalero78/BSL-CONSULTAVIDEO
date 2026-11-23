@@ -31,8 +31,16 @@ export async function redirigirASalaDeIntegracion(
     const historiaId = String(req.query.documento ?? '').trim();
     if (!historiaId) return next();
 
+    // Dos orígenes: las integraciones de esta app (Maluwa360) y las citas de los aliados de
+    // teleconsulta de BSL-PLATAFORMA2 (Grupo MOK / ORIONT, tabla teleconsulta_citas: la sala
+    // nace al agendar y va en el link del paciente). Ver PLATAFORMA2
+    // docs/modulos/teleconsulta-aliados.md.
     const filas = await postgresService.query(
-      `SELECT room_name FROM integration_consultas WHERE historia_id = $1 LIMIT 1`,
+      `SELECT room_name FROM integration_consultas WHERE historia_id = $1
+       UNION ALL
+       SELECT sala AS room_name FROM teleconsulta_citas
+        WHERE orden_id = $1 AND estado IN ('agendada', 'en_curso')
+       LIMIT 1`,
       [historiaId]
     );
     // null = la base falló · sin filas = la historia no vino de una integración.
