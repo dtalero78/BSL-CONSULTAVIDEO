@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, memo } from 'react';
 import type { VideoEngine } from '../video/video-engine';
-import apiService from '../services/api.service';
+import apiService, { esOrdenMedicinaGeneral } from '../services/api.service';
 import { PatientHistoryModal } from './PatientHistoryModal';
+import { MedicinaGeneralPanel } from './MedicinaGeneralPanel';
 import { useConsultationRecorder } from '../hooks/useConsultationRecorder';
 
 interface AntecedentesPersonales {
@@ -166,6 +167,9 @@ const MedicalHistoryPanelInner = ({ historiaId, sueltaBase, onAppendToObservacio
   useEffect(() => {
     if (!patientConnected || !room || autoStartedRef.current) return;
     if (recorder.isRecording || recorder.isProcessing) return;
+    // Medicina general tiene su propio formulario, sin botón de grabar: no se graba a escondidas.
+    // Por eso se espera a que cargue la orden para saber de qué tipo es.
+    if (isLoading || esOrdenMedicinaGeneral(data?.tipoExamen)) return;
     autoStartedRef.current = true;
 
     let cancelled = false;
@@ -191,7 +195,7 @@ const MedicalHistoryPanelInner = ({ historiaId, sueltaBase, onAppendToObservacio
       clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [patientConnected, room]);
+  }, [patientConnected, room, isLoading]);
 
   // Formatear segundos a mm:ss para el cronómetro de grabación
   const formatElapsed = (totalSeconds: number): string => {
@@ -639,6 +643,12 @@ const MedicalHistoryPanelInner = ({ historiaId, sueltaBase, onAppendToObservacio
         </div>
       </div>
     );
+  }
+
+  // Orden de medicina general (Grupo MOK / ORIONT): otro formulario y otra tabla.
+  // Todo lo demás de este panel es solo para salud ocupacional.
+  if (esOrdenMedicinaGeneral(data.tipoExamen)) {
+    return <MedicinaGeneralPanel historiaId={data.historiaId} />;
   }
 
   return (

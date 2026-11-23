@@ -13,6 +13,7 @@ import twilioVoiceRoutes from './routes/twilio-voice.routes';
 import tenantRoutes from './routes/tenant.routes';
 import webhookRoutes from './routes/webhook.routes';
 import whatsappChatRoutes from './routes/whatsapp-chat.routes';
+import medicinaGeneralRoutes from './routes/medicina-general.routes';
 import { redirigirASalaDeIntegracion } from './middleware/sala-integracion.middleware';
 import { telemedicineSocketService } from './services/telemedicine-socket.service';
 import { sessionTracker } from './services/session-tracker.service';
@@ -108,6 +109,9 @@ app.get('/health', (_req: Request, res: Response) => {
 });
 
 // API Routes
+// Historia de medicina general (órdenes con tipoExamen 'Medicina general'). Antes de
+// '/api/video' para que su router la atienda primero.
+app.use('/api/video/medicina-general', medicinaGeneralRoutes);
 app.use('/api/video', videoRoutes);
 app.use('/api/telemedicine', telemedicineRoutes);
 app.use('/api/medical-panel', medicalPanelRoutes);

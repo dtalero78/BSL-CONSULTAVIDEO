@@ -24,6 +24,119 @@ export interface PatientHistoryRecord {
   atendido: string | null;
 }
 
+// ----- Consulta de medicina general -----
+// Formas de los JSON: las de la migración 0018_medicina_general.sql de BSL-PLATAFORMA2.
+
+/** ¿La orden es de medicina general? (mismo criterio que el backend: sin importar mayúsculas). */
+export const esOrdenMedicinaGeneral = (tipoExamen?: string | null): boolean =>
+  (tipoExamen || '').trim().toLowerCase() === 'medicina general';
+
+export interface Cie10 {
+  codigo: string;
+  descripcion: string;
+}
+
+export type TipoDiagnostico = 'principal' | 'relacionado';
+export type ClaseDiagnostico = 'impresion' | 'confirmado_nuevo' | 'confirmado_repetido';
+
+export interface DiagnosticoMG {
+  codigo: string;
+  descripcion: string; // la pone el servidor desde cie10; la que mande el navegador se ignora
+  tipo: TipoDiagnostico;
+  clase: ClaseDiagnostico;
+}
+
+export interface ItemFormulaMG {
+  medicamento: string;
+  concentracion: string | null;
+  forma: string | null;
+  dosis: string;
+  via: string;
+  frecuencia: string;
+  duracion_dias: number | string;
+  cantidad: string;
+  indicaciones: string | null;
+}
+
+export interface ItemOrdenMG {
+  tipo: 'laboratorio' | 'imagen' | 'remision' | 'otro';
+  descripcion: string;
+  indicaciones: string | null;
+}
+
+export interface IncapacidadMG {
+  dias: number | string;
+  desde: string;
+  hasta?: string; // la calcula el servidor
+  origen: 'enfermedad_general' | 'accidente_trabajo' | 'enfermedad_laboral';
+  diagnostico: string;
+}
+
+export interface OrdenMedicinaGeneral {
+  _id: string;
+  numeroId: string | null;
+  tipoDocumento: string | null;
+  primerNombre: string | null;
+  segundoNombre: string | null;
+  primerApellido: string | null;
+  segundoApellido: string | null;
+  fecha_nacimiento: string | null;
+  genero_biologico: string | null;
+  celular: string | null;
+  email: string | null;
+  codEmpresa: string | null;
+  empresa: string | null;
+  tipoExamen: string | null;
+  medico: string | null;
+  motivoConsulta: string | null;
+  fechaAtencion: string | null;
+}
+
+type SignoVitalMG =
+  | 'ta_sistolica'
+  | 'ta_diastolica'
+  | 'frecuencia_cardiaca'
+  | 'frecuencia_respiratoria'
+  | 'temperatura'
+  | 'saturacion'
+  | 'peso_kg'
+  | 'talla_cm';
+
+type TextoMG =
+  | 'motivo_consulta'
+  | 'enfermedad_actual'
+  | 'antecedentes'
+  | 'revision_sistemas'
+  | 'examen_fisico'
+  | 'analisis'
+  | 'plan_manejo'
+  | 'recomendaciones';
+
+export type ConsultaMedicinaGeneralPayload = { [K in TextoMG]: string | null } & {
+  [K in SignoVitalMG]: number | string | null;
+} & {
+  medico: string | null;
+  diagnosticos: Array<Pick<DiagnosticoMG, 'codigo' | 'tipo' | 'clase'> & { descripcion?: string }>;
+  formula: ItemFormulaMG[];
+  ordenes: ItemOrdenMG[];
+  incapacidad: IncapacidadMG | null;
+};
+
+export type ConsultaMedicinaGeneral = { [K in TextoMG]: string | null } & {
+  [K in SignoVitalMG]: number | null;
+} & {
+  tenant_id: string;
+  orden_id: string;
+  medico: string;
+  diagnosticos: DiagnosticoMG[];
+  formula: ItemFormulaMG[];
+  ordenes: ItemOrdenMG[];
+  incapacidad: IncapacidadMG | null;
+  cerrada_at: string | null;
+  creado_at: string;
+  actualizado_at: string;
+};
+
 /** Un mensaje del chat de WhatsApp (entrante = del paciente, saliente = del panel). */
 export interface WaMensaje {
   id: number;
@@ -319,6 +432,43 @@ class ApiService {
     tipoExamen?: string;
   }): Promise<void> {
     await this.client.post('/api/video/medical-history', payload);
+  }
+
+  // ----- Consulta de medicina general (órdenes con tipoExamen 'Medicina general') -----
+
+  /** Typeahead CIE-10: por código (J02, j02.9) o por palabras de la descripción. */
+  async buscarCie10(q: string): Promise<Cie10[]> {
+    const res = await this.client.get('/api/video/medicina-general/cie10', { params: { q } });
+    return res.data;
+  }
+
+  /** La orden y la consulta guardada (null si aún no hay borrador). */
+  async getMedicinaGeneral(
+    historiaId: string
+  ): Promise<{ orden: OrdenMedicinaGeneral; consulta: ConsultaMedicinaGeneral | null }> {
+    const res = await this.client.get(`/api/video/medicina-general/${encodeURIComponent(historiaId)}`);
+    return res.data;
+  }
+
+  /** Guarda el borrador (upsert). Error 400 trae { error, campo }; 409 si ya está cerrada. */
+  async guardarMedicinaGeneral(
+    historiaId: string,
+    payload: ConsultaMedicinaGeneralPayload
+  ): Promise<ConsultaMedicinaGeneral> {
+    const res = await this.client.put(`/api/video/medicina-general/${encodeURIComponent(historiaId)}`, payload);
+    return res.data.consulta;
+  }
+
+  /** Cierra (firma) la consulta: después ya no se puede modificar. */
+  async cerrarMedicinaGeneral(
+    historiaId: string,
+    payload: ConsultaMedicinaGeneralPayload
+  ): Promise<ConsultaMedicinaGeneral> {
+    const res = await this.client.post(
+      `/api/video/medicina-general/${encodeURIComponent(historiaId)}/cerrar`,
+      payload
+    );
+    return res.data.consulta;
   }
 
   /**
