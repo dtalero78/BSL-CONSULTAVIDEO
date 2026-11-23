@@ -843,7 +843,7 @@ export function MedicalPanelPage() {
                         }
                         disabled={!patient.celular || esDeAliado(patient)}
                         className="bg-[#075e54] text-white px-4 py-2 rounded-lg hover:bg-[#0a7a6c] transition text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
-                        title={patient.celular ? 'Ver chat de WhatsApp' : 'Sin celular'}
+                        title={esDeAliado(patient) ? 'Paciente de ORIONT: no se le escribe desde BSL' : patient.celular ? 'Ver chat de WhatsApp' : 'Sin celular'}
                       >
                         <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                           <path d="M12 2a10 10 0 0 0-8.7 15l-1.3 4.7 4.8-1.3A10 10 0 1 0 12 2zm0 2a8 8 0 1 1-4.2 14.8l-.3-.2-2.8.7.8-2.7-.2-.3A8 8 0 0 1 12 4z" />
@@ -1057,7 +1057,7 @@ export function MedicalPanelPage() {
                             }
                             disabled={!patient.celular || esDeAliado(patient)}
                             className="bg-[#075e54] text-white px-4 py-2 rounded-lg hover:bg-[#0a7a6c] transition text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
-                            title={patient.celular ? 'Ver chat de WhatsApp' : 'Sin celular'}
+                            title={esDeAliado(patient) ? 'Paciente de ORIONT: no se le escribe desde BSL' : patient.celular ? 'Ver chat de WhatsApp' : 'Sin celular'}
                           >
                             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                               <path d="M12 2a10 10 0 0 0-8.7 15l-1.3 4.7 4.8-1.3A10 10 0 1 0 12 2zm0 2a8 8 0 1 1-4.2 14.8l-.3-.2-2.8.7.8-2.7-.2-.3A8 8 0 0 1 12 4z" />
