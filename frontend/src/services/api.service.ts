@@ -30,7 +30,10 @@ export interface ResumenPostincapacidadData {
   origen: string | null;
   completadoAt: string | null;
   enCurso: boolean;
+  fallo: boolean;
+  documentosSinEnviar: number;
   hayDocumentos: boolean;
+  analisisSinResumen: boolean;
 }
 
 export interface PatientHistoryRecord {

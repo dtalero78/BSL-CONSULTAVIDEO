@@ -48,6 +48,7 @@ export const PostincapacidadResumenModal = ({ isOpen, onClose, historiaId }: Pro
     let vigente = true;
     setIsLoading(true);
     setError(null);
+    setDatos(null);
     apiService
       .getResumenPostincapacidad(historiaId)
       .then((d) => { if (vigente) setDatos(d); })
@@ -63,11 +64,15 @@ export const PostincapacidadResumenModal = ({ isOpen, onClose, historiaId }: Pro
   if (datos && !r) {
     vacio = !datos.disponible
       ? 'El resumen todavía no está disponible.'
-      : datos.enCurso
-        ? 'Estamos analizando los documentos que subió el paciente. Vuelve a abrir esta ventana en unos minutos.'
-        : datos.hayDocumentos
-          ? 'El paciente subió documentos, pero todavía no los envió a análisis.'
-          : 'El paciente todavía no ha subido su historia clínica.';
+      : datos.analisisSinResumen
+        ? 'Hay un análisis de esta historia hecho antes de que existiera el resumen. Pide que lo abran una vez en Órdenes de la plataforma y vuelve a abrir esta ventana.'
+        : datos.enCurso
+          ? 'Estamos analizando los documentos que subió el paciente. Vuelve a abrir esta ventana en unos minutos.'
+          : datos.fallo
+            ? 'No se pudieron analizar los documentos que subió el paciente (por ejemplo, fotos que no se leen). Pídele que los envíe de nuevo.'
+            : datos.documentosSinEnviar > 0
+              ? 'El paciente subió documentos, pero todavía no los envió a análisis.'
+              : 'El paciente todavía no ha subido su historia clínica.';
   }
 
   return (
@@ -158,6 +163,8 @@ export const PostincapacidadResumenModal = ({ isOpen, onClose, historiaId }: Pro
               <p className="text-xs text-gray-400 mt-4">
                 {datos?.origen === 'paciente' ? 'Documentos subidos por el paciente. ' : ''}
                 {datos?.enCurso ? 'Hay documentos nuevos en análisis; este resumen se actualizará. ' : ''}
+                {!datos?.enCurso && datos?.documentosSinEnviar ? `El paciente subió ${datos.documentosSinEnviar} documento(s) más que no ha enviado a análisis. ` : ''}
+                {datos?.fallo ? 'El último análisis de documentos nuevos falló. ' : ''}
                 Las cifras se calculan de los soportes; los puntos a verificar no prueban nada por sí solos: el concepto es del médico.
               </p>
             </>
