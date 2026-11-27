@@ -3,6 +3,7 @@ import type { Room } from 'twilio-video';
 import apiService from '../services/api.service';
 import { PatientHistoryModal } from './PatientHistoryModal';
 import { NationalHistoryModal } from './NationalHistoryModal';
+import { PostincapacidadResumenModal, esPostIncapacidad } from './PostincapacidadResumenModal';
 import { useConsultationRecorder } from '../hooks/useConsultationRecorder';
 
 interface AntecedentesPersonales {
@@ -146,6 +147,7 @@ const MedicalHistoryPanelInner = ({ historiaId, sueltaBase, onAppendToObservacio
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [isNationalModalOpen, setIsNationalModalOpen] = useState(false);
+  const [isPostincModalOpen, setIsPostincModalOpen] = useState(false);
   const [transcriptionNotice, setTranscriptionNotice] = useState<string | null>(null);
   const [transcriptText, setTranscriptText] = useState('');
   const [showTranscript, setShowTranscript] = useState(false);
@@ -648,10 +650,11 @@ const MedicalHistoryPanelInner = ({ historiaId, sueltaBase, onAppendToObservacio
   return (
     <div className="h-full flex flex-col bg-[#1f2c34] text-white">
       {/* Header fijo */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-700 bg-[#1f2c34] sticky top-0 z-10">
-        <h2 className="text-lg font-bold text-[#00a884]">Historia Clínica</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2 p-4 border-b border-gray-700 bg-[#1f2c34] sticky top-0 z-10">
+        <h2 className="text-lg font-bold text-[#00a884] whitespace-nowrap">Historia Clínica</h2>
+        {/* flex-wrap: con Grabar y Post-incapacidad los botones no caben en los 450 px del panel */}
         {data?.numeroId && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             {room && (
               <button
                 onClick={handleToggleRecording}
@@ -733,6 +736,18 @@ const MedicalHistoryPanelInner = ({ historiaId, sueltaBase, onAppendToObservacio
               </svg>
               Historial
             </button>
+            {esPostIncapacidad(data?.tipoExamen) && (
+              <button
+                onClick={() => setIsPostincModalOpen(true)}
+                className="flex items-center gap-2 px-3 py-2 bg-amber-600 text-white text-sm rounded-lg hover:bg-amber-700 transition"
+                title="Resumen de la historia clínica que subió el paciente post-incapacidad"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                </svg>
+                Post-incapacidad
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -1263,6 +1278,15 @@ const MedicalHistoryPanelInner = ({ historiaId, sueltaBase, onAppendToObservacio
         historiaId={historiaId}
         medicoCode={medicoCode}
       />
+
+      {/* Resumen de la historia post-incapacidad que subió el paciente */}
+      {data && esPostIncapacidad(data.tipoExamen) && (
+        <PostincapacidadResumenModal
+          isOpen={isPostincModalOpen}
+          onClose={() => setIsPostincModalOpen(false)}
+          historiaId={data.historiaId || historiaId}
+        />
+      )}
 
       {/* Modal de Historial de Consultas */}
       {data?.numeroId && (
