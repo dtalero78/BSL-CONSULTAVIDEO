@@ -3,6 +3,7 @@ import twilioService from '../services/twilio.service';
 import { sessionTracker } from '../services/session-tracker.service';
 import whatsappService from '../services/whatsapp.service';
 import medicalHistoryService from '../services/medical-history.service';
+import postincapacidadResumenService from '../services/postincapacidad-resumen.service';
 import openaiService from '../services/openai.service';
 import consultaTranscriptionService from '../services/consulta-transcription.service';
 import postgresService from '../services/postgres.service';
@@ -490,6 +491,30 @@ class VideoController {
       console.error('Error fetching medical history:', error);
       res.status(500).json({
         error: 'Failed to fetch medical history',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  /**
+   * Resumen de la historia post-incapacidad que subió el paciente (Daniel, 27-nov-2026).
+   * GET /api/video/medical-history/:historiaId/resumen-postincapacidad
+   */
+  async getResumenPostincapacidad(req: Request, res: Response): Promise<void> {
+    try {
+      const { historiaId } = req.params;
+      if (!historiaId) {
+        res.status(400).json({ error: 'historiaId is required' });
+        return;
+      }
+      const hostname = req.hostname || (req.headers.host || '').split(':')[0];
+      const tenant = await tenantService.getByHostname(hostname);
+      const data = await postincapacidadResumenService.getResumen(historiaId, tenant.id);
+      res.status(200).json({ success: true, data });
+    } catch (error) {
+      console.error('Error fetching resumen postincapacidad:', error);
+      res.status(500).json({
+        error: 'Failed to fetch resumen postincapacidad',
         message: error instanceof Error ? error.message : 'Unknown error',
       });
     }

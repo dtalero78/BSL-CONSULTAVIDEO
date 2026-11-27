@@ -5,6 +5,37 @@ import axios, { AxiosInstance } from 'axios';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 // Interfaz para el historial de consultas anteriores
+// Forma de analisis_postincapacidad.resumen_medico (BSL-PLATAFORMA2, src/helpers/postincapacidad-resumen.js).
+export interface ResumenPostincapacidad {
+  soportes: number;
+  soportesQueCertifican: number;
+  diasCertificados: number;
+  diasSinSoporte: number;
+  periodo: { desde: string; hasta: string; dias: number } | null;
+  tramos: { desde: string; hasta: string; dias: number }[];
+  vacios: { desde: string; hasta: string; dias: number }[];
+  dia120: boolean;
+  dia180: boolean;
+  porNivel: { nivel: string; dias: number; soportes: number }[];
+  origenes: string[];
+  diagnosticos: { codigo: string; descripcion: string; soportes: number }[];
+  prestadores: string[];
+  alertas: { titulo: string; detalle: string; queHacer: string; origen: string }[];
+  alertasTotal: number;
+}
+
+export interface ResumenPostincapacidadData {
+  disponible: boolean;
+  resumen: ResumenPostincapacidad | null;
+  origen: string | null;
+  completadoAt: string | null;
+  enCurso: boolean;
+  fallo: boolean;
+  documentosSinEnviar: number;
+  hayDocumentos: boolean;
+  analisisSinResumen: boolean;
+}
+
 export interface PatientHistoryRecord {
   _id: string;
   numeroId: string;
@@ -215,6 +246,14 @@ class ApiService {
    */
   async getPatientHistory(numeroId: string): Promise<PatientHistoryRecord[]> {
     const response = await this.client.get(`/api/video/medical-history/patient/${numeroId}`);
+    return response.data.data;
+  }
+
+  /**
+   * Resumen de la historia post-incapacidad que subió el paciente (lo arma BSL-PLATAFORMA2).
+   */
+  async getResumenPostincapacidad(historiaId: string): Promise<ResumenPostincapacidadData> {
+    const response = await this.client.get(`/api/video/medical-history/${historiaId}/resumen-postincapacidad`);
     return response.data.data;
   }
 

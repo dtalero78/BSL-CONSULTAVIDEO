@@ -30,6 +30,8 @@ router.post('/whatsapp/send-suelta', videoController.sendWhatsAppSuelta);
 // Medical History
 // IMPORTANTE: La ruta específica '/patient/:numeroId' debe ir ANTES de '/:historiaId' para evitar conflictos
 router.get('/medical-history/patient/:numeroId', videoController.getPatientHistory);
+// Resumen de la historia post-incapacidad que subió el paciente (lo arma BSL-PLATAFORMA2).
+router.get('/medical-history/:historiaId/resumen-postincapacidad', videoController.getResumenPostincapacidad);
 router.get('/medical-history/:historiaId', videoController.getMedicalHistory);
 router.post('/medical-history', videoController.updateMedicalHistory);
 
